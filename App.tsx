@@ -32,9 +32,11 @@ import UpdatePopup from './src/components/UpdatePopup';
 import { useUpdatePopup } from './src/hooks/useUpdatePopup';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
+
 import UpdateService from './src/services/updateService';
 import { memoryMonitorService } from './src/services/memoryMonitorService';
 import { aiService } from './src/services/aiService';
+import { initializeServices } from './src/initializeServices';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -91,25 +93,28 @@ const ThemedApp = () => {
         // Check onboarding status
         const onboardingCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
         setHasCompletedOnboarding(onboardingCompleted === 'true');
-        
+
         // Initialize update service
         await UpdateService.initialize();
-        
+
         // Initialize memory monitoring service to prevent OutOfMemoryError
         memoryMonitorService; // Just accessing it starts the monitoring
         console.log('Memory monitoring service initialized');
-        
+
         // Initialize AI service
         await aiService.initialize();
         console.log('AI service initialized');
-        
+
+        // Initialize notificationService and other late-initialized services
+        initializeServices();
+
       } catch (error) {
         console.error('Error initializing app:', error);
         // Default to showing onboarding if we can't check
         setHasCompletedOnboarding(false);
       }
     };
-    
+
     initializeApp();
   }, []);
   

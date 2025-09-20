@@ -57,14 +57,21 @@ class NotificationService {
   private lastSyncTime: number = 0;
   private readonly MIN_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes minimum between syncs
   
+  private _initialized = false;
   private constructor() {
     // Initialize notifications
     this.configureNotifications();
     this.loadSettings();
     this.loadScheduledNotifications();
-    this.setupLibraryIntegration();
+    // Do NOT call setupLibraryIntegration here to avoid circular dependency
     this.setupBackgroundSync();
     this.setupAppStateHandling();
+  }
+
+  public init() {
+    if (this._initialized) return;
+    this._initialized = true;
+    this.setupLibraryIntegration();
   }
 
   static getInstance(): NotificationService {
@@ -508,7 +515,7 @@ class NotificationService {
       // Reduced logging verbosity
       // logger.log(`[NotificationService] Successfully synced notifications for ${syncedCount}/${allTraktShows.size} Trakt shows`);
     } catch (error) {
-      logger.error('[NotificationService] Error syncing Trakt notifications:', error);
+      logger.warn('[NotificationService] Error syncing Trakt notifications:', error);
     }
   }
 
