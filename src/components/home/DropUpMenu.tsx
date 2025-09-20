@@ -33,11 +33,9 @@ interface DropUpMenuProps {
   onClose: () => void;
   item: StreamingContent;
   onOptionSelect: (option: string) => void;
-  isSaved?: boolean; // allow parent to pass saved status directly
-  isWatched?: boolean; // allow parent to pass watched status directly
 }
 
-export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: isSavedProp, isWatched: isWatchedProp }: DropUpMenuProps) => {
+export const DropUpMenu = ({ visible, onClose, item, onOptionSelect }: DropUpMenuProps) => {
   const translateY = useSharedValue(300);
   const opacity = useSharedValue(0);
   const isDarkMode = useColorScheme() === 'dark';
@@ -89,18 +87,15 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
     borderTopRightRadius: 24,
   }));
 
-  // Robustly determine if the item is in the library (saved)
-  const isSaved = typeof isSavedProp === 'boolean' ? isSavedProp : !!item.inLibrary;
-  const isWatched = !!isWatchedProp;
   const menuOptions = [
     {
-      icon: isSaved ? 'bookmark' : 'bookmark-border',
-      label: isSaved ? 'Remove from Library' : 'Add to Library',
+      icon: item.inLibrary ? 'bookmark' : 'bookmark-border',
+      label: item.inLibrary ? 'Remove from Library' : 'Add to Library',
       action: 'library'
     },
     {
       icon: 'check-circle',
-      label: isWatched ? 'Mark as Unwatched' : 'Mark as Watched',
+      label: 'Mark as Watched',
       action: 'watched'
     },
     {
