@@ -74,6 +74,13 @@ export interface AppSettings {
   trailerMuted: boolean; // Default to muted for better user experience
   // AI
   aiChatEnabled: boolean; // Enable/disable Ask AI and AI features
+
+  // Appearance: Filler episode marking
+  showFillerMarking: boolean; // Show filler/mixed/canon badges on episodes
+
+  // Playback: Auto-skip filler/mixed
+  autoSkipFiller: boolean; // Auto-skip "filler" episodes
+  autoSkipMixed: boolean; // Auto-skip "mixed" episodes
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -120,6 +127,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   trailerMuted: true, // Default to muted for better user experience
   // AI
   aiChatEnabled: false,
+
+  // Appearance: Filler episode marking
+  showFillerMarking: true,
+
+  // Playback: Auto-skip filler/mixed
+  autoSkipFiller: true,
+  autoSkipMixed: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

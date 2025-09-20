@@ -6,6 +6,8 @@ import { tmdbService } from '../services/tmdbService';
 import { cacheService } from '../services/cacheService';
 import { localScraperService, ScraperInfo } from '../services/localScraperService';
 import { Cast, Episode, GroupedEpisodes, GroupedStreams } from '../types/metadata';
+import { fetchFillerEpisodes } from '../services/animeFillerService.native';
+import { normalizeAnimeTitleForFillerApi } from '../utils/animeTitleUtils';
 import { TMDBService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { usePersistentSeasons } from './usePersistentSeasons';
@@ -598,6 +600,32 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         
         // Group addon episodes by season
         const groupedAddonEpisodes: GroupedEpisodes = {};
+        // AnimeFiller integration: fetch filler data if anime
+        let fillerEpisodes: { episode: number; type: 'filler' | 'mixed' | 'canon' }[] = [];
+        if (__DEV__) {
+          console.log('🍥 [AnimeFiller] Checking if series is anime for filler lookup...');
+          console.log('🍥 [AnimeFiller] metadata.name:', metadata?.name);
+          console.log('🍥 [AnimeFiller] metadata.genres:', metadata?.genres);
+          console.log('🍥 [AnimeFiller] metadata.type:', metadata?.type);
+        }
+  const isAnime = (metadata?.genres || []).some((g: string) => g.toLowerCase().includes('animation')) || (metadata?.type?.toLowerCase() === 'animation');
+        if (__DEV__) {
+          console.log(`🍥 [AnimeFiller] isAnime: ${isAnime}`);
+        }
+        if (isAnime && metadata?.name) {
+          const normalizedTitle = normalizeAnimeTitleForFillerApi(metadata.name);
+          if (__DEV__) {
+            console.log(`🍥 [AnimeFiller] Fetching filler data for: ${normalizedTitle}`);
+          }
+          fillerEpisodes = await fetchFillerEpisodes(normalizedTitle);
+          if (__DEV__) {
+            console.log(`🍥 [AnimeFiller] Fetched ${fillerEpisodes.length} filler episodes for: ${normalizedTitle}`);
+            if (fillerEpisodes.length > 0) {
+              console.log('🍥 [AnimeFiller] Example filler episode:', fillerEpisodes[0]);
+            }
+            console.log('🍥 [AnimeFiller] All fetched filler episodes:', fillerEpisodes);
+          }
+        }
         
                  addonVideos.forEach((video: any) => {
           const seasonNumber = video.season;
@@ -611,6 +639,17 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           }
           
           // Convert addon episode format to our Episode interface
+          let fillerType: 'filler' | 'mixed' | 'canon' | undefined = undefined;
+          if (seasonNumber === 1 && fillerEpisodes.length > 0) {
+            // AnimeFiller API only supports season 1 (most anime are single season)
+            const match = fillerEpisodes.find(f => f.episode === episodeNumber);
+            if (match) {
+              fillerType = match.type;
+              if (__DEV__) {
+                console.log(`🍥 [AnimeFiller] Attached fillerType '${fillerType}' to episode S${seasonNumber}E${episodeNumber}`);
+              }
+            }
+          }
           const episode: Episode = {
             id: video.id,
             name: video.name || video.title || `Episode ${episodeNumber}`,
@@ -623,9 +662,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             runtime: undefined,
             episodeString: `S${seasonNumber.toString().padStart(2, '0')}E${episodeNumber.toString().padStart(2, '0')}`,
             stremioId: video.id,
-            season_poster_path: null
+            season_poster_path: null,
+            fillerType
           };
-          
           groupedAddonEpisodes[seasonNumber].push(episode);
         });
         

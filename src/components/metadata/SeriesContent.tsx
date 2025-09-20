@@ -498,6 +498,29 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
   // Vertical layout episode card (traditional)
   const renderVerticalEpisodeCard = (episode: Episode) => {
+    // Filler badge color and label
+    let fillerBadge: React.ReactNode = null;
+    if (settings?.showFillerMarking !== false) {
+      if (episode.fillerType === 'filler') {
+        fillerBadge = (
+          <View style={[styles.fillerBadge, { backgroundColor: '#e57373' }]}> 
+            <Text style={styles.fillerBadgeText}>FILLER</Text>
+          </View>
+        );
+      } else if (episode.fillerType === 'mixed') {
+        fillerBadge = (
+          <View style={[styles.fillerBadge, { backgroundColor: '#ffd54f' }]}> 
+            <Text style={styles.fillerBadgeText}>MIXED</Text>
+          </View>
+        );
+      } else if (episode.fillerType === 'canon') {
+        fillerBadge = (
+          <View style={[styles.fillerBadge, { backgroundColor: '#81c784' }]}> 
+            <Text style={styles.fillerBadgeText}>CANON</Text>
+          </View>
+        );
+      }
+    }
     let episodeImage = EPISODE_PLACEHOLDER;
     if (episode.still_path) {
       // Check if still_path is already a full URL
@@ -568,6 +591,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             style={styles.episodeImage}
             contentFit="cover"
           />
+          {/* Filler badge in top-left corner */}
+          {fillerBadge && (
+            <View style={styles.fillerBadgeTopLeft}>{fillerBadge}</View>
+          )}
           <View style={styles.episodeNumberBadge}>
             <Text style={styles.episodeNumberText}>{episodeString}</Text>
           </View>
@@ -582,7 +609,7 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             </View>
           )}
           {progressPercent >= 85 && (
-            <View style={[styles.completedBadge, { backgroundColor: currentTheme.colors.primary }]}>
+            <View style={[styles.completedBadge, { backgroundColor: currentTheme.colors.primary }]}> 
               <MaterialIcons name="check" size={12} color={currentTheme.colors.white} />
             </View>
           )}
@@ -648,6 +675,29 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 
   // Horizontal layout episode card (Netflix-style)
   const renderHorizontalEpisodeCard = (episode: Episode) => {
+    // Filler badge color and label
+    let fillerBadge: React.ReactNode = null;
+    if (settings?.showFillerMarking !== false) {
+      if (episode.fillerType === 'filler') {
+        fillerBadge = (
+          <View style={[styles.fillerBadge, { backgroundColor: '#e57373' }]}> 
+            <Text style={styles.fillerBadgeText}>FILLER</Text>
+          </View>
+        );
+      } else if (episode.fillerType === 'mixed') {
+        fillerBadge = (
+          <View style={[styles.fillerBadge, { backgroundColor: '#ffd54f' }]}> 
+            <Text style={styles.fillerBadgeText}>MIXED</Text>
+          </View>
+        );
+      } else if (episode.fillerType === 'canon') {
+        fillerBadge = (
+          <View style={[styles.fillerBadge, { backgroundColor: '#81c784' }]}> 
+            <Text style={styles.fillerBadgeText}>CANON</Text>
+          </View>
+        );
+      }
+    }
     let episodeImage = EPISODE_PLACEHOLDER;
     if (episode.still_path) {
       // Check if still_path is already a full URL
@@ -728,6 +778,10 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
               borderRadius: 17,
             }}
           />
+          {/* Filler badge in top-left corner */}
+          {fillerBadge && (
+            <View style={styles.fillerBadgeTopLeft}>{fillerBadge}</View>
+          )}
         </View>
 
         {/* Background Image */}
@@ -756,6 +810,8 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
             <Text style={[styles.episodeNumberHorizontal, isTablet && styles.episodeNumberHorizontalTablet]}>{episodeString}</Text>
             </View>
             
+            {/* Filler Badge */}
+            {fillerBadge}
             {/* Episode Title */}
             <Text style={[styles.episodeTitleHorizontal, isTablet && styles.episodeTitleHorizontalTablet]} numberOfLines={2}>
               {episode.name}
@@ -907,6 +963,25 @@ export const SeriesContent: React.FC<SeriesContentProps> = ({
 };
 
 const styles = StyleSheet.create({
+  fillerBadgeTopLeft: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    zIndex: 10,
+  },
+  fillerBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 4,
+    marginBottom: 2,
+  },
+  fillerBadgeText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 10,
+    letterSpacing: 1,
+  },
   container: {
     flex: 1,
     paddingVertical: 16,

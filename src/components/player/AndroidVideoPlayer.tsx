@@ -374,29 +374,33 @@ const AndroidVideoPlayer: React.FC = () => {
   })();
 
   // Find next episode for series
+  const { settings } = useSettings();
   const nextEpisode = useMemo(() => {
     try {
       if ((type as any) !== 'series' || !season || !episode) return null;
       const allEpisodes = Object.values(groupedEpisodes || {}).flat() as any[];
       if (!allEpisodes || allEpisodes.length === 0) return null;
-      
-      // First try next episode in same season
-      let nextEp = allEpisodes.find((ep: any) => 
-        ep.season_number === season && ep.episode_number === episode + 1
-      );
-      
-      // If not found, try first episode of next season
-      if (!nextEp) {
-        nextEp = allEpisodes.find((ep: any) => 
-          ep.season_number === season + 1 && ep.episode_number === 1
-        );
+
+      // Find the next episode index
+      let nextEpIdx = allEpisodes.findIndex((ep: any) => ep.season_number === season && ep.episode_number === episode + 1);
+      if (nextEpIdx === -1) {
+        nextEpIdx = allEpisodes.findIndex((ep: any) => ep.season_number === season + 1 && ep.episode_number === 1);
       }
-      
-      return nextEp;
+      // Auto-skip logic based on settings
+      while (nextEpIdx !== -1 && allEpisodes[nextEpIdx]) {
+        const fillerType = allEpisodes[nextEpIdx].fillerType;
+        if ((fillerType === 'filler' && settings?.autoSkipFiller) || (fillerType === 'mixed' && settings?.autoSkipMixed)) {
+          nextEpIdx++;
+        } else {
+          break;
+        }
+        if (!allEpisodes[nextEpIdx]) return null;
+      }
+      return nextEpIdx !== -1 ? allEpisodes[nextEpIdx] : null;
     } catch {
       return null;
     }
-  }, [type, season, episode, groupedEpisodes]);
+  }, [type, season, episode, groupedEpisodes, settings]);
   
   // Small offset (in seconds) used to avoid seeking to the *exact* end of the
   // file which triggers the `onEnd` callback and causes playback to restart.

@@ -500,6 +500,48 @@ const SettingsScreen: React.FC = () => {
                   onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
                 />
               )}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Show Filler Marking"
+              description="Show FILLER, MIXED, CANON badges on anime episodes"
+              icon="label"
+              renderControl={() => (
+                <Switch
+                  value={settings?.showFillerMarking ?? true}
+                  onValueChange={(value) => updateSetting('showFillerMarking', value)}
+                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                  thumbColor={settings?.showFillerMarking ? '#fff' : '#f4f3f4'}
+                />
+              )}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Auto-skip Filler Episodes"
+              description="Automatically skip FILLER episodes when playing next"
+              icon="skip-next"
+              renderControl={() => (
+                <Switch
+                  value={settings?.autoSkipFiller ?? true}
+                  onValueChange={(value) => updateSetting('autoSkipFiller', value)}
+                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                  thumbColor={settings?.autoSkipFiller ? '#fff' : '#f4f3f4'}
+                />
+              )}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Auto-skip Mixed Episodes"
+              description="Automatically skip MIXED episodes when playing next"
+              icon="skip-next"
+              renderControl={() => (
+                <Switch
+                  value={settings?.autoSkipMixed ?? false}
+                  onValueChange={(value) => updateSetting('autoSkipMixed', value)}
+                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                  thumbColor={settings?.autoSkipMixed ? '#fff' : '#f4f3f4'}
+                />
+              )}
               isLast={true}
               isTablet={isTablet}
             />

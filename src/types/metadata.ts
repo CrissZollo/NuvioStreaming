@@ -57,6 +57,10 @@ export interface GroupedStreams {
 export interface Episode extends TMDBEpisode {
   stremioId?: string;
   episodeString: string;
+  /**
+   * Filler type from AnimeFiller API: 'filler', 'mixed', 'canon', or undefined if not tagged
+   */
+  fillerType?: 'filler' | 'mixed' | 'canon';
 }
 
 export interface GroupedEpisodes {
