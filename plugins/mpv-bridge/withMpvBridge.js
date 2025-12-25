@@ -1,4 +1,4 @@
-const { withDangerousMod, withMainApplication, withMainActivity } = require('@expo/config-plugins');
+const { withDangerousMod, withMainApplication, withMainActivity, withAppBuildGradle } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -70,6 +70,48 @@ function withMpvMainActivity(config) {
 }
 
 /**
+ * Add MPV library dependency and fix duplicate class conflicts in build.gradle
+ */
+function withMpvBuildGradle(config) {
+    return withAppBuildGradle(config, async (config) => {
+        let contents = config.modResults.contents;
+
+        // Add androidsvg exclusion to fix duplicate class conflict (before dependencies block)
+        const androidsvgExclusion = `// Exclude duplicate androidsvg library (androidsvg vs androidsvg-aar conflict)
+configurations.all {
+    exclude group: 'com.caverock', module: 'androidsvg'
+}`;
+        if (!contents.includes("exclude group: 'com.caverock', module: 'androidsvg'")) {
+            // Find the dependencies block and add exclusion before it
+            const dependenciesMatch = contents.match(/dependencies\s*\{/);
+            if (dependenciesMatch) {
+                contents = contents.slice(0, dependenciesMatch.index) +
+                    androidsvgExclusion + '\n\n' +
+                    contents.slice(dependenciesMatch.index);
+                console.log('[mpv-bridge] Added androidsvg exclusion to fix duplicate class conflict');
+            }
+        }
+
+        // Add MPV library dependency if not present
+        const mpvDependency = "implementation 'dev.jdtech.mpv:libmpv:0.2.0'";
+        if (!contents.includes('dev.jdtech.mpv:libmpv')) {
+            // Find the dependencies block and add MPV dependency
+            const dependenciesMatch = contents.match(/dependencies\s*\{/);
+            if (dependenciesMatch) {
+                const insertIndex = dependenciesMatch.index + dependenciesMatch[0].length;
+                contents = contents.slice(0, insertIndex) +
+                    `\n    // MPV library for video playback\n    ${mpvDependency}` +
+                    contents.slice(insertIndex);
+                console.log('[mpv-bridge] Added MPV library dependency to build.gradle');
+            }
+        }
+
+        config.modResults.contents = contents;
+        return config;
+    });
+}
+
+/**
  * Main plugin function
  */
 function withMpvBridge(config) {
@@ -87,6 +129,9 @@ function withMpvBridge(config) {
 
     // Modify MainActivity if needed
     config = withMpvMainActivity(config);
+
+    // Add MPV library dependency to build.gradle
+    config = withMpvBuildGradle(config);
 
     return config;
 }

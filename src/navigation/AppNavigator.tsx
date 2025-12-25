@@ -16,6 +16,8 @@ import { Stream } from '../types/streams';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { PostHogProvider } from 'posthog-react-native';
+import { TVProvider, useIsTV } from '../contexts/TVContext';
+import TVNavigator from './TVNavigator';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback
 let GlassViewComp: any = null;
@@ -1072,6 +1074,19 @@ const customFadeInterpolator = ({ current, layouts }: any) => {
   };
 };
 
+// Conditional Main Screen - Shows TVNavigator on Android TV, MainTabs on phones/tablets
+const MainScreen = () => {
+  const isTV = useIsTV();
+
+  // On Android TV, use the TV-optimized side-rail navigation
+  if (isTV && Platform.OS === 'android') {
+    return <TVNavigator />;
+  }
+
+  // On phones and tablets, use the standard bottom tab navigation
+  return <MainTabs />;
+};
+
 // Stack Navigator
 const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => {
   const { currentTheme } = useTheme();
@@ -1169,7 +1184,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="MainTabs"
-              component={MainTabs as any}
+              component={MainScreen as any}
               options={{
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
@@ -1606,16 +1621,18 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
 };
 
 const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => (
-  <PostHogProvider
-    apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C"
-    options={{
-      host: "https://us.i.posthog.com",
-    }}
-  >
-    <LoadingProvider>
-      <InnerNavigator initialRouteName={initialRouteName} />
-    </LoadingProvider>
-  </PostHogProvider>
+  <TVProvider>
+    <PostHogProvider
+      apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C"
+      options={{
+        host: "https://us.i.posthog.com",
+      }}
+    >
+      <LoadingProvider>
+        <InnerNavigator initialRouteName={initialRouteName} />
+      </LoadingProvider>
+    </PostHogProvider>
+  </TVProvider>
 );
 
 export default AppNavigator;

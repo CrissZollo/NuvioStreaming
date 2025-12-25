@@ -23,12 +23,6 @@ class MPVView @JvmOverloads constructor(
     private var isPaused: Boolean = true
     private var surface: Surface? = null
     private var httpHeaders: Map<String, String>? = null
-    
-    // Hardware decoding setting (default: false = software decoding)
-    var useHardwareDecoding: Boolean = false
-    
-    // Flag to track if onLoad has been fired (prevents multiple fires for HLS streams)
-    private var hasLoadEventFired: Boolean = false
 
     // Event listener for React Native
     var onLoadCallback: ((duration: Double, width: Int, height: Int) -> Unit)? = null
@@ -57,8 +51,8 @@ class MPVView @JvmOverloads constructor(
             isMpvInitialized = true
             
             // If a data source was set before surface was ready, load it now
-            // Headers are already applied in initOptions() before init()
             pendingDataSource?.let { url ->
+                applyHttpHeaders()
                 loadFile(url)
                 pendingDataSource = null
             }
@@ -93,70 +87,67 @@ class MPVView @JvmOverloads constructor(
     }
 
     private fun initOptions() {
+        // Mobile-optimized profile
         MPVLib.setOptionString("profile", "fast")
         MPVLib.setOptionString("vo", "gpu")
         MPVLib.setOptionString("gpu-context", "android")
         MPVLib.setOptionString("opengl-es", "yes")
         
-        val hwdecValue = if (useHardwareDecoding) "mediacodec,mediacodec-copy" else "no"
-        Log.d(TAG, "Hardware decoding: $useHardwareDecoding, hwdec value: $hwdecValue")
-        MPVLib.setOptionString("hwdec", hwdecValue)
-        MPVLib.setOptionString("hwdec-codecs", "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1")
+        // Hardware decoding - use mediacodec-copy to allow subtitle overlay
+        // 'mediacodec-copy' copies frames to CPU memory which enables subtitle blending
+        MPVLib.setOptionString("hwdec", "auto")
+        MPVLib.setOptionString("hwdec-codecs", "all")
         
-        MPVLib.setOptionString("target-colorspace-hint", "yes")
-        MPVLib.setOptionString("vd-lavc-film-grain", "cpu")
-        
+        // Audio output
         MPVLib.setOptionString("ao", "audiotrack,opensles")
         
-        MPVLib.setOptionString("demuxer-max-bytes", "67108864")
-        MPVLib.setOptionString("demuxer-max-back-bytes", "33554432")
+        // Network caching for streaming
+        MPVLib.setOptionString("demuxer-max-bytes", "67108864") // 64MB
+        MPVLib.setOptionString("demuxer-max-back-bytes", "33554432") // 32MB
         MPVLib.setOptionString("cache", "yes")
         MPVLib.setOptionString("cache-secs", "30")
         
-        MPVLib.setOptionString("network-timeout", "60")
-        MPVLib.setOptionString("ytdl", "no")
+        // Network options
+        MPVLib.setOptionString("network-timeout", "60") // 60 second timeout
         
-        applyHttpHeadersAsOptions()
+        // Subtitle configuration - CRITICAL for Android
+        MPVLib.setOptionString("sub-auto", "fuzzy") // Auto-load subtitles
+        MPVLib.setOptionString("sub-visibility", "yes") // Make subtitles visible by default
+        MPVLib.setOptionString("sub-font-size", "48") // Larger font size for mobile readability
+        MPVLib.setOptionString("sub-pos", "95") // Position at bottom (0-100, 100 = very bottom)
+        MPVLib.setOptionString("sub-color", "#FFFFFFFF") // White color
+        MPVLib.setOptionString("sub-border-size", "3") // Thicker border for readability
+        MPVLib.setOptionString("sub-border-color", "#FF000000") // Black border
+        MPVLib.setOptionString("sub-shadow-offset", "2") // Add shadow for better visibility
+        MPVLib.setOptionString("sub-shadow-color", "#80000000") // Semi-transparent black shadow
         
-        MPVLib.setOptionString("tls-verify", "no")
-        MPVLib.setOptionString("http-reconnect", "yes")
-        MPVLib.setOptionString("stream-reconnect", "yes")
-        
-        MPVLib.setOptionString("demuxer-lavf-o", "live_start_index=0,prefer_x_start=1,http_persistent=0")
-        MPVLib.setOptionString("demuxer-seekable-cache", "yes")
-        MPVLib.setOptionString("force-seekable", "yes")
-        
-        MPVLib.setOptionString("demuxer-lavf-probesize", "10000000")
-        MPVLib.setOptionString("demuxer-lavf-analyzeduration", "10")
-        
-        MPVLib.setOptionString("sub-auto", "fuzzy")
-        MPVLib.setOptionString("sub-visibility", "yes")
-        MPVLib.setOptionString("sub-font-size", "48")
-        MPVLib.setOptionString("sub-pos", "95")
-        MPVLib.setOptionString("sub-color", "#FFFFFFFF")
-        MPVLib.setOptionString("sub-border-size", "3")
-        MPVLib.setOptionString("sub-border-color", "#FF000000")
-        MPVLib.setOptionString("sub-shadow-offset", "2")
-        MPVLib.setOptionString("sub-shadow-color", "#80000000")
-        
+        // Font configuration - point to Android system fonts for all language support
         MPVLib.setOptionString("osd-fonts-dir", "/system/fonts")
         MPVLib.setOptionString("sub-fonts-dir", "/system/fonts")
-        MPVLib.setOptionString("sub-font", "Roboto")
+        MPVLib.setOptionString("sub-font", "Roboto") // Default fallback font
+        // Allow embedded fonts in ASS/SSA but fallback to system fonts
         MPVLib.setOptionString("embeddedfonts", "yes")
         
-        MPVLib.setOptionString("sub-codepage", "auto")
+        // Language/encoding support for various subtitle formats
+        MPVLib.setOptionString("sub-codepage", "auto") // Auto-detect encoding (supports UTF-8, Latin, CJK, etc.)
         
-        MPVLib.setOptionString("osc", "no")
+        MPVLib.setOptionString("osc", "no") // Disable on screen controller
         MPVLib.setOptionString("osd-level", "1")
     
+        // Critical for subtitle rendering on Android GPU
+        // blend-subtitles=no lets the GPU renderer handle subtitle overlay properly
         MPVLib.setOptionString("blend-subtitles", "no")
         MPVLib.setOptionString("sub-use-margins", "no")
+        // Use 'scale' to allow ASS styling but with our scale and font overrides
+        // This preserves styled subtitles while having font fallbacks
         MPVLib.setOptionString("sub-ass-override", "scale")
         MPVLib.setOptionString("sub-scale", "1.0")
-        MPVLib.setOptionString("sub-fix-timing", "yes")
+        MPVLib.setOptionString("sub-fix-timing", "yes") // Fix timing for SRT subtitles
         
-        MPVLib.setOptionString("sid", "auto")
+        // Force subtitle rendering
+        MPVLib.setOptionString("sid", "auto") // Auto-select subtitle track
         
+        // Disable terminal/input
         MPVLib.setOptionString("terminal", "no")
         MPVLib.setOptionString("input-default-bindings", "no")
     }
@@ -186,8 +177,6 @@ class MPVView @JvmOverloads constructor(
 
     private fun loadFile(url: String) {
         Log.d(TAG, "Loading file: $url")
-        // Reset load event flag for new file
-        hasLoadEventFired = false
         MPVLib.command(arrayOf("loadfile", url))
     }
 
@@ -195,7 +184,8 @@ class MPVView @JvmOverloads constructor(
 
     fun setDataSource(url: String) {
         if (isMpvInitialized) {
-            // Headers were already set during initialization in initOptions()
+            // Apply headers before loading the file
+            applyHttpHeaders()
             loadFile(url)
         } else {
             pendingDataSource = url
@@ -207,22 +197,13 @@ class MPVView @JvmOverloads constructor(
         Log.d(TAG, "Headers set: $headers")
     }
 
-    private fun applyHttpHeadersAsOptions() {
-        // Always set user-agent (this works reliably)
-        val userAgent = httpHeaders?.get("User-Agent") 
-            ?: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        
-        Log.d(TAG, "Setting User-Agent: $userAgent")
-        MPVLib.setOptionString("user-agent", userAgent)
-        
-        // Additionally, set other headers via http-header-fields if present
-        // This is needed for streams that require Referer, Origin, Cookie, etc.
+    private fun applyHttpHeaders() {
         httpHeaders?.let { headers ->
-            val otherHeaders = headers.filterKeys { it != "User-Agent" }
-            if (otherHeaders.isNotEmpty()) {
-                // Format as comma-separated "Key: Value" pairs
-                val headerString = otherHeaders.map { (key, value) -> "$key: $value" }.joinToString(",")
-                Log.d(TAG, "Setting additional headers: $headerString")
+            if (headers.isNotEmpty()) {
+                // Format headers for MPV: comma-separated "Key: Value" pairs
+                val headerList = headers.map { (key, value) -> "$key: $value" }
+                val headerString = headerList.joinToString(",")
+                Log.d(TAG, "Applying HTTP headers: $headerString")
                 MPVLib.setOptionString("http-header-fields", headerString)
             }
         }
@@ -388,18 +369,9 @@ class MPVView @JvmOverloads constructor(
                 onProgressCallback?.invoke(value, duration)
             }
             "duration/full", "duration" -> {
-                // Only fire onLoad once when video dimensions are available
-                // For HLS streams, duration updates incrementally as segments are fetched
-                if (!hasLoadEventFired) {
-                    val width = MPVLib.getPropertyInt("width") ?: 0
-                    val height = MPVLib.getPropertyInt("height") ?: 0
-                    // Wait until we have valid dimensions before firing onLoad
-                    if (width > 0 && height > 0 && value > 0) {
-                        hasLoadEventFired = true
-                        Log.d(TAG, "Firing onLoad event: duration=$value, width=$width, height=$height")
-                        onLoadCallback?.invoke(value, width, height)
-                    }
-                }
+                val width = MPVLib.getPropertyInt("width") ?: 0
+                val height = MPVLib.getPropertyInt("height") ?: 0
+                onLoadCallback?.invoke(value, width, height)
             }
         }
     }

@@ -25,6 +25,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { mmkvStorage } from '../services/mmkvStorage';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from '../components/tv/Focusable';
 
 const { width, height } = Dimensions.get('window');
 
@@ -168,6 +170,7 @@ const OnboardingScreen = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<Animated.FlatList<OnboardingSlide>>(null);
   const scrollX = useSharedValue(0);
+  const isTV = useIsTV();
 
   const updateIndex = (index: number) => {
     setCurrentIndex(index);
@@ -276,20 +279,31 @@ const OnboardingScreen = () => {
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" translucent />
 
       <View style={styles.fullScreenContainer}>
-        {/* Header */}
-        <Animated.View
-          entering={FadeIn.delay(300).duration(600)}
-          style={styles.header}
-        >
-          <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
+        {/* Header - hidden on TV since skip is in footer */}
+        {!isTV && (
+          <Animated.View
+            entering={FadeIn.delay(300).duration(600)}
+            style={styles.header}
+          >
+            <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
+              <Text style={styles.skipText}>Skip</Text>
+            </TouchableOpacity>
 
-          {/* Smooth Progress Bar */}
-          <View style={styles.progressContainer}>
-            <Animated.View style={[styles.progressBar, progressStyle]} />
+            {/* Smooth Progress Bar */}
+            <View style={styles.progressContainer}>
+              <Animated.View style={[styles.progressBar, progressStyle]} />
+            </View>
+          </Animated.View>
+        )}
+
+        {/* TV Progress indicator */}
+        {isTV && (
+          <View style={styles.tvProgressHeader}>
+            <Text style={styles.tvProgressText}>
+              {currentIndex + 1} / {onboardingData.length}
+            </Text>
           </View>
-        </Animated.View>
+        )}
 
         {/* Slides */}
         <Animated.FlatList
@@ -307,6 +321,10 @@ const OnboardingScreen = () => {
           snapToAlignment="start"
           bounces={false}
           style={{ flex: 1 }}
+          // Disable scroll on TV - navigation is controlled by buttons
+          scrollEnabled={!isTV}
+          // Prevent FlatList from capturing focus on TV
+          focusable={false}
         />
 
         {/* Footer */}
@@ -321,19 +339,49 @@ const OnboardingScreen = () => {
             ))}
           </View>
 
-          {/* Animated Button */}
-          <TouchableOpacity
-            onPress={handleNext}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            activeOpacity={1}
-          >
-            <Animated.View style={[styles.button, buttonStyle]}>
-              <Text style={styles.buttonText}>
-                {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Continue'}
-              </Text>
-            </Animated.View>
-          </TouchableOpacity>
+          {/* Animated Button - TV compatible */}
+          {isTV ? (
+            <View style={styles.tvButtonContainer}>
+              <Focusable
+                onPress={handleSkip}
+                style={styles.tvButton}
+                borderRadius={16}
+                focusScale={1.05}
+              >
+                {(focused) => (
+                  <Text style={[styles.tvButtonText, focused && styles.tvButtonTextFocused]}>
+                    Skip
+                  </Text>
+                )}
+              </Focusable>
+              <Focusable
+                onPress={handleNext}
+                autoFocus
+                style={styles.tvButton}
+                borderRadius={16}
+                focusScale={1.05}
+              >
+                {(focused) => (
+                  <Text style={[styles.tvButtonText, focused && styles.tvButtonTextFocused]}>
+                    {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Continue'}
+                  </Text>
+                )}
+              </Focusable>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={handleNext}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              activeOpacity={1}
+            >
+              <Animated.View style={[styles.button, buttonStyle]}>
+                <Text style={styles.buttonText}>
+                  {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Continue'}
+                </Text>
+              </Animated.View>
+            </TouchableOpacity>
+          )}
         </Animated.View>
       </View>
     </View>
@@ -428,6 +476,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingVertical: 18,
+    paddingHorizontal: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -436,6 +485,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0A0A0A',
     letterSpacing: 0.3,
+  },
+  tvButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  tvButton: {
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 160,
+  },
+  tvButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  tvButtonTextFocused: {
+    color: '#0A0A0A',
+  },
+  tvProgressHeader: {
+    paddingVertical: 20,
+    paddingHorizontal: 48,
+    alignItems: 'flex-end',
+  },
+  tvProgressText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
 });
 

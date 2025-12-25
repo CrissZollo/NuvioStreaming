@@ -30,6 +30,8 @@ import { SkeletonFeatured } from './SkeletonLoaders';
 import { hasValidLogoFormat, isTmdbUrl } from '../../utils/logoUtils';
 import { logger } from '../../utils/logger';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 
 interface FeaturedContentProps {
   featuredContent: StreamingContent | null;
@@ -141,6 +143,7 @@ const NoFeaturedContent = ({ onRetry }: { onRetry?: () => void }) => {
 const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loading, onRetry }: FeaturedContentProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
+  const isTVDevice = useIsTV();
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
@@ -418,19 +421,25 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
   if (isTablet) {
     // Tablet layout: full-width image with overlaid content
+    // On TV, use View instead of TouchableOpacity to allow focus to reach inner buttons
+    const TabletImageContainer = isTVDevice ? View : TouchableOpacity;
+    const tabletImageProps = isTVDevice ? {} : {
+      activeOpacity: 0.95,
+      onPress: () => {
+        navigation.navigate('Metadata', {
+          id: featuredContent.id,
+          type: featuredContent.type
+        });
+      }
+    };
+
     return (
       <Animated.View
         entering={FadeIn.duration(400).easing(Easing.out(Easing.cubic))}
         style={[styles.tabletContainer as ViewStyle, { height: tabletHeroHeight }]}
       >
-        <TouchableOpacity
-          activeOpacity={0.95}
-          onPress={() => {
-            navigation.navigate('Metadata', {
-              id: featuredContent.id,
-              type: featuredContent.type
-            });
-          }}
+        <TabletImageContainer
+          {...tabletImageProps}
           style={styles.tabletFullContainer as ViewStyle}
         >
           <Animated.View style={[styles.tabletImageWrapper, posterAnimatedStyle]}>
@@ -443,7 +452,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
               <LinearGradient
                 colors={[
                   'transparent',
-                  'transparent', 
+                  'transparent',
                   'rgba(0,0,0,0.3)',
                   'rgba(0,0,0,0.7)',
                   'rgba(0,0,0,0.95)'
@@ -453,7 +462,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
               />
             </ImageBackground>
           </Animated.View>
-        </TouchableOpacity>
+        </TabletImageContainer>
 
         <Animated.View style={[styles.tabletOverlayContent as ViewStyle, contentAnimatedStyle]}>
           {logoUrl && !logoLoadError ? (
@@ -495,45 +504,121 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
           )}
 
           <Animated.View style={[styles.tabletButtons as ViewStyle, buttonsAnimatedStyle]}>
-            <TouchableOpacity
-              style={[styles.tabletPlayButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
-              onPress={() => {
-                if (featuredContent) {
-                  navigation.navigate('Streams', {
-                    id: featuredContent.id,
-                    type: featuredContent.type
-                  });
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons name="play-arrow" size={28} color={currentTheme.colors.black} />
-              <Text style={[styles.tabletPlayButtonText as TextStyle, { color: currentTheme.colors.black }]}>
-                Play Now
-              </Text>
-            </TouchableOpacity>
+            {isTVDevice ? (
+              <>
+                <Focusable
+                  onPress={() => {
+                    if (featuredContent) {
+                      navigation.navigate('Streams', {
+                        id: featuredContent.id,
+                        type: featuredContent.type
+                      });
+                    }
+                  }}
+                  style={[styles.tabletPlayButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
+                  borderRadius={30}
+                  focusScale={1.08}
+                  animateBackground={false}
+                >
+                  {(focused) => (
+                    <>
+                      <MaterialIcons name="play-arrow" size={28} color={currentTheme.colors.black} />
+                      <Text style={[styles.tabletPlayButtonText as TextStyle, { color: currentTheme.colors.black }]}>
+                        Play Now
+                      </Text>
+                    </>
+                  )}
+                </Focusable>
 
-            <TouchableOpacity
-              style={[styles.tabletSecondaryButton as ViewStyle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.3)' }]}
-              onPress={handleSaveToLibrary}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={currentTheme.colors.white} />
-              <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                {isSaved ? "Saved" : "My List"}
-              </Text>
-            </TouchableOpacity>
+                <Focusable
+                  onPress={handleSaveToLibrary}
+                  style={[styles.tabletSecondaryButton as ViewStyle, { borderColor: 'rgba(255,255,255,0.3)' }]}
+                  borderRadius={25}
+                  focusScale={1.08}
+                >
+                  {(focused) => (
+                    <>
+                      <MaterialIcons
+                        name={isSaved ? "bookmark" : "bookmark-outline"}
+                        size={20}
+                        color={focused ? '#0A0A0A' : currentTheme.colors.white}
+                      />
+                      <Text style={[
+                        styles.tabletSecondaryButtonText as TextStyle,
+                        { color: focused ? '#0A0A0A' : currentTheme.colors.white }
+                      ]}>
+                        {isSaved ? "Saved" : "My List"}
+                      </Text>
+                    </>
+                  )}
+                </Focusable>
 
-            <TouchableOpacity
-              style={[styles.tabletSecondaryButton as ViewStyle, { backgroundColor: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.3)' }]}
-              onPress={handleInfoPress}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons name="info-outline" size={20} color={currentTheme.colors.white} />
-              <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                More Info
-              </Text>
-            </TouchableOpacity>
+                <Focusable
+                  onPress={handleInfoPress}
+                  style={[styles.tabletSecondaryButton as ViewStyle, { borderColor: 'rgba(255,255,255,0.3)' }]}
+                  borderRadius={25}
+                  focusScale={1.08}
+                >
+                  {(focused) => (
+                    <>
+                      <MaterialIcons
+                        name="info-outline"
+                        size={20}
+                        color={focused ? '#0A0A0A' : currentTheme.colors.white}
+                      />
+                      <Text style={[
+                        styles.tabletSecondaryButtonText as TextStyle,
+                        { color: focused ? '#0A0A0A' : currentTheme.colors.white }
+                      ]}>
+                        More Info
+                      </Text>
+                    </>
+                  )}
+                </Focusable>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.tabletPlayButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
+                  onPress={() => {
+                    if (featuredContent) {
+                      navigation.navigate('Streams', {
+                        id: featuredContent.id,
+                        type: featuredContent.type
+                      });
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="play-arrow" size={28} color={currentTheme.colors.black} />
+                  <Text style={[styles.tabletPlayButtonText as TextStyle, { color: currentTheme.colors.black }]}>
+                    Play Now
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.tabletSecondaryButton as ViewStyle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.3)' }]}
+                  onPress={handleSaveToLibrary}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={currentTheme.colors.white} />
+                  <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                    {isSaved ? "Saved" : "My List"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.tabletSecondaryButton as ViewStyle, { backgroundColor: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.3)' }]}
+                  onPress={handleInfoPress}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="info-outline" size={20} color={currentTheme.colors.white} />
+                  <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                    More Info
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </Animated.View>
         </Animated.View>
         
@@ -551,18 +636,24 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
     );
   } else {
     // Phone layout: original vertical stack
+    // On TV, we use a View instead of TouchableOpacity to allow focus to reach inner buttons
+    const ContainerComponent = isTVDevice ? View : TouchableOpacity;
+    const containerProps = isTVDevice ? {} : {
+      activeOpacity: 0.95,
+      onPress: () => {
+        navigation.navigate('Metadata', {
+          id: featuredContent.id,
+          type: featuredContent.type
+        });
+      }
+    };
+
     return (
       <Animated.View
         entering={FadeIn.duration(400).easing(Easing.out(Easing.cubic))}
       >
-        <TouchableOpacity
-          activeOpacity={0.95}
-          onPress={() => {
-            navigation.navigate('Metadata', {
-              id: featuredContent.id,
-              type: featuredContent.type
-            });
-          }}
+        <ContainerComponent
+          {...containerProps}
           style={styles.featuredContainer as ViewStyle}
         >
           <Animated.View style={[styles.imageContainer, posterAnimatedStyle]}>
@@ -589,7 +680,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                   {logoUrl && !logoLoadError ? (
                     <Animated.View style={logoAnimatedStyle}>
                       <FastImage
-                        source={{ 
+                        source={{
                           uri: logoUrl,
                           priority: FastImage.priority.high,
                           cache: FastImage.cacheControl.immutable
@@ -619,51 +710,127 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                 </Animated.View>
 
                 <Animated.View style={[styles.featuredButtons as ViewStyle, buttonsAnimatedStyle]}>
-                  <TouchableOpacity
-                    style={styles.myListButton as ViewStyle}
-                    onPress={handleSaveToLibrary}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={currentTheme.colors.white} />
-                    <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                      {isSaved ? "Saved" : "Save"}
-                    </Text>
-                  </TouchableOpacity>
+                  {isTVDevice ? (
+                    <>
+                      <Focusable
+                        onPress={handleSaveToLibrary}
+                        style={styles.tvHeroButton as ViewStyle}
+                        borderRadius={25}
+                        focusScale={1.08}
+                      >
+                        {(focused) => (
+                          <>
+                            <MaterialIcons
+                              name={isSaved ? "bookmark" : "bookmark-outline"}
+                              size={22}
+                              color={focused ? '#0A0A0A' : currentTheme.colors.white}
+                            />
+                            <Text style={[
+                              styles.tvHeroButtonText as TextStyle,
+                              { color: focused ? '#0A0A0A' : currentTheme.colors.white }
+                            ]}>
+                              {isSaved ? "Saved" : "My List"}
+                            </Text>
+                          </>
+                        )}
+                      </Focusable>
 
-                  <TouchableOpacity
-                    style={[styles.playButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
-                    onPress={() => {
-                      if (featuredContent) {
-                        navigation.navigate('Streams', {
-                          id: featuredContent.id,
-                          type: featuredContent.type
-                        });
-                      }
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
-                    <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
-                      Play
-                    </Text>
-                  </TouchableOpacity>
+                      <Focusable
+                        onPress={() => {
+                          if (featuredContent) {
+                            navigation.navigate('Streams', {
+                              id: featuredContent.id,
+                              type: featuredContent.type
+                            });
+                          }
+                        }}
+                        style={[styles.tvHeroPlayButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
+                        borderRadius={30}
+                        focusScale={1.08}
+                        animateBackground={false}
+                      >
+                        {(focused) => (
+                          <>
+                            <MaterialIcons name="play-arrow" size={28} color={currentTheme.colors.black} />
+                            <Text style={[styles.tvHeroPlayButtonText as TextStyle, { color: currentTheme.colors.black }]}>
+                              Play Now
+                            </Text>
+                          </>
+                        )}
+                      </Focusable>
 
-                  <TouchableOpacity
-                    style={styles.infoButton as ViewStyle}
-                    onPress={handleInfoPress}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
-                    <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                      Info
-                    </Text>
-                  </TouchableOpacity>
+                      <Focusable
+                        onPress={handleInfoPress}
+                        style={styles.tvHeroButton as ViewStyle}
+                        borderRadius={25}
+                        focusScale={1.08}
+                      >
+                        {(focused) => (
+                          <>
+                            <MaterialIcons
+                              name="info-outline"
+                              size={22}
+                              color={focused ? '#0A0A0A' : currentTheme.colors.white}
+                            />
+                            <Text style={[
+                              styles.tvHeroButtonText as TextStyle,
+                              { color: focused ? '#0A0A0A' : currentTheme.colors.white }
+                            ]}>
+                              More Info
+                            </Text>
+                          </>
+                        )}
+                      </Focusable>
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={styles.myListButton as ViewStyle}
+                        onPress={handleSaveToLibrary}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={currentTheme.colors.white} />
+                        <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                          {isSaved ? "Saved" : "Save"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.playButton as ViewStyle, { backgroundColor: currentTheme.colors.white }]}
+                        onPress={() => {
+                          if (featuredContent) {
+                            navigation.navigate('Streams', {
+                              id: featuredContent.id,
+                              type: featuredContent.type
+                            });
+                          }
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
+                        <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
+                          Play
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.infoButton as ViewStyle}
+                        onPress={handleInfoPress}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
+                        <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
+                          Info
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </Animated.View>
               </LinearGradient>
             </ImageBackground>
           </Animated.View>
-        </TouchableOpacity>
-        
+        </ContainerComponent>
+
         {/* Bottom fade to blend with background */}
         <LinearGradient
           colors={[
@@ -826,6 +993,32 @@ const styles = StyleSheet.create({
   infoButtonText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  // TV-specific hero button styles
+  tvHeroButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  tvHeroButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  tvHeroPlayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 30,
+    gap: 8,
+  },
+  tvHeroPlayButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
   },
   // Tablet-specific styles
   tabletContainer: {

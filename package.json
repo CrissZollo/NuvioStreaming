@@ -42,6 +42,7 @@
     "expo-auth-session": "~7.0.8",
     "expo-blur": "~15.0.7",
     "expo-brightness": "~14.0.7",
+    "expo-build-properties": "^1.0.10",
     "expo-clipboard": "~8.0.8",
     "expo-crypto": "~15.0.7",
     "expo-dev-client": "~6.0.15",

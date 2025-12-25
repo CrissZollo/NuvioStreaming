@@ -41,6 +41,7 @@
       "jsEngine": "hermes"
     },
     "android": {
+      "minSdkVersion": 26,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android/mipmap-xxxhdpi/ic_launcher_foreground.png",
         "backgroundColor": "#020404"
@@ -69,6 +70,14 @@
     "owner": "nayifleo",
     "plugins": [
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      [
         "@sentry/react-native/expo",
         {
           "url": "https://sentry.io/",
@@ -91,7 +100,8 @@
           "iosStartDiscoveryAfterFirstTapOnCastButton": true
         }
       ],
-      "./plugins/mpv-bridge/withMpvBridge"
+      "./plugins/mpv-bridge/withMpvBridge",
+      "./plugins/android-tv/withAndroidTV"
     ],
     "updates": {
       "enabled": true,

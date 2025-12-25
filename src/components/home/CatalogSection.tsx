@@ -8,6 +8,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import ContentItem from './ContentItem';
 import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 
 interface CatalogSectionProps {
   catalog: CatalogContent;
@@ -75,6 +77,7 @@ const POSTER_WIDTH = posterLayout.posterWidth;
 const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
+  const isTVDevice = useIsTV();
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
@@ -130,37 +133,76 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
             ]}
           />
         </View>
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('Catalog', {
-              id: catalog.id,
-              type: catalog.type,
-              addonId: catalog.addon
-            })
-          }
-          style={[
-            styles.viewAllButton,
-            {
-              paddingVertical: isTV ? 10 : isLargeTablet ? 9 : isTablet ? 8 : 8,
-              paddingHorizontal: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 10,
-              borderRadius: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 20 : 20,
+        {isTVDevice ? (
+          <Focusable
+            onPress={() =>
+              navigation.navigate('Catalog', {
+                id: catalog.id,
+                type: catalog.type,
+                addonId: catalog.addon
+              })
             }
-          ]}
-        >
-          <Text style={[
-            styles.viewAllText,
-            {
-              color: currentTheme.colors.textMuted,
-              fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
-              marginRight: isTV ? 6 : isLargeTablet ? 5 : 4,
+            style={[
+              styles.viewAllButton,
+              {
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+              }
+            ]}
+            borderRadius={22}
+            focusScale={1.05}
+          >
+            {(focused) => (
+              <>
+                <Text style={[
+                  styles.viewAllText,
+                  {
+                    color: focused ? '#0A0A0A' : currentTheme.colors.textMuted,
+                    fontSize: 16,
+                    marginRight: 6,
+                  }
+                ]}>View All</Text>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={24}
+                  color={focused ? '#0A0A0A' : currentTheme.colors.textMuted}
+                />
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate('Catalog', {
+                id: catalog.id,
+                type: catalog.type,
+                addonId: catalog.addon
+              })
             }
-          ]}>View All</Text>
-          <MaterialIcons
-            name="chevron-right"
-            size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20}
-            color={currentTheme.colors.textMuted}
-          />
-        </TouchableOpacity>
+            style={[
+              styles.viewAllButton,
+              {
+                paddingVertical: isLargeTablet ? 9 : isTablet ? 8 : 8,
+                paddingHorizontal: isLargeTablet ? 11 : isTablet ? 10 : 10,
+                borderRadius: isLargeTablet ? 20 : isTablet ? 20 : 20,
+              }
+            ]}
+          >
+            <Text style={[
+              styles.viewAllText,
+              {
+                color: currentTheme.colors.textMuted,
+                fontSize: isLargeTablet ? 15 : isTablet ? 14 : 14,
+                marginRight: isLargeTablet ? 5 : 4,
+              }
+            ]}>View All</Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={isLargeTablet ? 22 : isTablet ? 20 : 20}
+              color={currentTheme.colors.textMuted}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
@@ -180,8 +222,9 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
             paddingRight: (isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 16) - posterLayout.partialPosterWidth,
           }
         ])}
+        style={isTVDevice ? { overflow: 'visible' } : undefined}
         ItemSeparatorComponent={ItemSeparator}
-        removeClippedSubviews={true}
+        removeClippedSubviews={!isTVDevice} // Disable on TV to prevent clipping focused items
         initialNumToRender={isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3}
         maxToRenderPerBatch={isTV ? 4 : isLargeTablet ? 4 : 3}
         windowSize={isTV ? 4 : isLargeTablet ? 4 : 3}
@@ -194,6 +237,8 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
 const styles = StyleSheet.create({
   catalogContainer: {
     marginBottom: 28,
+    overflow: 'visible', // Allow focused items to scale beyond container
+    zIndex: 1,
   },
   catalogHeader: {
     flexDirection: 'row',
@@ -236,6 +281,8 @@ const styles = StyleSheet.create({
   },
   catalogList: {
     // padding will be applied responsively in JSX
+    overflow: 'visible', // Allow focused items to scale beyond container
+    paddingVertical: 8, // Extra vertical space for scaled items
   },
 });
 

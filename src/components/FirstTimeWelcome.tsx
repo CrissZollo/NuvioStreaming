@@ -12,15 +12,29 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from './tv/Focusable';
 
 const { width } = Dimensions.get('window');
 
 const FirstTimeWelcome = () => {
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const isTV = useIsTV();
+
+  const handleNavigateToAddons = () => {
+    navigation.navigate('Addons');
+  };
+
+  const ButtonContent = () => (
+    <>
+      <MaterialIcons name="extension" size={20} color="white" />
+      <Text style={styles.buttonText}>Install Addons</Text>
+    </>
+  );
 
   return (
-    <Animated.View 
+    <Animated.View
       entering={FadeInDown.delay(200).duration(600)}
       style={[styles.container, { backgroundColor: currentTheme.colors.elevation1 }]}
     >
@@ -36,18 +50,36 @@ const FirstTimeWelcome = () => {
       <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>
         Welcome to Nuvio!
       </Text>
-      
+
       <Text style={[styles.description, { color: currentTheme.colors.mediumEmphasis }]}>
         To get started, install some addons to access content from various sources.
       </Text>
 
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
-        onPress={() => navigation.navigate('Addons')}
-      >
-        <MaterialIcons name="extension" size={20} color="white" />
-        <Text style={styles.buttonText}>Install Addons</Text>
-      </TouchableOpacity>
+      {isTV ? (
+        <Focusable
+          onPress={handleNavigateToAddons}
+          autoFocus
+          style={styles.tvButton}
+          borderRadius={25}
+          focusScale={1.05}
+        >
+          {(focused) => (
+            <>
+              <MaterialIcons name="extension" size={20} color={focused ? '#0A0A0A' : 'white'} />
+              <Text style={[styles.buttonText, focused && styles.buttonTextFocused]}>
+                Install Addons
+              </Text>
+            </>
+          )}
+        </Focusable>
+      ) : (
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
+          onPress={handleNavigateToAddons}
+        >
+          <ButtonContent />
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 };
@@ -96,11 +128,21 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     gap: 8,
   },
+  tvButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
   buttonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
   },
+  buttonTextFocused: {
+    color: '#0A0A0A',
+  },
 });
 
-export default FirstTimeWelcome; 
+export default FirstTimeWelcome;

@@ -1,7 +1,11 @@
 apply plugin: "com.android.application"
+// @generated begin safeExtGet - expo prebuild (DO NOT MODIFY) sync-be4acad6508a6820102c74ab393bd7ab1093e6c0
+def safeExtGet(prop, fallback) {
+  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+// @generated end safeExtGet
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
-apply plugin: "io.sentry.android.gradle"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -100,36 +104,6 @@ android {
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
-
-    // Split APKs by architecture only for smaller downloads
-    splits {
-        abi {
-            enable true
-            reset()
-            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
-            universalApk true
-        }
-        density {
-            enable false
-        }
-    }
-
-    // Generate unique version codes for each split APK
-    def abiVersionCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
-    applicationVariants.all { variant ->
-        variant.outputs.each { output ->
-            def baseVersionCode = 28 // Current versionCode 28 from defaultConfig
-            def abiName = output.getFilter(com.android.build.OutputFile.ABI)
-
-            def versionCode = baseVersionCode * 100 // Base multiplier
-
-            if (abiName != null) {
-                versionCode += abiVersionCodes.get(abiName)
-            }
-
-            output.versionCodeOverride = versionCode
-        }
-    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -185,30 +159,7 @@ android {
     }
 }
 
-sentry {
-    // Enables or disables the automatic configuration of Native Symbols
-    // for Sentry. This executes sentry-cli automatically so
-    // you don't need to do it manually.
-    // Default is disabled.
-    uploadNativeSymbols = true
-
-    // Enables or disables the automatic upload of the app's native source code to Sentry.
-    // This executes sentry-cli with the --include-sources param automatically so
-    // you don't need to do it manually.
-    // This option has an effect only when [uploadNativeSymbols] is enabled.
-    // Default is disabled.
-    includeNativeSources = true
-
-    // `@sentry/react-native` ships with compatible `sentry-android`
-    // This option would install the latest version that ships with the SDK or SAGP (Sentry Android Gradle Plugin)
-    // which might be incompatible with the React Native SDK
-    // Enable auto-installation of Sentry components (sentry-android SDK and okhttp, timber and fragment integrations).
-    // Default is enabled.
-    autoInstallation {
-      enabled = false
-    }
-}
-
+// Exclude duplicate androidsvg library (androidsvg vs androidsvg-aar conflict)
 configurations.all {
     exclude group: 'com.caverock', module: 'androidsvg'
 }
@@ -217,6 +168,8 @@ dependencies {
 // @generated begin react-native-google-cast-dependencies - expo prebuild (DO NOT MODIFY) sync-3822a3c86222e7aca74039b551612aab7e75365d
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"
 // @generated end react-native-google-cast-dependencies
+    // MPV library for video playback
+    implementation 'dev.jdtech.mpv:libmpv:0.2.0'
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
@@ -243,17 +196,4 @@ dependencies {
     } else {
         implementation jscFlavor
     }
-
-    // Include only FFmpeg decoder AAR to avoid duplicates with Maven Media3
-    implementation files("libs/lib-decoder-ffmpeg-release.aar")
-    
-    // MPV Player library
-    implementation files("libs/libmpv-release.aar")
-
-    // Google Cast Framework
-    implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"
-}
-
-def safeExtGet(prop, fallback) {
-    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
