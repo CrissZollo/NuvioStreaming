@@ -7,6 +7,8 @@ import {
   ViewStyle,
   StyleProp,
   findNodeHandle,
+  TVEventHandler,
+  Platform,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -22,6 +24,10 @@ import { useIsTV } from '../../contexts/TVContext';
 const TV_FOCUS_BORDER_COLOR = '#FFFFFF';
 const TV_FOCUS_BG_COLOR = '#FFFFFF';
 const TV_UNFOCUSED_BG_COLOR = 'rgba(255, 255, 255, 0.1)';
+
+// Generate unique ID for each Focusable instance
+let focusableIdCounter = 0;
+const generateFocusableId = () => `focusable-${++focusableIdCounter}`;
 
 interface FocusableProps {
   /** Content to render inside the focusable container */
@@ -60,6 +66,8 @@ interface FocusableProps {
   focusScale?: number;
   /** Whether to animate background color change (default true) */
   animateBackground?: boolean;
+  /** External ref to the underlying View for directional focus linking */
+  viewRef?: React.RefObject<View>;
 }
 
 export interface FocusableRef {
@@ -101,16 +109,21 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       borderRadius = 8,
       focusScale = 1.05,
       animateBackground = true,
+      viewRef,
     },
     ref
   ) => {
     const isTV = useIsTV();
     const innerRef = useRef<View>(null);
+    // Use external viewRef if provided, otherwise use internal ref
+    const actualRef = viewRef || innerRef;
     const [isFocused, setIsFocused] = useState(false);
     const focusProgress = useSharedValue(0);
     // Track if autoFocus has been consumed (only apply once on mount)
     const autoFocusConsumed = useRef(false);
     const [shouldAutoFocus, setShouldAutoFocus] = useState(autoFocus);
+    // Unique ID for this focusable instance
+    const focusableId = useRef(generateFocusableId()).current;
 
     // Only apply autoFocus once on mount
     useEffect(() => {
@@ -152,8 +165,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       focus: () => {
         setIsFocused(true);
         focusProgress.value = withSpring(1, { damping: 15, stiffness: 150 });
-        if (innerRef.current) {
-          (innerRef.current as any).setNativeProps?.({
+        if (actualRef.current) {
+          (actualRef.current as any).setNativeProps?.({
             hasTVPreferredFocus: true,
           });
         }
@@ -163,7 +176,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         focusProgress.value = withTiming(0, { duration: 150 });
       },
       isFocused: () => isFocused,
-      getViewRef: () => innerRef,
+      getViewRef: () => actualRef,
     }));
 
     // Animated styles for focus effect - scale
@@ -205,7 +218,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     if (!isTV) {
       return (
         <TouchableOpacity
-          ref={innerRef as any}
+          ref={actualRef as any}
           onPress={onPress}
           onLongPress={onLongPress}
           disabled={disabled}
@@ -240,7 +253,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
 
     return (
       <AnimatedPressable
-        ref={innerRef as any}
+        ref={actualRef as any}
         onPress={onPress}
         onLongPress={onLongPress}
         disabled={disabled}

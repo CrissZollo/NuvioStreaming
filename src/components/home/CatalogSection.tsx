@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,9 +10,14 @@ import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useIsTV } from '../../contexts/TVContext';
 import { Focusable } from '../tv/Focusable';
+import { useTVFocus } from '../../contexts/TVFocusContext';
 
 interface CatalogSectionProps {
   catalog: CatalogContent;
+  /** Called when any item in this section receives focus (TV only) */
+  onSectionFocus?: () => void;
+  /** Whether this is the first catalog section (TV only - registers first item for side menu navigation) */
+  isFirstSection?: boolean;
 }
 
 const { width } = Dimensions.get('window');
@@ -74,23 +79,44 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const CatalogSection = ({ catalog }: CatalogSectionProps) => {
+const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const isTVDevice = useIsTV();
+  const { setFirstContentRef } = useTVFocus();
+
+  // Create refs for each content item to constrain horizontal navigation (TV only)
+  const itemRefs = useMemo(() =>
+    catalog.items.map(() => React.createRef<View>()),
+    [catalog.items.length]
+  );
+
+  // Register the first item of the first section for side menu navigation
+  useEffect(() => {
+    if (isTVDevice && isFirstSection && itemRefs[0]) {
+      setFirstContentRef(itemRefs[0]);
+    }
+  }, [isTVDevice, isFirstSection, itemRefs, setFirstContentRef]);
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
   }, [navigation, catalog.addon]);
 
-  const renderContentItem = useCallback(({ item }: { item: StreamingContent, index: number }) => {
+  const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
+    const isFirst = index === 0;
+    const isLast = index === catalog.items.length - 1;
+
     return (
       <ContentItem
         item={item}
         onPress={handleContentPress}
+        onItemFocus={onSectionFocus}
+        isFirstInRow={isTVDevice ? isFirst : undefined}
+        isLastInRow={isTVDevice ? isLast : undefined}
+        focusRef={isTVDevice ? itemRefs[index] : undefined}
       />
     );
-  }, [handleContentPress]);
+  }, [handleContentPress, onSectionFocus, isTVDevice, catalog.items.length, itemRefs]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation (responsive spacing)
   const separatorWidth = isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8;

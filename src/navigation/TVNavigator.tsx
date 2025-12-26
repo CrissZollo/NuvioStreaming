@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TVSideRail } from '../components/tv/TVSideRail';
 import { useTheme } from '../contexts/ThemeContext';
 import { RootStackParamList } from './AppNavigator';
+import { TVFocusProvider, useTVFocus } from '../contexts/TVFocusContext';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
@@ -29,14 +30,14 @@ const SCREENS: Record<ScreenKey, ScreenConfig> = {
 };
 
 /**
- * TV-specific navigator with side rail navigation
- * Replaces bottom tab navigation on Android TV devices
+ * Inner TV navigator component that uses the focus context
  */
-export const TVNavigator: React.FC = () => {
+const TVNavigatorInner: React.FC = () => {
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('Home');
   const [screenHistory, setScreenHistory] = useState<ScreenKey[]>(['Home']);
+  const { firstContentRef } = useTVFocus();
 
   // Handle navigation between main sections
   const handleNavigate = useCallback((screen: string) => {
@@ -85,12 +86,28 @@ export const TVNavigator: React.FC = () => {
         { backgroundColor: currentTheme.colors.darkBackground },
       ]}
     >
-      <TVSideRail activeScreen={activeScreen} onNavigate={handleNavigate}>
+      <TVSideRail
+        activeScreen={activeScreen}
+        onNavigate={handleNavigate}
+        firstContentRef={firstContentRef}
+      >
         <View style={styles.screenContainer}>
           <ActiveScreenComponent />
         </View>
       </TVSideRail>
     </View>
+  );
+};
+
+/**
+ * TV-specific navigator with side rail navigation
+ * Replaces bottom tab navigation on Android TV devices
+ */
+export const TVNavigator: React.FC = () => {
+  return (
+    <TVFocusProvider>
+      <TVNavigatorInner />
+    </TVFocusProvider>
   );
 };
 

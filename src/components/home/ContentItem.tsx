@@ -21,6 +21,14 @@ interface ContentItemProps {
   onPress: (id: string, type: string) => void;
   shouldLoadImage?: boolean;
   deferMs?: number;
+  /** Called when this item receives focus (TV only) */
+  onItemFocus?: () => void;
+  /** Whether this is the first item in the row (TV only - constrains left navigation) */
+  isFirstInRow?: boolean;
+  /** Whether this is the last item in the row (TV only - constrains right navigation) */
+  isLastInRow?: boolean;
+  /** Ref to this item's view for focus navigation (TV only) */
+  focusRef?: React.RefObject<View>;
 }
 
 const { width } = Dimensions.get('window');
@@ -83,7 +91,7 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0 }: ContentItemProps) => {
+const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0, onItemFocus, isFirstInRow, isLastInRow, focusRef }: ContentItemProps) => {
   const isTVDevice = useIsTV();
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
@@ -367,9 +375,13 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             style={[styles.contentItem, { width: finalWidth, aspectRatio: finalAspectRatio, borderRadius }]}
             onPress={handlePress}
             onLongPress={handleLongPress}
+            onFocus={onItemFocus}
             borderRadius={borderRadius}
             animateBackground={false}
             focusScale={1.08}
+            viewRef={focusRef}
+            // Constrain right navigation at row end (left is allowed to reach side menu)
+            nextFocusRight={isLastInRow ? focusRef : undefined}
           >
             {renderPosterContent()}
           </Focusable>

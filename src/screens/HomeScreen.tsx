@@ -65,6 +65,7 @@ import { useToast } from '../contexts/ToastContext';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
 import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { useTrailer } from '../contexts/TrailerContext';
+import { useIsTV } from '../contexts/TVContext';
 
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
@@ -121,10 +122,14 @@ const HomeScreen = () => {
   const { lastUpdate } = useCatalogContext(); // Add catalog context to listen for addon changes
   const { showInfo } = useToast();
   const { setTrailerPlaying } = useTrailer();
+  const isTVDevice = useIsTV();
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
+
+  // FlashList ref for TV scroll-to-center on focus
+  const flashListRef = useRef<any>(null);
 
   // Shared value for scroll position (for parallax effects)
   const scrollY = useSharedValue(0);
@@ -750,15 +755,45 @@ const HomeScreen = () => {
     HeaderVisibility.setHidden(hide);
   }, []);
 
+  // TV: Scroll to center the focused catalog row (immediate, no debounce)
+  const lastFocusedIndexRef = useRef<number>(-1);
+
+  const handleCatalogFocus = useCallback((index: number) => {
+    if (!isTVDevice || !flashListRef.current) return;
+
+    // Skip if same index to avoid unnecessary scrolls
+    if (lastFocusedIndexRef.current === index) return;
+    lastFocusedIndexRef.current = index;
+
+    // Scroll instantly (no animation) to stay perfectly in sync with D-pad navigation
+    try {
+      flashListRef.current?.scrollToIndex({
+        index,
+        animated: false, // Instant scroll - no rubber-banding
+        viewPosition: 0.25, // Position focused row at ~25% from top
+      });
+    } catch (e) {
+      // FlashList may throw if index is out of bounds during loading
+    }
+  }, [isTVDevice]);
+
   // Stabilize renderItem to prevent FlashList re-renders
-  const renderListItem = useCallback(({ item }: { item: HomeScreenListItem; index: number }) => {
+  const renderListItem = useCallback(({ item, index }: { item: HomeScreenListItem; index: number }) => {
     switch (item.type) {
       case 'thisWeek':
         return memoizedThisWeekSection;
       case 'continueWatching':
         return null; // Moved to ListHeaderComponent to avoid remounts on scroll
       case 'catalog':
-        return <CatalogSection catalog={item.catalog} />;
+        // Check if this is the first catalog in the list (for TV side menu navigation)
+        const isFirstCatalog = isTVDevice && listData.findIndex(d => d.type === 'catalog') === index;
+        return (
+          <CatalogSection
+            catalog={item.catalog}
+            onSectionFocus={isTVDevice ? () => handleCatalogFocus(index) : undefined}
+            isFirstSection={isFirstCatalog}
+          />
+        );
       case 'placeholder':
         return (
           <Animated.View>
@@ -802,7 +837,7 @@ const HomeScreen = () => {
       default:
         return null;
     }
-  }, [memoizedThisWeekSection, currentTheme.colors.elevation1, currentTheme.colors.primary, currentTheme.colors.white, handleLoadMoreCatalogs]);
+  }, [memoizedThisWeekSection, currentTheme.colors.elevation1, currentTheme.colors.primary, currentTheme.colors.white, handleLoadMoreCatalogs, isTVDevice, handleCatalogFocus, listData]);
 
   // FlashList: using minimal props per installed version
 
@@ -890,6 +925,7 @@ const HomeScreen = () => {
           translucent
         />
         <FlashList
+          ref={flashListRef}
           data={listData}
           renderItem={renderListItem}
           keyExtractor={keyExtractor}

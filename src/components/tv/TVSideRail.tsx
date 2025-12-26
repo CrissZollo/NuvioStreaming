@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, createRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Focusable, FocusableRef } from './Focusable';
+import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export interface NavItem {
@@ -41,6 +41,8 @@ interface TVSideRailProps {
   onRailFocus?: () => void;
   /** Called when focus leaves the rail */
   onRailBlur?: () => void;
+  /** Ref to the first focusable content item (for nextFocusRight from menu) */
+  firstContentRef?: React.RefObject<View>;
 }
 
 /**
@@ -53,6 +55,7 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   children,
   onRailFocus,
   onRailBlur,
+  firstContentRef,
 }) => {
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -63,9 +66,11 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   const gradientOpacityAnim = useRef(new Animated.Value(0)).current;
 
   // Refs for each nav item to constrain focus navigation within the menu
-  const navItemRefs = useRef<Array<React.RefObject<FocusableRef>>>(
-    NAV_ITEMS.map(() => createRef<FocusableRef>())
-  ).current;
+  // Using View refs directly for nextFocusUp/nextFocusDown
+  const navItemRefs = useMemo(() =>
+    NAV_ITEMS.map(() => React.createRef<View>()),
+    []
+  );
 
   // Animate rail width and gradient on expand/collapse
   useEffect(() => {
@@ -202,7 +207,6 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
             return (
               <Focusable
                 key={item.key}
-                ref={navItemRefs[index]}
                 onPress={() => handleItemPress(item.screen)}
                 onFocus={() => handleItemFocus(index)}
                 onBlur={handleItemBlur}
@@ -213,8 +217,11 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
                 // Constrain vertical navigation within the menu
                 // First item: nextFocusUp points to itself to prevent escaping up
                 // Last item: nextFocusDown points to itself to prevent escaping down
-                nextFocusUp={isFirst ? navItemRefs[0].current?.getViewRef() : navItemRefs[index - 1].current?.getViewRef()}
-                nextFocusDown={isLast ? navItemRefs[NAV_ITEMS.length - 1].current?.getViewRef() : navItemRefs[index + 1].current?.getViewRef()}
+                nextFocusUp={isFirst ? navItemRefs[0] : navItemRefs[index - 1]}
+                nextFocusDown={isLast ? navItemRefs[NAV_ITEMS.length - 1] : navItemRefs[index + 1]}
+                // Point right navigation to first content item if provided
+                nextFocusRight={firstContentRef}
+                viewRef={navItemRefs[index]}
               >
                 {(focused) => (
                   <>
