@@ -66,6 +66,8 @@ export interface FocusableRef {
   focus: () => void;
   blur: () => void;
   isFocused: () => boolean;
+  /** The underlying View ref for directional focus navigation */
+  getViewRef: () => React.RefObject<View>;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -161,6 +163,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         focusProgress.value = withTiming(0, { duration: 150 });
       },
       isFocused: () => isFocused,
+      getViewRef: () => innerRef,
     }));
 
     // Animated styles for focus effect - scale

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, createRef } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   Animated,
   BackHandler,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Focusable } from './Focusable';
+import { Focusable, FocusableRef } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export interface NavItem {
@@ -58,17 +59,34 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [railHasFocus, setRailHasFocus] = useState(false);
   const widthAnim = useRef(new Animated.Value(COLLAPSED_WIDTH)).current;
-  // Note: Focus navigation between items is handled automatically by React Native TV
-  // so we don't need explicit refs for nextFocusUp/nextFocusDown
+  const gradientWidthAnim = useRef(new Animated.Value(0)).current; // 0 when collapsed, 350 when expanded
+  const gradientOpacityAnim = useRef(new Animated.Value(0)).current;
 
-  // Animate rail width on expand/collapse
+  // Refs for each nav item to constrain focus navigation within the menu
+  const navItemRefs = useRef<Array<React.RefObject<FocusableRef>>>(
+    NAV_ITEMS.map(() => createRef<FocusableRef>())
+  ).current;
+
+  // Animate rail width and gradient on expand/collapse
   useEffect(() => {
-    Animated.timing(widthAnim, {
-      toValue: isExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  }, [isExpanded, widthAnim]);
+    Animated.parallel([
+      Animated.timing(widthAnim, {
+        toValue: isExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+      Animated.timing(gradientWidthAnim, {
+        toValue: isExpanded ? 350 : 0,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+      Animated.timing(gradientOpacityAnim, {
+        toValue: isExpanded ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [isExpanded, widthAnim, gradientWidthAnim, gradientOpacityAnim]);
 
   // Handle back button to collapse rail or go back
   useEffect(() => {
@@ -134,17 +152,40 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Side Rail */}
+      {/* Side Rail with gradient background */}
       <Animated.View
         style={[
           styles.sideRail,
           {
             width: widthAnim,
-            backgroundColor: currentTheme.colors.darkBackground,
-            borderRightColor: currentTheme.colors.border || 'rgba(255,255,255,0.1)',
           },
         ]}
       >
+        {/* Gradient background - only visible when expanded */}
+        <Animated.View
+          style={[
+            styles.railGradient,
+            {
+              width: gradientWidthAnim,
+              opacity: gradientOpacityAnim,
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[
+              'rgba(0, 0, 0, 0.95)',
+              'rgba(0, 0, 0, 0.85)',
+              'rgba(0, 0, 0, 0.6)',
+              'rgba(0, 0, 0, 0.3)',
+              'transparent',
+            ]}
+            locations={[0, 0.3, 0.6, 0.85, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+
         {/* App Logo/Brand at top */}
         <View style={styles.brandContainer}>
           <Text style={[styles.brandText, { color: currentTheme.colors.primary }]}>
@@ -156,15 +197,24 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
         <View style={styles.navItems}>
           {NAV_ITEMS.map((item, index) => {
             const isActive = activeScreen === item.screen;
+            const isFirst = index === 0;
+            const isLast = index === NAV_ITEMS.length - 1;
             return (
               <Focusable
                 key={item.key}
+                ref={navItemRefs[index]}
                 onPress={() => handleItemPress(item.screen)}
                 onFocus={() => handleItemFocus(index)}
                 onBlur={handleItemBlur}
                 style={styles.navItem}
                 borderRadius={12}
                 focusScale={1.05}
+                animateBackground={false}
+                // Constrain vertical navigation within the menu
+                // First item: nextFocusUp points to itself to prevent escaping up
+                // Last item: nextFocusDown points to itself to prevent escaping down
+                nextFocusUp={isFirst ? navItemRefs[0].current?.getViewRef() : navItemRefs[index - 1].current?.getViewRef()}
+                nextFocusDown={isLast ? navItemRefs[NAV_ITEMS.length - 1].current?.getViewRef() : navItemRefs[index + 1].current?.getViewRef()}
               >
                 {(focused) => (
                   <>
@@ -174,7 +224,7 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
                         size={28}
                         color={
                           focused
-                            ? '#0A0A0A'
+                            ? '#FFFFFF'
                             : isActive
                             ? currentTheme.colors.primary
                             : currentTheme.colors.text
@@ -186,7 +236,7 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
                             styles.navLabel,
                             {
                               color: focused
-                                ? '#0A0A0A'
+                                ? '#FFFFFF'
                                 : isActive
                                 ? currentTheme.colors.primary
                                 : currentTheme.colors.text,
@@ -215,8 +265,8 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
         </View>
       </Animated.View>
 
-      {/* Main Content Area */}
-      <View style={[styles.content, { paddingBottom: insets.bottom }]}>
+      {/* Main Content Area - offset by collapsed menu width so content is not behind menu */}
+      <View style={[styles.content, { paddingBottom: insets.bottom, paddingLeft: COLLAPSED_WIDTH }]}>
         {children}
       </View>
     </View>
@@ -226,13 +276,22 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'row',
   },
   sideRail: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
     height: '100%',
-    borderRightWidth: 1,
     paddingVertical: 20,
-    zIndex: 10,
+    zIndex: 100,
+  },
+  railGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    overflow: 'hidden',
   },
   brandContainer: {
     height: 60,

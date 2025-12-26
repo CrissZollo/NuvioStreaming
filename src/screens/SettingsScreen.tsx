@@ -12,7 +12,8 @@ import {
   Dimensions,
   Button,
   Linking,
-  Clipboard
+  Clipboard,
+  ViewStyle,
 } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
@@ -40,6 +41,8 @@ import TraktIcon from '../components/icons/TraktIcon';
 import TMDBIcon from '../components/icons/TMDBIcon';
 import MDBListIcon from '../components/icons/MDBListIcon';
 import { campaignService } from '../services/campaignService';
+import { Focusable } from '../components/tv/Focusable';
+import { useIsTV } from '../contexts/TVContext';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -112,6 +115,7 @@ interface SettingItemProps {
   onPress?: () => void;
   badge?: string | number;
   isTablet?: boolean;
+  isTV?: boolean;
 }
 
 const SettingItem: React.FC<SettingItemProps> = ({
@@ -123,9 +127,81 @@ const SettingItem: React.FC<SettingItemProps> = ({
   isLast = false,
   onPress,
   badge,
-  isTablet = false
+  isTablet = false,
+  isTV = false
 }) => {
   const { currentTheme } = useTheme();
+
+  const content = (focused: boolean = false) => (
+    <>
+      <View style={[
+        styles.settingIconContainer,
+        {
+          backgroundColor: focused ? 'rgba(0, 0, 0, 0.2)' : currentTheme.colors.primary + '12',
+        },
+        isTablet && styles.tabletSettingIconContainer
+      ]}>
+        {customIcon ? (
+          customIcon
+        ) : (
+          <Feather
+            name={icon! as any}
+            size={isTablet ? 22 : 18}
+            color={focused ? '#0A0A0A' : currentTheme.colors.primary}
+          />
+        )}
+      </View>
+      <View style={styles.settingContent}>
+        <View style={styles.settingTextContainer}>
+          <Text style={[
+            styles.settingTitle,
+            { color: focused ? '#0A0A0A' : currentTheme.colors.highEmphasis },
+            isTablet && styles.tabletSettingTitle
+          ]}>
+            {title}
+          </Text>
+          {description && (
+            <Text style={[
+              styles.settingDescription,
+              { color: focused ? '#0A0A0A' : currentTheme.colors.mediumEmphasis },
+              isTablet && styles.tabletSettingDescription
+            ]} numberOfLines={1}>
+              {description}
+            </Text>
+          )}
+        </View>
+        {badge && (
+          <View style={[styles.badge, { backgroundColor: focused ? 'rgba(0, 0, 0, 0.15)' : `${currentTheme.colors.primary}20` }]}>
+            <Text style={[styles.badgeText, { color: focused ? '#0A0A0A' : currentTheme.colors.primary }]}>{String(badge)}</Text>
+          </View>
+        )}
+      </View>
+      {renderControl && (
+        <View style={styles.settingControl}>
+          {renderControl()}
+        </View>
+      )}
+    </>
+  );
+
+  // TV version with Focusable
+  if (isTV) {
+    return (
+      <Focusable
+        onPress={onPress}
+        style={[
+          styles.settingItem,
+          !isLast ? styles.settingItemBorder : undefined,
+          { borderBottomColor: currentTheme.colors.elevation2 },
+          isTablet ? styles.tabletSettingItem : undefined
+        ]}
+        borderRadius={0}
+        focusScale={1.02}
+      >
+        {(focused) => content(focused)}
+      </Focusable>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -138,53 +214,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
         isTablet && styles.tabletSettingItem
       ]}
     >
-      <View style={[
-        styles.settingIconContainer,
-        {
-          backgroundColor: currentTheme.colors.primary + '12',
-        },
-        isTablet && styles.tabletSettingIconContainer
-      ]}>
-        {customIcon ? (
-          customIcon
-        ) : (
-          <Feather
-            name={icon! as any}
-            size={isTablet ? 22 : 18}
-            color={currentTheme.colors.primary}
-          />
-        )}
-      </View>
-      <View style={styles.settingContent}>
-        <View style={styles.settingTextContainer}>
-          <Text style={[
-            styles.settingTitle,
-            { color: currentTheme.colors.highEmphasis },
-            isTablet && styles.tabletSettingTitle
-          ]}>
-            {title}
-          </Text>
-          {description && (
-            <Text style={[
-              styles.settingDescription,
-              { color: currentTheme.colors.mediumEmphasis },
-              isTablet && styles.tabletSettingDescription
-            ]} numberOfLines={1}>
-              {description}
-            </Text>
-          )}
-        </View>
-        {badge && (
-          <View style={[styles.badge, { backgroundColor: `${currentTheme.colors.primary}20` }]}>
-            <Text style={[styles.badgeText, { color: currentTheme.colors.primary }]}>{String(badge)}</Text>
-          </View>
-        )}
-      </View>
-      {renderControl && (
-        <View style={styles.settingControl}>
-          {renderControl()}
-        </View>
-      )}
+      {content(false)}
     </TouchableOpacity>
   );
 };
@@ -196,9 +226,53 @@ interface SidebarProps {
   currentTheme: any;
   categories: typeof SETTINGS_CATEGORIES;
   extraTopPadding?: number;
+  isTV?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories, extraTopPadding = 0 }) => {
+const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories, extraTopPadding = 0, isTV = false }) => {
+  const renderCategoryItem = (category: typeof SETTINGS_CATEGORIES[0], focused: boolean = false) => {
+    const isActive = selectedCategory === category.id;
+    return (
+      <>
+        <View style={[
+          styles.sidebarItemIconContainer,
+          {
+            backgroundColor: focused
+              ? 'rgba(0, 0, 0, 0.2)'
+              : isActive
+                ? currentTheme.colors.primary + '15'
+                : 'transparent',
+          }
+        ]}>
+          <Feather
+            name={category.icon as any}
+            size={20}
+            color={
+              focused
+                ? '#0A0A0A'
+                : isActive
+                  ? currentTheme.colors.primary
+                  : currentTheme.colors.mediumEmphasis
+            }
+          />
+        </View>
+        <Text style={[
+          styles.sidebarItemText,
+          {
+            color: focused
+              ? '#0A0A0A'
+              : isActive
+                ? currentTheme.colors.highEmphasis
+                : currentTheme.colors.mediumEmphasis,
+            fontWeight: isActive ? '600' : '500',
+          }
+        ]}>
+          {category.title}
+        </Text>
+      </>
+    );
+  };
+
   return (
     <View style={[
       styles.sidebar,
@@ -221,48 +295,36 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
 
       <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
         {categories.map((category) => (
-          <TouchableOpacity
-            key={category.id}
-            style={[
-              styles.sidebarItem,
-              selectedCategory === category.id && [
-                styles.sidebarItemActive,
-                { backgroundColor: currentTheme.colors.primary + '10' }
-              ]
-            ]}
-            onPress={() => onCategorySelect(category.id)}
-            activeOpacity={0.6}
-          >
-            <View style={[
-              styles.sidebarItemIconContainer,
-              {
-                backgroundColor: selectedCategory === category.id
-                  ? currentTheme.colors.primary + '15'
-                  : 'transparent',
-              }
-            ]}>
-              <Feather
-                name={category.icon as any}
-                size={20}
-                color={
-                  selectedCategory === category.id
-                    ? currentTheme.colors.primary
-                    : currentTheme.colors.mediumEmphasis
-                }
-              />
-            </View>
-            <Text style={[
-              styles.sidebarItemText,
-              {
-                color: selectedCategory === category.id
-                  ? currentTheme.colors.highEmphasis
-                  : currentTheme.colors.mediumEmphasis,
-                fontWeight: selectedCategory === category.id ? '600' : '500',
-              }
-            ]}>
-              {category.title}
-            </Text>
-          </TouchableOpacity>
+          isTV ? (
+            <Focusable
+              key={category.id}
+              onPress={() => onCategorySelect(category.id)}
+              style={[
+                styles.sidebarItem,
+                selectedCategory === category.id ? styles.sidebarItemActive : undefined,
+                selectedCategory === category.id ? { backgroundColor: currentTheme.colors.primary + '10' } : undefined
+              ]}
+              borderRadius={10}
+              focusScale={1.03}
+            >
+              {(focused) => renderCategoryItem(category, focused)}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              key={category.id}
+              style={[
+                styles.sidebarItem,
+                selectedCategory === category.id && [
+                  styles.sidebarItemActive,
+                  { backgroundColor: currentTheme.colors.primary + '10' }
+                ]
+              ]}
+              onPress={() => onCategorySelect(category.id)}
+              activeOpacity={0.6}
+            >
+              {renderCategoryItem(category, false)}
+            </TouchableOpacity>
+          )
         ))}
       </ScrollView>
     </View>
@@ -272,6 +334,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
 
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
+  const isTVDevice = useIsTV();
   const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -535,6 +598,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('TraktSettings')}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         );
@@ -549,6 +613,7 @@ const SettingsScreen: React.FC = () => {
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('Addons')}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Debrid Integration"
@@ -557,6 +622,7 @@ const SettingsScreen: React.FC = () => {
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('DebridIntegration')}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Plugins"
@@ -565,6 +631,7 @@ const SettingsScreen: React.FC = () => {
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('ScraperSettings')}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Catalogs"
@@ -573,6 +640,7 @@ const SettingsScreen: React.FC = () => {
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('CatalogSettings')}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Home Screen"
@@ -581,6 +649,7 @@ const SettingsScreen: React.FC = () => {
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('HomeScreenSettings')}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Continue Watching"
@@ -590,6 +659,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('ContinueWatchingSettings')}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         );
@@ -604,6 +674,7 @@ const SettingsScreen: React.FC = () => {
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('ThemeSettings')}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Episode Layout"
@@ -617,6 +688,7 @@ const SettingsScreen: React.FC = () => {
               )}
               isLast={isTablet}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             {!isTablet && (
               <SettingItem
@@ -631,6 +703,7 @@ const SettingsScreen: React.FC = () => {
                 )}
                 isLast={true}
                 isTablet={isTablet}
+                isTV={isTVDevice}
               />
             )}
           </SettingsCard>
@@ -646,6 +719,7 @@ const SettingsScreen: React.FC = () => {
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('MDBListSettings')}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="TMDB"
@@ -655,6 +729,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('TMDBSettings')}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         );
@@ -670,6 +745,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('AISettings')}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         );
@@ -687,6 +763,7 @@ const SettingsScreen: React.FC = () => {
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('PlayerSettings')}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Show Trailers"
@@ -701,6 +778,7 @@ const SettingsScreen: React.FC = () => {
                 />
               )}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Enable Downloads (Beta)"
@@ -715,6 +793,7 @@ const SettingsScreen: React.FC = () => {
                 />
               )}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Notifications"
@@ -724,6 +803,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('NotificationSettings')}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         );
@@ -737,6 +817,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
               renderControl={ChevronRight}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Report Issue"
@@ -744,12 +825,14 @@ const SettingsScreen: React.FC = () => {
               onPress={() => Sentry.showFeedbackWidget()}
               renderControl={ChevronRight}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Version"
               description={getDisplayedAppVersion()}
               icon="info"
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Contributors"
@@ -759,6 +842,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('Contributors')}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         );
@@ -772,6 +856,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('Onboarding')}
               renderControl={ChevronRight}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Reset Onboarding"
@@ -786,6 +871,7 @@ const SettingsScreen: React.FC = () => {
               }}
               renderControl={ChevronRight}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Test Announcement"
@@ -801,6 +887,7 @@ const SettingsScreen: React.FC = () => {
               }}
               renderControl={ChevronRight}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Reset Campaigns"
@@ -812,6 +899,7 @@ const SettingsScreen: React.FC = () => {
               }}
               renderControl={ChevronRight}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
             <SettingItem
               title="Clear All Data"
@@ -838,6 +926,7 @@ const SettingsScreen: React.FC = () => {
               }}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         ) : null;
@@ -851,6 +940,7 @@ const SettingsScreen: React.FC = () => {
               onPress={handleClearMDBListCache}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         ) : null;
@@ -866,6 +956,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('Backup')}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         );
@@ -888,6 +979,7 @@ const SettingsScreen: React.FC = () => {
               }}
               isLast={true}
               isTablet={isTablet}
+              isTV={isTVDevice}
             />
           </SettingsCard>
         );
@@ -914,6 +1006,7 @@ const SettingsScreen: React.FC = () => {
             currentTheme={currentTheme}
             categories={visibleCategories}
             extraTopPadding={tabletNavOffset}
+            isTV={isTVDevice}
           />
 
           <View style={[
