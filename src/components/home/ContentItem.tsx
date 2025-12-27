@@ -27,6 +27,8 @@ interface ContentItemProps {
   isFirstInRow?: boolean;
   /** Whether this is the last item in the row (TV only - constrains right navigation) */
   isLastInRow?: boolean;
+  /** Whether this row is the last catalog row (TV only - constrains down navigation) */
+  isLastRow?: boolean;
   /** Ref to this item's view for focus navigation (TV only) */
   focusRef?: React.RefObject<View>;
 }
@@ -91,7 +93,7 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0, onItemFocus, isFirstInRow, isLastInRow, focusRef }: ContentItemProps) => {
+const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0, onItemFocus, isFirstInRow, isLastInRow, isLastRow, focusRef }: ContentItemProps) => {
   const isTVDevice = useIsTV();
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
@@ -382,7 +384,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             focusScale={1.08}
             viewRef={focusRef}
             // Constrain right navigation at row end (left is allowed to reach side menu)
-            nextFocusRight={isLastInRow ? focusRef : undefined}
+            blockRight={isLastInRow}
+            // Constrain down navigation on last row to prevent wrap-around
+            blockDown={isLastRow}
           >
             {renderPosterContent()}
           </Focusable>
@@ -504,8 +508,12 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(ContentItem, (prev, next) => {
-  // Re-render when identity or poster changes. Caching is handled by FastImage.
+  // Re-render when identity, poster, or TV navigation props change
   if (prev.item.id !== next.item.id) return false;
   if (prev.item.poster !== next.item.poster) return false;
+  // TV navigation props - must match for proper D-pad behavior
+  if (prev.isFirstInRow !== next.isFirstInRow) return false;
+  if (prev.isLastInRow !== next.isLastInRow) return false;
+  if (prev.isLastRow !== next.isLastRow) return false;
   return true;
 });

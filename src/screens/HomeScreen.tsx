@@ -757,25 +757,49 @@ const HomeScreen = () => {
 
   // TV: Scroll to center the focused catalog row (immediate, no debounce)
   const lastFocusedIndexRef = useRef<number>(-1);
+  const isTVScrollingRef = useRef(false);
 
   const handleCatalogFocus = useCallback((index: number) => {
     if (!isTVDevice || !flashListRef.current) return;
 
     // Skip if same index to avoid unnecessary scrolls
     if (lastFocusedIndexRef.current === index) return;
-    lastFocusedIndexRef.current = index;
 
-    // Scroll instantly (no animation) to stay perfectly in sync with D-pad navigation
-    try {
-      flashListRef.current?.scrollToIndex({
-        index,
-        animated: false, // Instant scroll - no rubber-banding
-        viewPosition: 0.25, // Position focused row at ~25% from top
-      });
-    } catch (e) {
-      // FlashList may throw if index is out of bounds during loading
-    }
-  }, [isTVDevice]);
+    // Validate index is within bounds
+    if (index < 0 || index >= listData.length) return;
+
+    // Skip scrolling for placeholder items (catalogs still loading)
+    const item = listData[index];
+    if (!item || item.type === 'placeholder') return;
+
+    // Skip if already scrolling to prevent race conditions
+    if (isTVScrollingRef.current) return;
+
+    lastFocusedIndexRef.current = index;
+    isTVScrollingRef.current = true;
+
+    // Use requestAnimationFrame to ensure layout is complete before scrolling
+    requestAnimationFrame(() => {
+      try {
+        // Double-check the ref and data are still valid
+        if (flashListRef.current && index < listData.length && listData[index]?.type !== 'placeholder') {
+          flashListRef.current.scrollToIndex({
+            index,
+            animated: false, // Instant scroll - no rubber-banding
+            viewPosition: 0.25, // Position focused row at ~25% from top
+          });
+        }
+      } catch (e) {
+        // FlashList may throw if index is out of bounds during loading
+        if (__DEV__) console.warn('[HomeScreen] scrollToIndex failed:', e);
+      } finally {
+        // Reset scrolling flag after a short delay
+        setTimeout(() => {
+          isTVScrollingRef.current = false;
+        }, 100);
+      }
+    });
+  }, [isTVDevice, listData]);
 
   // Stabilize renderItem to prevent FlashList re-renders
   const renderListItem = useCallback(({ item, index }: { item: HomeScreenListItem; index: number }) => {
@@ -787,11 +811,17 @@ const HomeScreen = () => {
       case 'catalog':
         // Check if this is the first catalog in the list (for TV side menu navigation)
         const isFirstCatalog = isTVDevice && listData.findIndex(d => d.type === 'catalog') === index;
+        // Check if this is the last catalog in the list (to prevent down navigation wrap-around)
+        // Only block if we've loaded ALL catalogs (no "Load More" button exists)
+        const hasLoadMore = listData.some(d => d.type === 'loadMore');
+        const lastCatalogIndex = listData.map((d, i) => d.type === 'catalog' ? i : -1).filter(i => i >= 0).pop();
+        const isLastCatalog = isTVDevice && !hasLoadMore && index === lastCatalogIndex;
         return (
           <CatalogSection
             catalog={item.catalog}
             onSectionFocus={isTVDevice ? () => handleCatalogFocus(index) : undefined}
             isFirstSection={isFirstCatalog}
+            isLastSection={isLastCatalog}
           />
         );
       case 'placeholder':

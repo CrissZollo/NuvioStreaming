@@ -18,6 +18,8 @@ interface CatalogSectionProps {
   onSectionFocus?: () => void;
   /** Whether this is the first catalog section (TV only - registers first item for side menu navigation) */
   isFirstSection?: boolean;
+  /** Whether this is the last catalog section (TV only - constrains down navigation) */
+  isLastSection?: boolean;
 }
 
 const { width } = Dimensions.get('window');
@@ -79,7 +81,7 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSectionProps) => {
+const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const isTVDevice = useIsTV();
@@ -116,10 +118,11 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
         onItemFocus={handleSectionItemFocus}
         isFirstInRow={isTVDevice ? isFirst : undefined}
         isLastInRow={isTVDevice ? isLast : undefined}
+        isLastRow={isTVDevice ? isLastSection : undefined}
         focusRef={isTVDevice ? (isFirst ? firstItemRef : isLast ? lastItemRef : undefined) : undefined}
       />
     );
-  }, [handleContentPress, handleSectionItemFocus, isTVDevice, catalog.items.length]);
+  }, [handleContentPress, handleSectionItemFocus, isTVDevice, catalog.items.length, isLastSection]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation (responsive spacing)
   const separatorWidth = isTVLayout ? 8 : isLargeTablet ? 10 : isTablet ? 8 : 8;
@@ -326,12 +329,14 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(CatalogSection, (prevProps, nextProps) => {
-  // Only re-render if the catalog data actually changes
+  // Only re-render if the catalog data or TV navigation props change
   return (
     prevProps.catalog.addon === nextProps.catalog.addon &&
     prevProps.catalog.id === nextProps.catalog.id &&
     prevProps.catalog.name === nextProps.catalog.name &&
     prevProps.catalog.items.length === nextProps.catalog.items.length &&
+    prevProps.isFirstSection === nextProps.isFirstSection &&
+    prevProps.isLastSection === nextProps.isLastSection &&
     // Deep compare the first few items to detect changes
     prevProps.catalog.items.slice(0, 3).every((item, index) =>
       nextProps.catalog.items[index] &&

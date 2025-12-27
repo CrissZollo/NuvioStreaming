@@ -56,6 +56,10 @@ interface FocusableProps {
   nextFocusLeft?: React.RefObject<View>;
   /** Reference to element that should receive focus when pressing right */
   nextFocusRight?: React.RefObject<View>;
+  /** Block down navigation (focus stays on this element) */
+  blockDown?: boolean;
+  /** Block right navigation (focus stays on this element) */
+  blockRight?: boolean;
   /** Test ID for testing */
   testID?: string;
   /** Whether to show focus border (default true on TV) */
@@ -104,6 +108,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       nextFocusDown,
       nextFocusLeft,
       nextFocusRight,
+      blockDown = false,
+      blockRight = false,
       testID,
       showFocusBorder = true,
       borderRadius = 8,
@@ -124,6 +130,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     const [shouldAutoFocus, setShouldAutoFocus] = useState(autoFocus);
     // Unique ID for this focusable instance
     const focusableId = useRef(generateFocusableId()).current;
+    // Store own node handle for blockDown/blockRight - updated after layout
+    const [selfNodeHandle, setSelfNodeHandle] = useState<number | null>(null);
 
     // Only apply autoFocus once on mount
     useEffect(() => {
@@ -242,14 +250,24 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
 
     // Add directional focus if refs are provided
     const upHandle = getNodeHandle(nextFocusUp);
-    const downHandle = getNodeHandle(nextFocusDown);
+    const downHandle = blockDown ? selfNodeHandle : getNodeHandle(nextFocusDown);
     const leftHandle = getNodeHandle(nextFocusLeft);
-    const rightHandle = getNodeHandle(nextFocusRight);
+    const rightHandle = blockRight ? selfNodeHandle : getNodeHandle(nextFocusRight);
 
     if (upHandle) tvProps.nextFocusUp = upHandle;
     if (downHandle) tvProps.nextFocusDown = downHandle;
     if (leftHandle) tvProps.nextFocusLeft = leftHandle;
     if (rightHandle) tvProps.nextFocusRight = rightHandle;
+
+    // Capture own node handle after layout for blockDown/blockRight
+    const handleLayout = useCallback(() => {
+      if ((blockDown || blockRight) && actualRef.current && !selfNodeHandle) {
+        const handle = findNodeHandle(actualRef.current);
+        if (handle) {
+          setSelfNodeHandle(handle);
+        }
+      }
+    }, [blockDown, blockRight, selfNodeHandle]);
 
     return (
       <AnimatedPressable
@@ -257,6 +275,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         onPress={onPress}
         onLongPress={onLongPress}
         disabled={disabled}
+        onLayout={handleLayout}
         style={[
           style,
           animatedContainerStyle,

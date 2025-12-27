@@ -210,7 +210,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
     return Math.min(screenBased, aspectBased);
   }, [width, height, featuredContent?.id]);
 
-  // Preload the image
+  // Preload the image - fire-and-forget since FastImage.preload doesn't return a promise
   const preloadImage = async (url: string): Promise<boolean> => {
     const t0 = nowMs();
     logger.debug('[FeaturedContent] preloadImage:start', { url });
@@ -221,17 +221,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
       // Simplified validation to reduce CPU overhead
       if (!url || typeof url !== 'string') return false;
 
-      // Add timeout guard to prevent hanging preloads
-      const timeout = new Promise<never>((_, reject) => {
-        const t = setTimeout(() => {
-          clearTimeout(t as any);
-          reject(new Error('preload-timeout'));
-        }, 1500);
-      });
-
-      // FastImage.preload doesn't return a promise, so we just call it and use timeout
+      // FastImage.preload doesn't return a promise - just fire and forget
+      // Give it a short time to start the network request, then proceed
       FastImage.preload([{ uri: url }]);
-      await timeout;
+
+      // Small delay to allow preload to initiate, but don't block on completion
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       imageCache[url] = true;
       logger.debug('[FeaturedContent] preloadImage:success', { url, duration: since(t0) });
       return true;
