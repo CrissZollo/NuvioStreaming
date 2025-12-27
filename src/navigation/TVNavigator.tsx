@@ -37,7 +37,7 @@ const TVNavigatorInner: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('Home');
   const [screenHistory, setScreenHistory] = useState<ScreenKey[]>(['Home']);
-  const { firstContentRef } = useTVFocus();
+  const { lastFocusedRowRef } = useTVFocus();
 
   // Handle navigation between main sections
   const handleNavigate = useCallback((screen: string) => {
@@ -89,7 +89,7 @@ const TVNavigatorInner: React.FC = () => {
       <TVSideRail
         activeScreen={activeScreen}
         onNavigate={handleNavigate}
-        firstContentRef={firstContentRef}
+        firstContentRef={lastFocusedRowRef}
       >
         <View style={styles.screenContainer}>
           <ActiveScreenComponent />

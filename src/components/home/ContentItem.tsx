@@ -52,11 +52,11 @@ const getDeviceType = (screenWidth: number) => {
 const calculatePosterLayout = (screenWidth: number) => {
   const deviceType = getDeviceType(screenWidth);
 
-  // Responsive sizing based on device type
-  const MIN_POSTER_WIDTH = deviceType === 'tv' ? 180 : deviceType === 'largeTablet' ? 160 : deviceType === 'tablet' ? 140 : 100;
-  const MAX_POSTER_WIDTH = deviceType === 'tv' ? 220 : deviceType === 'largeTablet' ? 200 : deviceType === 'tablet' ? 180 : 130;
-  const LEFT_PADDING = deviceType === 'tv' ? 32 : deviceType === 'largeTablet' ? 28 : deviceType === 'tablet' ? 24 : 16;
-  const SPACING = deviceType === 'tv' ? 12 : deviceType === 'largeTablet' ? 10 : deviceType === 'tablet' ? 8 : 8;
+  // Responsive sizing based on device type - TV uses smaller posters to fit 2 rows on screen
+  const MIN_POSTER_WIDTH = deviceType === 'tv' ? 120 : deviceType === 'largeTablet' ? 160 : deviceType === 'tablet' ? 140 : 100;
+  const MAX_POSTER_WIDTH = deviceType === 'tv' ? 150 : deviceType === 'largeTablet' ? 200 : deviceType === 'tablet' ? 180 : 130;
+  const LEFT_PADDING = deviceType === 'tv' ? 24 : deviceType === 'largeTablet' ? 28 : deviceType === 'tablet' ? 24 : 16;
+  const SPACING = deviceType === 'tv' ? 10 : deviceType === 'largeTablet' ? 10 : deviceType === 'tablet' ? 8 : 8;
 
   // Calculate available width for posters (reserve space for left padding)
   const availableWidth = screenWidth - LEFT_PADDING;
@@ -136,7 +136,8 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
     const deviceType = getDeviceType(width);
-    const sizeMultiplier = deviceType === 'tv' ? 1.2 : deviceType === 'largeTablet' ? 1.1 : deviceType === 'tablet' ? 1.0 : 0.9;
+    // TV uses smaller posters (0.7x) to fit 2 rows on screen
+    const sizeMultiplier = isTVDevice ? 0.7 : deviceType === 'largeTablet' ? 1.1 : deviceType === 'tablet' ? 1.0 : 0.9;
 
     switch (settings.posterSize) {
       case 'small':
@@ -148,7 +149,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       default:
         return POSTER_WIDTH * sizeMultiplier;
     }
-  }, [settings.posterSize, width]);
+  }, [settings.posterSize, width, isTVDevice]);
 
   // Determine dimensions based on poster shape
   const { finalWidth, finalAspectRatio, borderRadius } = React.useMemo(() => {

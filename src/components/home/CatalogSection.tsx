@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -83,20 +83,23 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const isTVDevice = useIsTV();
-  const { setFirstContentRef } = useTVFocus();
+  const { setLastFocusedRowView } = useTVFocus();
 
-  // Create refs for each content item to constrain horizontal navigation (TV only)
-  const itemRefs = useMemo(() =>
-    catalog.items.map(() => React.createRef<View>()),
-    [catalog.items.length]
-  );
+  // Use isTVDevice for TV-specific styling (more reliable than screen width detection)
+  const isTVLayout = isTVDevice || isTV;
 
-  // Register the first item of the first section for side menu navigation
-  useEffect(() => {
-    if (isTVDevice && isFirstSection && itemRefs[0]) {
-      setFirstContentRef(itemRefs[0]);
+  // Only create refs for first and last items (for navigation constraints)
+  const firstItemRef = useRef<View>(null);
+  const lastItemRef = useRef<View>(null);
+
+  // When any item in this section gets focus, update the last focused row
+  // so pressing right from menu returns to this row's first item
+  const handleSectionItemFocus = useCallback(() => {
+    if (isTVDevice && firstItemRef.current) {
+      setLastFocusedRowView(firstItemRef.current);
     }
-  }, [isTVDevice, isFirstSection, itemRefs, setFirstContentRef]);
+    onSectionFocus?.();
+  }, [isTVDevice, setLastFocusedRowView, onSectionFocus]);
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
@@ -110,16 +113,16 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
       <ContentItem
         item={item}
         onPress={handleContentPress}
-        onItemFocus={onSectionFocus}
+        onItemFocus={handleSectionItemFocus}
         isFirstInRow={isTVDevice ? isFirst : undefined}
         isLastInRow={isTVDevice ? isLast : undefined}
-        focusRef={isTVDevice ? itemRefs[index] : undefined}
+        focusRef={isTVDevice ? (isFirst ? firstItemRef : isLast ? lastItemRef : undefined) : undefined}
       />
     );
-  }, [handleContentPress, onSectionFocus, isTVDevice, catalog.items.length, itemRefs]);
+  }, [handleContentPress, handleSectionItemFocus, isTVDevice, catalog.items.length]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation (responsive spacing)
-  const separatorWidth = isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8;
+  const separatorWidth = isTVLayout ? 8 : isLargeTablet ? 10 : isTablet ? 8 : 8;
   const ItemSeparator = useCallback(() => <View style={{ width: separatorWidth }} />, [separatorWidth]);
 
   // Memoize the keyExtractor to prevent re-creation
@@ -129,11 +132,14 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
 
   return (
     <View
-      style={styles.catalogContainer}
+      style={[styles.catalogContainer, isTVLayout && styles.catalogContainerTV]}
     >
       <View style={[
         styles.catalogHeader,
-        { paddingHorizontal: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 16 }
+        {
+          paddingHorizontal: isTVLayout ? 24 : isLargeTablet ? 28 : isTablet ? 24 : 16,
+          marginBottom: isTVLayout ? 6 : 16,
+        }
       ]}>
         <View style={styles.titleContainer}>
           <Text
@@ -141,7 +147,7 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
               styles.catalogTitle,
               {
                 color: currentTheme.colors.text,
-                fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22,
+                fontSize: isTVLayout ? 18 : isLargeTablet ? 26 : isTablet ? 24 : 22,
               }
             ]}
             numberOfLines={1}
@@ -153,8 +159,8 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
               styles.titleUnderline,
               {
                 backgroundColor: currentTheme.colors.primary,
-                width: isTV ? 64 : isLargeTablet ? 56 : isTablet ? 48 : 40,
-                height: isTV ? 4 : isLargeTablet ? 3 : 3,
+                width: isTVLayout ? 40 : isLargeTablet ? 56 : isTablet ? 48 : 40,
+                height: isTVLayout ? 2 : isLargeTablet ? 3 : 3,
               }
             ]}
           />
@@ -171,11 +177,11 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
             style={[
               styles.viewAllButton,
               {
-                paddingVertical: 10,
-                paddingHorizontal: 12,
+                paddingVertical: 6,
+                paddingHorizontal: 10,
               }
             ]}
-            borderRadius={22}
+            borderRadius={16}
             focusScale={1.05}
           >
             {(focused) => (
@@ -184,13 +190,13 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
                   styles.viewAllText,
                   {
                     color: focused ? '#0A0A0A' : currentTheme.colors.textMuted,
-                    fontSize: 16,
-                    marginRight: 6,
+                    fontSize: 13,
+                    marginRight: 4,
                   }
                 ]}>View All</Text>
                 <MaterialIcons
                   name="chevron-right"
-                  size={24}
+                  size={18}
                   color={focused ? '#0A0A0A' : currentTheme.colors.textMuted}
                 />
               </>
@@ -243,17 +249,18 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection }: CatalogSect
         nestedScrollEnabled={true}
         contentContainerStyle={StyleSheet.flatten([
           styles.catalogList,
+          isTVLayout && styles.catalogListTV,
           {
-            paddingHorizontal: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 16,
-            paddingRight: (isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 16) - posterLayout.partialPosterWidth,
+            paddingHorizontal: isTVLayout ? 24 : isLargeTablet ? 28 : isTablet ? 24 : 16,
+            paddingRight: (isTVLayout ? 24 : isLargeTablet ? 28 : isTablet ? 24 : 16) - posterLayout.partialPosterWidth,
           }
         ])}
         style={isTVDevice ? { overflow: 'visible' } : undefined}
         ItemSeparatorComponent={ItemSeparator}
         removeClippedSubviews={!isTVDevice} // Disable on TV to prevent clipping focused items
-        initialNumToRender={isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3}
-        maxToRenderPerBatch={isTV ? 4 : isLargeTablet ? 4 : 3}
-        windowSize={isTV ? 4 : isLargeTablet ? 4 : 3}
+        initialNumToRender={isTVLayout ? 10 : isLargeTablet ? 5 : isTablet ? 4 : 3}
+        maxToRenderPerBatch={isTVLayout ? 5 : isLargeTablet ? 4 : 3}
+        windowSize={isTVLayout ? 5 : isLargeTablet ? 4 : 3}
         updateCellsBatchingPeriod={50}
       />
     </View>
@@ -265,6 +272,9 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     overflow: 'visible', // Allow focused items to scale beyond container
     zIndex: 1,
+  },
+  catalogContainerTV: {
+    marginBottom: 8, // Reduced margin for TV to fit more rows
   },
   catalogHeader: {
     flexDirection: 'row',
@@ -309,6 +319,9 @@ const styles = StyleSheet.create({
     // padding will be applied responsively in JSX
     overflow: 'visible', // Allow focused items to scale beyond container
     paddingVertical: 8, // Extra vertical space for scaled items
+  },
+  catalogListTV: {
+    paddingVertical: 4, // Reduced vertical padding for TV
   },
 });
 

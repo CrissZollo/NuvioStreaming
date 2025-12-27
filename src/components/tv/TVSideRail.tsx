@@ -42,7 +42,7 @@ interface TVSideRailProps {
   /** Called when focus leaves the rail */
   onRailBlur?: () => void;
   /** Ref to the first focusable content item (for nextFocusRight from menu) */
-  firstContentRef?: React.RefObject<View>;
+  firstContentRef?: React.RefObject<View> | React.MutableRefObject<View | null>;
 }
 
 /**
