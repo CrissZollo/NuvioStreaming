@@ -17,6 +17,9 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { TMDBService } from '../../services/tmdbService';
 import { catalogService } from '../../services/catalogService';
 import CustomAlert from '../../components/CustomAlert';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
+import { TVFocusSection } from '../tv/TVFocusSection';
 
 const { width } = Dimensions.get('window');
 
@@ -33,12 +36,13 @@ interface MoreLikeThisSectionProps {
   loadingRecommendations: boolean;
 }
 
-export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({ 
-  recommendations, 
-  loadingRecommendations 
+export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
+  recommendations,
+  loadingRecommendations
 }) => {
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const isTVDevice = useIsTV();
 
   // Determine device type
   const deviceWidth = Dimensions.get('window').width;
@@ -115,21 +119,53 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
     }
   };
 
-  const renderItem = ({ item }: { item: StreamingContent }) => (
-    <TouchableOpacity 
-      style={[styles.itemContainer, { width: posterWidth, marginRight: itemSpacing }]}
-      onPress={() => handleItemPress(item)}
-    >
+  const renderItem = ({ item }: { item: StreamingContent }) => {
+    const itemStyle = [styles.itemContainer, { width: posterWidth, marginRight: itemSpacing }];
+    const borderRadius = isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8;
+
+    const posterImage = (
       <FastImage
         source={{ uri: item.poster }}
-        style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, width: posterWidth, height: posterHeight, borderRadius: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8 }]}
+        style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, width: posterWidth, height: posterHeight, borderRadius }]}
         resizeMode={FastImage.resizeMode.cover}
       />
+    );
+
+    const titleText = (
       <Text style={[styles.title, { color: currentTheme.colors.mediumEmphasis, fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13, lineHeight: isTV ? 20 : 18 }]} numberOfLines={2}>
         {item.name}
       </Text>
-    </TouchableOpacity>
-  );
+    );
+
+    if (isTVDevice) {
+      return (
+        <View style={[itemStyle, { overflow: 'visible', paddingTop: 6 }]}>
+          <Focusable
+            onPress={() => handleItemPress(item)}
+            style={{ width: posterWidth, height: posterHeight, marginBottom: 8 }}
+            borderRadius={borderRadius}
+            focusScale={1.05}
+            animateBackground={false}
+            showFocusBorder={true}
+            scrollOnFocus={false}
+          >
+            {posterImage}
+          </Focusable>
+          {titleText}
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={itemStyle}
+        onPress={() => handleItemPress(item)}
+      >
+        {posterImage}
+        {titleText}
+      </TouchableOpacity>
+    );
+  };
 
   if (loadingRecommendations) {
     return (
@@ -144,6 +180,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   }
 
   return (
+    <TVFocusSection>
     <View style={[styles.container, { paddingLeft: 0 }] }>
       <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis, fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20, paddingHorizontal: horizontalPadding }]}>More Like This</Text>
       <FlatList
@@ -162,6 +199,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
         onClose={() => setAlertVisible(false)}
       />
     </View>
+    </TVFocusSection>
   );
 };
 

@@ -13,6 +13,9 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
+import { TVFocusSection } from '../tv/TVFocusSection';
 
 // Enhanced responsive breakpoints for Cast Section
 const BREAKPOINTS = {
@@ -36,6 +39,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
   isTmdbEnrichmentEnabled = true,
 }) => {
   const { currentTheme } = useTheme();
+  const isTVDevice = useIsTV();
 
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
@@ -122,7 +126,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
   }
 
   return (
-    <Animated.View 
+    <TVFocusSection>
+    <Animated.View
       style={styles.castSection}
       entering={FadeIn.duration(300).delay(150)}
     >
@@ -148,21 +153,17 @@ export const CastSection: React.FC<CastSectionProps> = ({
           { paddingHorizontal: horizontalPadding }
         ]}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item, index }) => (
-          <Animated.View 
-            entering={FadeIn.duration(300).delay(50 + index * 30)} 
-          >
-            <TouchableOpacity 
-              style={[
-                styles.castCard,
-                {
-                  width: castCardWidth,
-                  marginRight: castCardSpacing
-                }
-              ]}
-              onPress={() => onSelectCastMember(item)}
-              activeOpacity={0.7}
-            >
+        renderItem={({ item, index }) => {
+          const cardStyle = [
+            styles.castCard,
+            {
+              width: castCardWidth,
+              marginRight: castCardSpacing
+            }
+          ];
+
+          const cardContent = (
+            <>
               <View style={[
                 styles.castImageContainer,
                 {
@@ -182,15 +183,15 @@ export const CastSection: React.FC<CastSectionProps> = ({
                   />
                 ) : (
                   <View style={[
-                    styles.castImagePlaceholder, 
-                    { 
+                    styles.castImagePlaceholder,
+                    {
                       backgroundColor: currentTheme.colors.darkBackground,
                       borderRadius: castImageSize / 2
                     }
                   ]}>
                     <Text style={[
-                      styles.placeholderText, 
-                      { 
+                      styles.placeholderText,
+                      {
                         color: currentTheme.colors.textMuted,
                         fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
                       }
@@ -201,8 +202,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
                 )}
               </View>
               <Text style={[
-                styles.castName, 
-                { 
+                styles.castName,
+                {
                   color: currentTheme.colors.text,
                   fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
                   width: castCardWidth
@@ -210,8 +211,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
               ]} numberOfLines={1}>{item.name}</Text>
               {isTmdbEnrichmentEnabled && item.character && (
                 <Text style={[
-                  styles.characterName, 
-                  { 
+                  styles.characterName,
+                  {
                     color: currentTheme.colors.textMuted,
                     fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12,
                     width: castCardWidth,
@@ -219,11 +220,99 @@ export const CastSection: React.FC<CastSectionProps> = ({
                   }
                 ]} numberOfLines={1}>{item.character}</Text>
               )}
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+            </>
+          );
+
+          // Text content shown below the image (used for both TV and mobile)
+          const textContent = (
+            <>
+              <Text style={[
+                styles.castName,
+                {
+                  color: currentTheme.colors.text,
+                  fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                  width: castCardWidth
+                }
+              ]} numberOfLines={1}>{item.name}</Text>
+              {isTmdbEnrichmentEnabled && item.character && (
+                <Text style={[
+                  styles.characterName,
+                  {
+                    color: currentTheme.colors.textMuted,
+                    fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12,
+                    width: castCardWidth,
+                    marginTop: isTV ? 4 : isLargeTablet ? 3 : isTablet ? 2 : 2
+                  }
+                ]} numberOfLines={1}>{item.character}</Text>
+              )}
+            </>
+          );
+
+          return (
+            <Animated.View
+              entering={FadeIn.duration(300).delay(50 + index * 30)}
+            >
+              {isTVDevice ? (
+                <View style={[cardStyle, { overflow: 'visible', paddingTop: 6 }]}>
+                  <Focusable
+                    onPress={() => onSelectCastMember(item)}
+                    style={{
+                      width: castImageSize,
+                      height: castImageSize,
+                      borderRadius: castImageSize / 2,
+                      marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                    }}
+                    borderRadius={castImageSize / 2}
+                    focusScale={1.05}
+                    animateBackground={false}
+                    showFocusBorder={true}
+                    scrollOnFocus={false}
+                  >
+                    {item.profile_path ? (
+                      <FastImage
+                        source={{
+                          uri: `https://image.tmdb.org/t/p/w185${item.profile_path}`,
+                        }}
+                        style={[styles.castImage, { borderRadius: castImageSize / 2 }]}
+                        resizeMode={FastImage.resizeMode.cover}
+                      />
+                    ) : (
+                      <View style={[
+                        styles.castImagePlaceholder,
+                        {
+                          backgroundColor: currentTheme.colors.darkBackground,
+                          borderRadius: castImageSize / 2
+                        }
+                      ]}>
+                        <Text style={[
+                          styles.placeholderText,
+                          {
+                            color: currentTheme.colors.textMuted,
+                            fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
+                          }
+                        ]}>
+                          {item.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
+                        </Text>
+                      </View>
+                    )}
+                  </Focusable>
+                  {textContent}
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={cardStyle}
+                  onPress={() => onSelectCastMember(item)}
+                  activeOpacity={0.7}
+                >
+                  {cardContent}
+                </TouchableOpacity>
+              )}
+            </Animated.View>
+          );
+        }}
       />
     </Animated.View>
+    </TVFocusSection>
   );
 };
 

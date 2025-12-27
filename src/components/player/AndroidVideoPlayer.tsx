@@ -31,7 +31,9 @@ import { useSettings } from '../../hooks/useSettings';
 import { GestureControls, PauseOverlay, SpeedActivatedOverlay } from './components';
 import LoadingOverlay from './modals/LoadingOverlay';
 import PlayerControls from './controls/PlayerControls';
+import TVPlayerControls from './tv/TVPlayerControls';
 import { AudioTrackModal } from './modals/AudioTrackModal';
+import { useIsTV } from '../../contexts/TVContext';
 import { SubtitleModals } from './modals/SubtitleModals';
 import SpeedModal from './modals/SpeedModal';
 import { SourcesModal } from './modals/SourcesModal';
@@ -73,6 +75,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const modals = usePlayerModals();
   const speedControl = useSpeedControl();
   const { settings } = useSettings();
+  const isTVDevice = useIsTV();
 
   const videoRef = useRef<any>(null);
   const mpvPlayerRef = useRef<MpvPlayerRef>(null);
@@ -181,6 +184,14 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     openingAnimation.startOpeningAnimation();
   }, []);
+
+  // Auto-show controls on TV after video loads
+  useEffect(() => {
+    if (isTVDevice && playerState.isVideoLoaded && openingAnimation.shouldHideOpeningOverlay) {
+      // Show controls initially on TV so user knows they can interact
+      playerState.setShowControls(true);
+    }
+  }, [isTVDevice, playerState.isVideoLoaded, openingAnimation.shouldHideOpeningOverlay]);
 
   // Load subtitle settings on mount
   useEffect(() => {
@@ -592,68 +603,94 @@ const AndroidVideoPlayer: React.FC = () => {
           controlsVisible={playerState.showControls}
           controlsExtraOffset={100}
         />
-        <GestureControls
-          screenDimensions={playerState.screenDimensions}
-          gestureControls={gestureControls}
-          onLongPressActivated={speedControl.activateSpeedBoost}
-          onLongPressEnd={speedControl.deactivateSpeedBoost}
-          onLongPressStateChange={(e) => {
-            if (e.nativeEvent.state !== 4 && e.nativeEvent.state !== 2) speedControl.deactivateSpeedBoost();
-          }}
-          toggleControls={toggleControls}
-          showControls={playerState.showControls}
-          hideControls={hideControls}
-          volume={volume}
-          brightness={brightness}
-          controlsTimeout={controlsTimeout}
-        />
+        {/* Gesture Controls - Only on mobile, TV uses remote */}
+        {!isTVDevice && (
+          <GestureControls
+            screenDimensions={playerState.screenDimensions}
+            gestureControls={gestureControls}
+            onLongPressActivated={speedControl.activateSpeedBoost}
+            onLongPressEnd={speedControl.deactivateSpeedBoost}
+            onLongPressStateChange={(e) => {
+              if (e.nativeEvent.state !== 4 && e.nativeEvent.state !== 2) speedControl.deactivateSpeedBoost();
+            }}
+            toggleControls={toggleControls}
+            showControls={playerState.showControls}
+            hideControls={hideControls}
+            volume={volume}
+            brightness={brightness}
+            controlsTimeout={controlsTimeout}
+          />
+        )}
 
-        <PlayerControls
-          showControls={playerState.showControls}
-          fadeAnim={fadeAnim}
-          paused={playerState.paused}
-          title={title}
-          episodeTitle={episodeTitle}
-          season={season}
-          episode={episode}
-          quality={currentQuality || quality}
-          year={year}
-          streamProvider={currentStreamProvider || streamProvider}
-          streamName={currentStreamName}
-          currentTime={playerState.currentTime}
-          duration={playerState.duration}
-          zoomScale={1}
-          currentResizeMode={playerState.resizeMode}
-          ksAudioTracks={tracksHook.ksAudioTracks}
-          selectedAudioTrack={tracksHook.computedSelectedAudioTrack}
-          availableStreams={availableStreams}
-          togglePlayback={controlsHook.togglePlayback}
-          skip={controlsHook.skip}
-          handleClose={handleClose}
-          cycleAspectRatio={cycleResizeMode}
-          cyclePlaybackSpeed={() => {
-            const speeds = [0.5, 1, 1.25, 1.5, 2];
-            const idx = speeds.indexOf(speedControl.playbackSpeed);
-            const next = speeds[(idx + 1) % speeds.length];
-            speedControl.setPlaybackSpeed(next);
-          }}
-          currentPlaybackSpeed={speedControl.playbackSpeed}
-          setShowAudioModal={modals.setShowAudioModal}
-          setShowSubtitleModal={modals.setShowSubtitleModal}
-          setShowSpeedModal={modals.setShowSpeedModal}
-          isSubtitleModalOpen={modals.showSubtitleModal}
-          setShowSourcesModal={modals.setShowSourcesModal}
-          setShowEpisodesModal={type === 'series' ? modals.setShowEpisodesModal : undefined}
-          onSliderValueChange={(val) => { playerState.isDragging.current = true; }}
-          onSlidingStart={() => { playerState.isDragging.current = true; }}
-          onSlidingComplete={(val) => {
-            playerState.isDragging.current = false;
-            controlsHook.seekToTime(val);
-          }}
-          buffered={playerState.buffered}
-          formatTime={formatTime}
-          playerBackend={'MPV'}
-        />
+        {/* Player Controls - TV or Mobile */}
+        {isTVDevice ? (
+          <TVPlayerControls
+            visible={playerState.showControls}
+            paused={playerState.paused}
+            currentTime={playerState.currentTime}
+            duration={playerState.duration}
+            title={title}
+            episodeTitle={episodeTitle}
+            season={season}
+            episode={episode}
+            onTogglePlayback={controlsHook.togglePlayback}
+            onSeek={(seconds) => controlsHook.skip(seconds)}
+            onClose={handleClose}
+            onShowControls={() => playerState.setShowControls(true)}
+            onShowSubtitles={() => modals.setShowSubtitleModal(true)}
+            onShowAudioTracks={() => modals.setShowAudioModal(true)}
+            onShowEpisodes={type === 'series' ? () => modals.setShowEpisodesModal(true) : undefined}
+            playbackSpeed={speedControl.playbackSpeed}
+            buffered={playerState.duration > 0 ? playerState.buffered / playerState.duration : 0}
+          />
+        ) : (
+          <PlayerControls
+            showControls={playerState.showControls}
+            fadeAnim={fadeAnim}
+            paused={playerState.paused}
+            title={title}
+            episodeTitle={episodeTitle}
+            season={season}
+            episode={episode}
+            quality={currentQuality || quality}
+            year={year}
+            streamProvider={currentStreamProvider || streamProvider}
+            streamName={currentStreamName}
+            currentTime={playerState.currentTime}
+            duration={playerState.duration}
+            zoomScale={1}
+            currentResizeMode={playerState.resizeMode}
+            ksAudioTracks={tracksHook.ksAudioTracks}
+            selectedAudioTrack={tracksHook.computedSelectedAudioTrack}
+            availableStreams={availableStreams}
+            togglePlayback={controlsHook.togglePlayback}
+            skip={controlsHook.skip}
+            handleClose={handleClose}
+            cycleAspectRatio={cycleResizeMode}
+            cyclePlaybackSpeed={() => {
+              const speeds = [0.5, 1, 1.25, 1.5, 2];
+              const idx = speeds.indexOf(speedControl.playbackSpeed);
+              const next = speeds[(idx + 1) % speeds.length];
+              speedControl.setPlaybackSpeed(next);
+            }}
+            currentPlaybackSpeed={speedControl.playbackSpeed}
+            setShowAudioModal={modals.setShowAudioModal}
+            setShowSubtitleModal={modals.setShowSubtitleModal}
+            setShowSpeedModal={modals.setShowSpeedModal}
+            isSubtitleModalOpen={modals.showSubtitleModal}
+            setShowSourcesModal={modals.setShowSourcesModal}
+            setShowEpisodesModal={type === 'series' ? modals.setShowEpisodesModal : undefined}
+            onSliderValueChange={(val) => { playerState.isDragging.current = true; }}
+            onSlidingStart={() => { playerState.isDragging.current = true; }}
+            onSlidingComplete={(val) => {
+              playerState.isDragging.current = false;
+              controlsHook.seekToTime(val);
+            }}
+            buffered={playerState.buffered}
+            formatTime={formatTime}
+            playerBackend={'MPV'}
+          />
+        )}
 
         <SpeedActivatedOverlay
           visible={speedControl.showSpeedActivatedOverlay}
@@ -661,19 +698,22 @@ const AndroidVideoPlayer: React.FC = () => {
           speed={speedControl.holdToSpeedValue}
         />
 
-        <PauseOverlay
-          visible={playerState.paused && !playerState.showControls}
-          onClose={() => playerState.setShowControls(true)}
-          title={title}
-          episodeTitle={episodeTitle}
-          season={season}
-          episode={episode}
-          year={year}
-          type={type || 'movie'}
-          description={nextEpisodeHook.currentEpisodeDescription || ''}
-          cast={cast}
-          screenDimensions={playerState.screenDimensions}
-        />
+        {/* Pause Overlay - Only on mobile (TV uses controls overlay instead) */}
+        {!isTVDevice && (
+          <PauseOverlay
+            visible={playerState.paused && !playerState.showControls}
+            onClose={() => playerState.setShowControls(true)}
+            title={title}
+            episodeTitle={episodeTitle}
+            season={season}
+            episode={episode}
+            year={year}
+            type={type || 'movie'}
+            description={nextEpisodeHook.currentEpisodeDescription || ''}
+            cast={cast}
+            screenDimensions={playerState.screenDimensions}
+          />
+        )}
 
         {/* Parental Guide Overlay - Shows after controls first hide */}
         <ParentalGuideOverlay

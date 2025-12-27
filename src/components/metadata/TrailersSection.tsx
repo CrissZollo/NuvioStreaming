@@ -20,6 +20,9 @@ import { logger } from '../../utils/logger';
 import TrailerService from '../../services/trailerService';
 import TrailerModal from './TrailerModal';
 import Animated, { useSharedValue, withTiming, withDelay, useAnimatedStyle } from 'react-native-reanimated';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
+import { TVFocusSection } from '../tv/TVFocusSection';
 
 // Enhanced responsive breakpoints for Trailers Section
 const BREAKPOINTS = {
@@ -62,6 +65,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
   const { pauseTrailer } = useTrailer();
+  const isTVDevice = useIsTV();
   const [trailers, setTrailers] = useState<CategorizedTrailers>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -498,6 +502,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   }
 
   return (
+    <TVFocusSection>
     <Animated.View style={[
       styles.container,
       sectionAnimatedStyle,
@@ -517,40 +522,80 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
 
         {/* Category Selector - Right Aligned */}
         {trailerCategories.length > 0 && selectedCategory && (
-          <TouchableOpacity
-            style={[
-              styles.categorySelector,
-              {
-                borderColor: 'rgba(255,255,255,0.6)',
-                paddingHorizontal: isTV ? 14 : isLargeTablet ? 12 : isTablet ? 10 : 10,
-                paddingVertical: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 5 : 5,
-                borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-                maxWidth: isTV ? 200 : isLargeTablet ? 180 : isTablet ? 160 : 160
-              }
-            ]}
-            onPress={toggleDropdown}
-            activeOpacity={0.8}
-          >
-            <Text
+          isTVDevice ? (
+            <Focusable
+              onPress={toggleDropdown}
               style={[
-                styles.categorySelectorText,
+                styles.categorySelector,
                 {
-                  color: currentTheme.colors.highEmphasis,
-                  fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
-                  maxWidth: isTV ? 150 : isLargeTablet ? 130 : isTablet ? 120 : 120
+                  borderColor: 'rgba(255,255,255,0.6)',
+                  paddingHorizontal: isTV ? 14 : isLargeTablet ? 12 : isTablet ? 10 : 10,
+                  paddingVertical: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 5 : 5,
+                  borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+                  maxWidth: isTV ? 200 : isLargeTablet ? 180 : isTablet ? 160 : 160
                 }
               ]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
+              borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
+              focusScale={1.05}
+              animateBackground={false}
+              scrollOnFocus={false}
             >
-              {formatTrailerType(selectedCategory)}
-            </Text>
-            <MaterialIcons
-              name={dropdownVisible ? "expand-less" : "expand-more"}
-              size={isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18}
-              color="rgba(255,255,255,0.7)"
-            />
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.categorySelectorText,
+                  {
+                    color: currentTheme.colors.highEmphasis,
+                    fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
+                    maxWidth: isTV ? 150 : isLargeTablet ? 130 : isTablet ? 120 : 120
+                  }
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {formatTrailerType(selectedCategory)}
+              </Text>
+              <MaterialIcons
+                name={dropdownVisible ? "expand-less" : "expand-more"}
+                size={isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18}
+                color="rgba(255,255,255,0.7)"
+              />
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.categorySelector,
+                {
+                  borderColor: 'rgba(255,255,255,0.6)',
+                  paddingHorizontal: isTV ? 14 : isLargeTablet ? 12 : isTablet ? 10 : 10,
+                  paddingVertical: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 5 : 5,
+                  borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+                  maxWidth: isTV ? 200 : isLargeTablet ? 180 : isTablet ? 160 : 160
+                }
+              ]}
+              onPress={toggleDropdown}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.categorySelectorText,
+                  {
+                    color: currentTheme.colors.highEmphasis,
+                    fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
+                    maxWidth: isTV ? 150 : isLargeTablet ? 130 : isTablet ? 120 : 120
+                  }
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {formatTrailerType(selectedCategory)}
+              </Text>
+              <MaterialIcons
+                name={dropdownVisible ? "expand-less" : "expand-more"}
+                size={isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18}
+                color="rgba(255,255,255,0.7)"
+              />
+            </TouchableOpacity>
+          )
         )}
       </View>
 
@@ -573,19 +618,9 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
             maxWidth: isTV ? 400 : isLargeTablet ? 360 : isTablet ? 320 : 320,
             borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
           }]}>
-            {trailerCategories.map(category => (
-              <TouchableOpacity
-                key={category}
-                style={[
-                  styles.dropdownItem,
-                  {
-                    paddingHorizontal: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-                    paddingVertical: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 14 : 14
-                  }
-                ]}
-                onPress={() => handleCategorySelect(category)}
-                activeOpacity={0.7}
-              >
+            {trailerCategories.map((category, index) => {
+              // For mobile: static content
+              const dropdownItemContent = (
                 <View style={styles.dropdownItemContent}>
                   <View style={[
                     styles.categoryIconContainer,
@@ -624,8 +659,84 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                     {trailers[category].length}
                   </Text>
                 </View>
-              </TouchableOpacity>
-            ))}
+              );
+
+              return isTVDevice ? (
+                <Focusable
+                  key={category}
+                  onPress={() => handleCategorySelect(category)}
+                  style={[
+                    styles.dropdownItem,
+                    {
+                      paddingHorizontal: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+                      paddingVertical: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 14 : 14
+                    }
+                  ]}
+                  borderRadius={8}
+                  focusScale={1.02}
+                  animateBackground={true}
+                  autoFocus={index === 0}
+                  scrollOnFocus={false}
+                >
+                  {(focused) => (
+                    <View style={styles.dropdownItemContent}>
+                      <View style={[
+                        styles.categoryIconContainer,
+                        {
+                          backgroundColor: focused ? currentTheme.colors.primary : currentTheme.colors.primary + '15',
+                          width: isTV ? 36 : isLargeTablet ? 32 : isTablet ? 28 : 28,
+                          height: isTV ? 36 : isLargeTablet ? 32 : isTablet ? 28 : 28,
+                          borderRadius: isTV ? 10 : isLargeTablet ? 9 : isTablet ? 8 : 8
+                        }
+                      ]}>
+                        <MaterialIcons
+                          name={getTrailerTypeIcon(category) as any}
+                          size={isTV ? 18 : isLargeTablet ? 16 : isTablet ? 14 : 14}
+                          color={focused ? '#FFFFFF' : currentTheme.colors.primary}
+                        />
+                      </View>
+                      <Text style={[
+                        styles.dropdownItemText,
+                        {
+                          color: focused ? '#000000' : currentTheme.colors.highEmphasis,
+                          fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 16
+                        }
+                      ]}>
+                        {formatTrailerType(category)}
+                      </Text>
+                      <Text style={[
+                        styles.dropdownItemCount,
+                        {
+                          color: focused ? '#333333' : currentTheme.colors.textMuted,
+                          backgroundColor: focused ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+                          fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12,
+                          paddingHorizontal: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8,
+                          paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4,
+                          borderRadius: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 10
+                        }
+                      ]}>
+                        {trailers[category].length}
+                      </Text>
+                    </View>
+                  )}
+                </Focusable>
+              ) : (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.dropdownItem,
+                    {
+                      paddingHorizontal: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+                      paddingVertical: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 14 : 14
+                    }
+                  ]}
+                  onPress={() => handleCategorySelect(category)}
+                  activeOpacity={0.7}
+                >
+                  {dropdownItemContent}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -646,25 +757,17 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
             snapToInterval={trailerCardWidth + trailerCardSpacing} // card width + gap for smooth scrolling
             snapToAlignment="start"
           >
-            {trailers[selectedCategory].map((trailer, index) => (
-              <View
-                key={trailer.id}
-                style={[
-                  styles.trailerCardContainer,
-                  { width: trailerCardWidth }
-                ]}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.trailerCard,
-                    {
-                      width: trailerCardWidth,
-                      borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
-                    }
-                  ]}
-                  onPress={() => handleTrailerPress(trailer)}
-                  activeOpacity={0.9}
-                >
+            {trailers[selectedCategory].map((trailer, index) => {
+              const cardStyle = [
+                styles.trailerCard,
+                {
+                  width: trailerCardWidth,
+                  borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
+                }
+              ];
+
+              const cardContent = (
+                <>
                   {/* Thumbnail with Gradient Overlay */}
                   <View style={styles.thumbnailWrapper}>
                     <FastImage
@@ -685,37 +788,68 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                       }
                     ]} />
                   </View>
-                </TouchableOpacity>
+                </>
+              );
 
-                {/* Trailer Info Below Card */}
-                <View style={styles.trailerInfoBelow}>
-                  <Text
-                    style={[
-                      styles.trailerTitle,
+              return (
+                <View
+                  key={trailer.id}
+                  style={[
+                    styles.trailerCardContainer,
+                    { width: trailerCardWidth }
+                  ]}
+                >
+                  {isTVDevice ? (
+                    <Focusable
+                      onPress={() => handleTrailerPress(trailer)}
+                      style={cardStyle}
+                      borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
+                      focusScale={1.05}
+                      animateBackground={false}
+                      scrollOnFocus={false}
+                    >
+                      {cardContent}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      style={cardStyle}
+                      onPress={() => handleTrailerPress(trailer)}
+                      activeOpacity={0.9}
+                    >
+                      {cardContent}
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Trailer Info Below Card */}
+                  <View style={styles.trailerInfoBelow}>
+                    <Text
+                      style={[
+                        styles.trailerTitle,
+                        {
+                          color: currentTheme.colors.highEmphasis,
+                          fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
+                          lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16,
+                          marginTop: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 10,
+                          marginBottom: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
+                        }
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {trailer.displayName || trailer.name}
+                    </Text>
+                    <Text style={[
+                      styles.trailerMeta,
                       {
-                        color: currentTheme.colors.highEmphasis,
-                        fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
-                        lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16,
-                        marginTop: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 10,
-                        marginBottom: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
+                        color: currentTheme.colors.textMuted,
+                        fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 10
                       }
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {trailer.displayName || trailer.name}
-                  </Text>
-                  <Text style={[
-                    styles.trailerMeta,
-                    {
-                      color: currentTheme.colors.textMuted,
-                      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 10
-                    }
-                  ]}>
-                    {new Date(trailer.published_at).getFullYear()}
-                  </Text>
+                    ]}>
+                      {new Date(trailer.published_at).getFullYear()}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
             {/* Scroll Indicator - shows when there are more items to scroll */}
             {trailers[selectedCategory].length > (isTV ? 5 : isLargeTablet ? 4 : isTablet ? 4 : 3) && (
               <View style={[
@@ -746,6 +880,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
         contentTitle={contentTitle}
       />
     </Animated.View>
+    </TVFocusSection>
   );
 });
 
@@ -891,6 +1026,8 @@ const styles = StyleSheet.create({
   // Trailer Card Container (wraps card + info)
   trailerCardContainer: {
     alignItems: 'flex-start',
+    overflow: 'visible',
+    paddingTop: 6,
   },
 
   // Enhanced Trailer Card Styles (thumbnail only)

@@ -338,7 +338,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         // Show placeholder for items without posters
         <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center', borderRadius: posterRadius }]}>
           <Text style={{ color: currentTheme.colors.textMuted, fontSize: 10, textAlign: 'center' }}>
-            {item.name.substring(0, 20)}...
+            {item.name ? item.name.substring(0, 20) + '...' : 'No title'}
           </Text>
         </View>
       )}

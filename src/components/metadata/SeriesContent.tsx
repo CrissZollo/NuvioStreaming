@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 import { Episode } from '../../types/metadata';
 import { tmdbService, IMDbRatings } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
@@ -56,6 +58,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   const { settings } = useSettings();
   const { width } = useWindowDimensions();
   const isDarkMode = useColorScheme() === 'dark';
+  const isTVDevice = useIsTV();
 
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
@@ -844,102 +847,137 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
             if (seasonViewMode === 'text') {
               // Text-only view
+              const textButtonStyle = [
+                styles.seasonTextButton,
+                {
+                  marginRight: seasonButtonSpacing,
+                  width: isTV ? 150 : isLargeTablet ? 140 : isTablet ? 130 : 110,
+                  paddingVertical: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+                  paddingHorizontal: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+                  borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                },
+                selectedSeason === season && styles.selectedSeasonTextButton
+              ];
+
+              const textButtonContent = (
+                <Text style={[
+                  styles.seasonTextButtonText,
+                  isTablet && styles.seasonTextButtonTextTablet,
+                  { color: currentTheme.colors.highEmphasis },
+                  selectedSeason === season && [
+                    styles.selectedSeasonTextButtonText,
+                    isTablet && styles.selectedSeasonTextButtonTextTablet,
+                    { color: currentTheme.colors.highEmphasis }
+                  ]
+                ]} numberOfLines={1}>
+                  {season === 0 ? 'Specials' : `Season ${season}`}
+                </Text>
+              );
 
               return (
                 <View
                   key={season}
                   style={{ opacity: textViewVisible ? 1 : 0 }}
                 >
-                  <TouchableOpacity
-                    style={[
-                      styles.seasonTextButton,
-                      {
-                        marginRight: seasonButtonSpacing,
-                        width: isTV ? 150 : isLargeTablet ? 140 : isTablet ? 130 : 110,
-                        paddingVertical: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
-                        paddingHorizontal: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-                        borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-                      },
-                      selectedSeason === season && styles.selectedSeasonTextButton
-                    ]}
-                    onPress={() => onSeasonChange(season)}
-                  >
-                    <Text style={[
-                      styles.seasonTextButtonText,
-                      isTablet && styles.seasonTextButtonTextTablet,
-                      { color: currentTheme.colors.highEmphasis },
-                      selectedSeason === season && [
-                        styles.selectedSeasonTextButtonText,
-                        isTablet && styles.selectedSeasonTextButtonTextTablet,
-                        { color: currentTheme.colors.highEmphasis }
-                      ]
-                    ]} numberOfLines={1}>
-                      {season === 0 ? 'Specials' : `Season ${season}`}
-                    </Text>
-                  </TouchableOpacity>
+                  {isTVDevice ? (
+                    <Focusable
+                      style={textButtonStyle}
+                      onPress={() => onSeasonChange(season)}
+                      borderRadius={isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12}
+                      focusScale={1.05}
+                      animateBackground={false}
+                    >
+                      {textButtonContent}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      style={textButtonStyle}
+                      onPress={() => onSeasonChange(season)}
+                    >
+                      {textButtonContent}
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             }
 
             // Poster view (current implementation)
+            const posterButtonStyle = [
+              styles.seasonButton,
+              {
+                marginRight: seasonButtonSpacing,
+                width: seasonPosterWidth
+              },
+              selectedSeason === season && [styles.selectedSeasonButton, { borderColor: currentTheme.colors.primary }]
+            ];
+
+            const posterButtonContent = (
+              <>
+                <View style={[
+                  styles.seasonPosterContainer,
+                  {
+                    width: seasonPosterWidth,
+                    height: seasonPosterHeight,
+                    borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
+                    marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+                  }
+                ]}>
+                  <FastImage
+                    source={{ uri: seasonPoster }}
+                    style={styles.seasonPoster}
+                    resizeMode={FastImage.resizeMode.cover}
+                  />
+                  {selectedSeason === season && (
+                    <View style={[
+                      styles.selectedSeasonIndicator,
+                      {
+                        backgroundColor: currentTheme.colors.primary,
+                        height: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+                      }
+                    ]} />
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.seasonButtonText,
+                    {
+                      color: currentTheme.colors.mediumEmphasis,
+                      fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14
+                    },
+                    selectedSeason === season && [
+                      styles.selectedSeasonButtonText,
+                      { color: currentTheme.colors.primary }
+                    ]
+                  ]}
+                >
+                  {season === 0 ? 'Specials' : `Season ${season}`}
+                </Text>
+              </>
+            );
 
             return (
               <View
                 key={season}
                 style={{ opacity: posterViewVisible ? 1 : 0 }}
               >
-                <TouchableOpacity
-                  style={[
-                    styles.seasonButton,
-                    {
-                      marginRight: seasonButtonSpacing,
-                      width: seasonPosterWidth
-                    },
-                    selectedSeason === season && [styles.selectedSeasonButton, { borderColor: currentTheme.colors.primary }]
-                  ]}
-                  onPress={() => onSeasonChange(season)}
-                >
-                  <View style={[
-                    styles.seasonPosterContainer,
-                    {
-                      width: seasonPosterWidth,
-                      height: seasonPosterHeight,
-                      borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
-                      marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
-                    }
-                  ]}>
-                    <FastImage
-                      source={{ uri: seasonPoster }}
-                      style={styles.seasonPoster}
-                      resizeMode={FastImage.resizeMode.cover}
-                    />
-                    {selectedSeason === season && (
-                      <View style={[
-                        styles.selectedSeasonIndicator,
-                        {
-                          backgroundColor: currentTheme.colors.primary,
-                          height: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
-                        }
-                      ]} />
-                    )}
-
-                  </View>
-                  <Text
-                    style={[
-                      styles.seasonButtonText,
-                      {
-                        color: currentTheme.colors.mediumEmphasis,
-                        fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14
-                      },
-                      selectedSeason === season && [
-                        styles.selectedSeasonButtonText,
-                        { color: currentTheme.colors.primary }
-                      ]
-                    ]}
+                {isTVDevice ? (
+                  <Focusable
+                    style={posterButtonStyle}
+                    onPress={() => onSeasonChange(season)}
+                    borderRadius={isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8}
+                    focusScale={1.05}
+                    animateBackground={false}
                   >
-                    {season === 0 ? 'Specials' : `Season ${season}`}
-                  </Text>
-                </TouchableOpacity>
+                    {posterButtonContent}
+                  </Focusable>
+                ) : (
+                  <TouchableOpacity
+                    style={posterButtonStyle}
+                    onPress={() => onSeasonChange(season)}
+                  >
+                    {posterButtonContent}
+                  </TouchableOpacity>
+                )}
               </View>
             );
           }}
@@ -1023,23 +1061,18 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     // Don't show progress bar if episode is complete (>= 85%)
     const showProgress = progress && progressPercent < 85;
 
-    return (
-      <TouchableOpacity
-        key={episode.id}
-        style={[
-          styles.episodeCardVertical,
-          {
-            backgroundColor: currentTheme.colors.elevation2,
-            borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-            marginBottom: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-            height: isTV ? 200 : isLargeTablet ? 180 : isTablet ? 160 : 120
-          }
-        ]}
-        onPress={() => onSelectEpisode(episode)}
-        onLongPress={() => handleEpisodeLongPress(episode)}
-        delayLongPress={400}
-        activeOpacity={0.7}
-      >
+    const episodeCardStyle = [
+      styles.episodeCardVertical,
+      {
+        backgroundColor: currentTheme.colors.elevation2,
+        borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+        marginBottom: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+        height: isTV ? 200 : isLargeTablet ? 180 : isTablet ? 160 : 120
+      }
+    ];
+
+    const episodeCardContent = (
+      <>
         <View style={[
           styles.episodeImageContainer,
           {
@@ -1229,6 +1262,35 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             {(episode.overview || (episode as any).description || (episode as any).plot || (episode as any).synopsis || 'No description available')}
           </Text>
         </View>
+      </>
+    );
+
+    if (isTVDevice) {
+      return (
+        <Focusable
+          key={episode.id}
+          style={episodeCardStyle}
+          onPress={() => onSelectEpisode(episode)}
+          onLongPress={() => handleEpisodeLongPress(episode)}
+          borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
+          focusScale={1.03}
+          animateBackground={false}
+        >
+          {episodeCardContent}
+        </Focusable>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        key={episode.id}
+        style={episodeCardStyle}
+        onPress={() => onSelectEpisode(episode)}
+        onLongPress={() => handleEpisodeLongPress(episode)}
+        delayLongPress={400}
+        activeOpacity={0.7}
+      >
+        {episodeCardContent}
       </TouchableOpacity>
     );
   };
@@ -1298,31 +1360,26 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     // Don't show progress bar if episode is complete (>= 85%)
     const showProgress = progress && progressPercent < 85;
 
-    return (
-      <TouchableOpacity
-        key={episode.id}
-        style={[
-          styles.episodeCardHorizontal,
-          {
-            borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
-            height: horizontalCardHeight,
-            elevation: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
-            shadowOpacity: isTV ? 0.4 : isLargeTablet ? 0.35 : isTablet ? 0.3 : 0.3,
-            shadowRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8
-          },
-          // Gradient border styling
-          {
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.12)',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-          }
-        ]}
-        onPress={() => onSelectEpisode(episode)}
-        onLongPress={() => handleEpisodeLongPress(episode)}
-        delayLongPress={400}
-        activeOpacity={0.85}
-      >
+    const horizontalCardStyle = [
+      styles.episodeCardHorizontal,
+      {
+        borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+        height: horizontalCardHeight,
+        elevation: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
+        shadowOpacity: isTV ? 0.4 : isLargeTablet ? 0.35 : isTablet ? 0.3 : 0.3,
+        shadowRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8
+      },
+      // Gradient border styling
+      {
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+      }
+    ];
+
+    const horizontalCardContent = (
+      <>
         {/* Solid outline replaces gradient border */}
 
         {/* Background Image */}
@@ -1522,6 +1579,35 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           )}
 
         </LinearGradient>
+      </>
+    );
+
+    if (isTVDevice) {
+      return (
+        <Focusable
+          key={episode.id}
+          style={horizontalCardStyle}
+          onPress={() => onSelectEpisode(episode)}
+          onLongPress={() => handleEpisodeLongPress(episode)}
+          borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
+          focusScale={1.03}
+          animateBackground={false}
+        >
+          {horizontalCardContent}
+        </Focusable>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        key={episode.id}
+        style={horizontalCardStyle}
+        onPress={() => onSelectEpisode(episode)}
+        onLongPress={() => handleEpisodeLongPress(episode)}
+        delayLongPress={400}
+        activeOpacity={0.85}
+      >
+        {horizontalCardContent}
       </TouchableOpacity>
     );
   };

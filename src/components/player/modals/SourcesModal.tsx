@@ -8,6 +8,8 @@ import Animated, {
   SlideOutRight,
 } from 'react-native-reanimated';
 import { Stream } from '../../../types/streams';
+import { useIsTV } from '../../../contexts/TVContext';
+import { Focusable } from '../../tv/Focusable';
 
 interface SourcesModalProps {
   showSourcesModal: boolean;
@@ -58,7 +60,8 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
   isChangingSource = false,
 }) => {
   const { width } = useWindowDimensions();
-  const MENU_WIDTH = Math.min(width * 0.85, 400);
+  const isTVDevice = useIsTV();
+  const MENU_WIDTH = isTVDevice ? Math.min(width * 0.4, 500) : Math.min(width * 0.85, 400);
 
   const handleClose = () => {
     setShowSourcesModal(false);
@@ -85,7 +88,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={10000}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 10000 }]}>
       {/* Backdrop */}
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
@@ -115,16 +118,33 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
       >
         {/* Header */}
         <View style={{
-          paddingTop: Platform.OS === 'ios' ? 60 : 20,
+          paddingTop: Platform.OS === 'ios' ? 60 : (isTVDevice ? 30 : 20),
           paddingHorizontal: 20,
           paddingBottom: 20,
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <Text style={{ color: 'white', fontSize: 20, fontWeight: '700' }}>
+          <Text style={{ color: 'white', fontSize: isTVDevice ? 24 : 20, fontWeight: '700' }}>
             Change Source
           </Text>
+          {isTVDevice && (
+            <Focusable
+              onPress={handleClose}
+              style={{
+                padding: 8,
+                borderRadius: 20,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+              }}
+              borderRadius={20}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <MaterialIcons name="close" size={24} color={focused ? 'black' : 'white'} />
+              )}
+            </Focusable>
+          )}
         </View>
 
         <ScrollView
@@ -151,10 +171,10 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
             sortedProviders.map(([providerId, providerData]) => (
               <View key={providerId} style={{ marginBottom: 20 }}>
                 <Text style={{
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  fontSize: 12,
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: isTVDevice ? 14 : 12,
                   fontWeight: '700',
-                  marginBottom: 10,
+                  marginBottom: isTVDevice ? 14 : 10,
                   marginLeft: 5,
                   textTransform: 'uppercase',
                   letterSpacing: 1,
@@ -162,10 +182,84 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                   {providerData.addonName} ({providerData.streams.length})
                 </Text>
 
-                <View style={{ gap: 8 }}>
+                <View style={{ gap: isTVDevice ? 10 : 8 }}>
                   {providerData.streams.map((stream, index) => {
                     const isSelected = isStreamSelected(stream);
                     const quality = getQualityFromTitle(stream.title) || stream.quality;
+                    const isFirstStream = providerId === sortedProviders[0]?.[0] && index === 0;
+
+                    const streamItemContent = (focused?: boolean) => (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={{
+                              color: (isSelected || focused) ? 'black' : 'white',
+                              fontWeight: (isSelected || focused) ? '700' : '500',
+                              fontSize: isTVDevice ? 16 : 14,
+                              flex: 1,
+                            }} numberOfLines={1}>
+                              {stream.title || stream.name || `Stream ${index + 1}`}
+                            </Text>
+                            <QualityBadge quality={quality} />
+                          </View>
+
+                          {(stream.size || stream.lang) && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                              {stream.size && (
+                                <Text style={{
+                                  color: (isSelected || focused) ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)',
+                                  fontSize: isTVDevice ? 13 : 11,
+                                }}>
+                                  {(stream.size / (1024 * 1024 * 1024)).toFixed(1)} GB
+                                </Text>
+                              )}
+                              {stream.lang && (
+                                <Text style={{
+                                  color: (isSelected || focused) ? 'rgba(59, 130, 246, 1)' : 'rgba(59, 130, 246, 0.8)',
+                                  fontSize: isTVDevice ? 13 : 11,
+                                  fontWeight: '600',
+                                }}>
+                                  {stream.lang.toUpperCase()}
+                                </Text>
+                              )}
+                            </View>
+                          )}
+                        </View>
+
+                        <View style={{ marginLeft: 12 }}>
+                          {isSelected ? (
+                            <MaterialIcons name="check" size={isTVDevice ? 24 : 20} color="black" />
+                          ) : (
+                            <MaterialIcons name="play-arrow" size={isTVDevice ? 24 : 20} color={(focused) ? 'black' : 'rgba(255,255,255,0.3)'} />
+                          )}
+                        </View>
+                      </View>
+                    );
+
+                    if (isTVDevice) {
+                      return (
+                        <Focusable
+                          key={`${providerId}-${index}`}
+                          onPress={() => handleStreamSelect(stream)}
+                          style={{
+                            padding: 14,
+                            borderRadius: 12,
+                            backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.08)',
+                            borderWidth: 2,
+                            borderColor: isSelected ? 'white' : 'transparent',
+                            opacity: (isChangingSource && !isSelected) ? 0.5 : 1,
+                          }}
+                          borderRadius={12}
+                          focusScale={1.0}
+                          animateBackground={!isSelected}
+                          showFocusBorder={!isSelected}
+                          autoFocus={isFirstStream}
+                          disabled={isChangingSource === true}
+                        >
+                          {(focused) => streamItemContent(focused)}
+                        </Focusable>
+                      );
+                    }
 
                     return (
                       <TouchableOpacity
@@ -182,51 +276,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                         activeOpacity={0.7}
                         disabled={isChangingSource === true}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <Text style={{
-                                color: isSelected ? 'black' : 'white',
-                                fontWeight: isSelected ? '700' : '500',
-                                fontSize: 14,
-                                flex: 1,
-                              }} numberOfLines={1}>
-                                {stream.title || stream.name || `Stream ${index + 1}`}
-                              </Text>
-                              <QualityBadge quality={quality} />
-                            </View>
-
-                            {(stream.size || stream.lang) && (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                {stream.size && (
-                                  <Text style={{
-                                    color: isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)',
-                                    fontSize: 11,
-                                  }}>
-                                    {(stream.size / (1024 * 1024 * 1024)).toFixed(1)} GB
-                                  </Text>
-                                )}
-                                {stream.lang && (
-                                  <Text style={{
-                                    color: isSelected ? 'rgba(59, 130, 246, 1)' : 'rgba(59, 130, 246, 0.8)',
-                                    fontSize: 11,
-                                    fontWeight: '600',
-                                  }}>
-                                    {stream.lang.toUpperCase()}
-                                  </Text>
-                                )}
-                              </View>
-                            )}
-                          </View>
-
-                          <View style={{ marginLeft: 12 }}>
-                            {isSelected ? (
-                              <MaterialIcons name="check" size={20} color="black" />
-                            ) : (
-                              <MaterialIcons name="play-arrow" size={20} color="rgba(255,255,255,0.3)" />
-                            )}
-                          </View>
-                        </View>
+                        {streamItemContent()}
                       </TouchableOpacity>
                     );
                   })}

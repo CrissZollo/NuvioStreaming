@@ -212,7 +212,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
     .map(source => [source, ratings[source as keyof typeof ratings]!]);
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         styles.container,
         {
@@ -226,6 +226,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
           }],
         },
       ]}
+      focusable={false}
     >
       <View style={styles.compactRatingsContainer}>
         {displayRatings.map(([source, value]) => {

@@ -60,6 +60,7 @@ import StreamCard from '../components/StreamCard';
 import AnimatedImage from '../components/AnimatedImage';
 import AnimatedText from '../components/AnimatedText';
 import AnimatedView from '../components/AnimatedView';
+import { useIsTV } from '../contexts/TVContext';
 
 // Lazy-safe community blur import for Android
 let AndroidBlurView: any = null;
@@ -130,6 +131,7 @@ export const StreamsScreen = () => {
   const { colors } = currentTheme;
   const { pauseTrailer, resumeTrailer } = useTrailer();
   const { showSuccess, showInfo } = useToast();
+  const isTVDevice = useIsTV();
 
   // Add dimension listener and tablet detection
   // Use a ref to track previous dimensions to avoid unnecessary re-renders
@@ -2070,9 +2072,10 @@ export const StreamsScreen = () => {
             <View style={[
               styles.streamsMainContent,
               type === 'movie' && styles.streamsMainContentMovie,
-              !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
+              !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground },
+              isTVDevice && { overflow: 'visible' }
             ]}>
-              <View style={[styles.filterContainer]}>
+              <View style={[styles.filterContainer, isTVDevice && { paddingHorizontal: 14, overflow: 'visible' }]}>
                 {!streamsEmpty && (
                   <ProviderFilter
                     selectedProvider={selectedProvider}
@@ -2156,10 +2159,11 @@ export const StreamsScreen = () => {
                   )}
 
                   <ScrollView
-                    style={styles.streamsContent}
+                    style={[styles.streamsContent, isTVDevice && { overflow: 'visible' }]}
                     contentContainerStyle={[
                       styles.streamsContainer,
-                      { paddingBottom: insets.bottom + 100 } // Add safe area + extra padding
+                      { paddingBottom: insets.bottom + 100 }, // Add safe area + extra padding
+                      isTVDevice && { paddingHorizontal: 16, overflow: 'visible' } // Extra padding for TV focus border
                     ]}
                     showsVerticalScrollIndicator={false}
                     bounces={true}
@@ -2173,7 +2177,7 @@ export const StreamsScreen = () => {
                     })}
                   >
                     {sections.filter(Boolean).map((section, sectionIndex) => (
-                      <View key={section!.addonId || sectionIndex}>
+                      <View key={section!.addonId || sectionIndex} style={isTVDevice ? { overflow: 'visible' } : undefined}>
                         {/* Section Header */}
                         {renderSectionHeader({ section: section! })}
 
@@ -2188,8 +2192,7 @@ export const StreamsScreen = () => {
                               return `empty-${sectionIndex}-${index}`;
                             }}
                             renderItem={({ item, index }) => (
-                              <View>
-                                <StreamCard
+                              <StreamCard
                                   stream={item}
                                   onPress={() => handleStreamPress(item)}
                                   index={index}
@@ -2208,18 +2211,20 @@ export const StreamsScreen = () => {
                                   providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
                                   parentId={id}
                                   parentImdbId={imdbId || undefined}
+                                  autoFocus={sectionIndex === 0 && index === 0}
                                 />
-                              </View>
                             )}
+                            style={isTVDevice ? { overflow: 'visible' } : undefined}
+                            contentContainerStyle={isTVDevice ? { overflow: 'visible', paddingHorizontal: 4 } : undefined}
                             scrollEnabled={false}
                             initialNumToRender={6}
                             maxToRenderPerBatch={2}
                             windowSize={3}
-                            removeClippedSubviews={true}
+                            removeClippedSubviews={!isTVDevice}
                             showsVerticalScrollIndicator={false}
                             getItemLayout={(data, index) => ({
-                              length: 78, // Approximate height of StreamCard (68 minHeight + 10 marginBottom)
-                              offset: 78 * index,
+                              length: isTVDevice ? 86 : 78, // Approximate height of StreamCard + margin
+                              offset: (isTVDevice ? 86 : 78) * index,
                               index,
                             })}
                           />

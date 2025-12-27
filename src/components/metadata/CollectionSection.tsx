@@ -17,6 +17,9 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { TMDBService } from '../../services/tmdbService';
 import { catalogService } from '../../services/catalogService';
 import CustomAlert from '../../components/CustomAlert';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
+import { TVFocusSection } from '../tv/TVFocusSection';
 
 const { width } = Dimensions.get('window');
 
@@ -34,13 +37,14 @@ interface CollectionSectionProps {
   loadingCollection: boolean;
 }
 
-export const CollectionSection: React.FC<CollectionSectionProps> = ({ 
-  collectionName, 
-  collectionMovies, 
-  loadingCollection 
+export const CollectionSection: React.FC<CollectionSectionProps> = ({
+  collectionName,
+  collectionMovies,
+  loadingCollection
 }) => {
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const isTVDevice = useIsTV();
 
   // Determine device type
   const deviceWidth = Dimensions.get('window').width;
@@ -131,38 +135,72 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
     });
   }, [collectionMovies]);
 
-  const renderItem = ({ item }: { item: StreamingContent }) => (
-    <TouchableOpacity 
-      style={[styles.itemContainer, { width: backdropWidth, marginRight: itemSpacing }]}
-      onPress={() => handleItemPress(item)}
-    >
+  const renderItem = ({ item }: { item: StreamingContent }) => {
+    const itemStyle = [styles.itemContainer, { width: backdropWidth, marginRight: itemSpacing }];
+    const borderRadius = isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8;
+
+    const backdropImage = (
       <FastImage
         source={{ uri: item.banner || item.poster }}
-        style={[styles.backdrop, { 
-          backgroundColor: currentTheme.colors.elevation1, 
-          width: backdropWidth, 
-          height: backdropHeight, 
-          borderRadius: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8 
+        style={[styles.backdrop, {
+          backgroundColor: currentTheme.colors.elevation1,
+          width: backdropWidth,
+          height: backdropHeight,
+          borderRadius
         }]}
         resizeMode={FastImage.resizeMode.cover}
       />
-      <Text style={[styles.title, { 
-        color: currentTheme.colors.mediumEmphasis, 
-        fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13, 
-        lineHeight: isTV ? 20 : 18 
-      }]} numberOfLines={2}>
-        {item.name}
-      </Text>
-      {item.year && (
-        <Text style={[styles.year, { 
-          color: currentTheme.colors.textMuted, 
-          fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 11 : 11 
-        }]}>
-          {item.year}
+    );
+
+    const textContent = (
+      <>
+        <Text style={[styles.title, {
+          color: currentTheme.colors.mediumEmphasis,
+          fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13,
+          lineHeight: isTV ? 20 : 18
+        }]} numberOfLines={2}>
+          {item.name}
         </Text>
-      )}
-    </TouchableOpacity>
-  );
+        {item.year && (
+          <Text style={[styles.year, {
+            color: currentTheme.colors.textMuted,
+            fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 11 : 11
+          }]}>
+            {item.year}
+          </Text>
+        )}
+      </>
+    );
+
+    if (isTVDevice) {
+      return (
+        <View style={[itemStyle, { overflow: 'visible', paddingTop: 6 }]}>
+          <Focusable
+            onPress={() => handleItemPress(item)}
+            style={{ width: backdropWidth, height: backdropHeight, marginBottom: 8 }}
+            borderRadius={borderRadius}
+            focusScale={1.05}
+            animateBackground={false}
+            showFocusBorder={true}
+            scrollOnFocus={false}
+          >
+            {backdropImage}
+          </Focusable>
+          {textContent}
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={itemStyle}
+        onPress={() => handleItemPress(item)}
+      >
+        {backdropImage}
+        {textContent}
+      </TouchableOpacity>
+    );
+  };
 
   if (loadingCollection) {
     return (
@@ -177,11 +215,12 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
   }
 
   return (
+    <TVFocusSection>
     <View style={[styles.container, { paddingLeft: 0 }] }>
-      <Text style={[styles.sectionTitle, { 
-        color: currentTheme.colors.highEmphasis, 
-        fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20, 
-        paddingHorizontal: horizontalPadding 
+      <Text style={[styles.sectionTitle, {
+        color: currentTheme.colors.highEmphasis,
+        fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
+        paddingHorizontal: horizontalPadding
       }]}>
         {collectionName}
       </Text>
@@ -191,9 +230,9 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
         keyExtractor={(item) => item.id}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.listContentContainer, { 
-          paddingHorizontal: horizontalPadding, 
-          paddingRight: horizontalPadding + itemSpacing 
+        contentContainerStyle={[styles.listContentContainer, {
+          paddingHorizontal: horizontalPadding,
+          paddingRight: horizontalPadding + itemSpacing
         }]}
       />
       <CustomAlert
@@ -204,6 +243,7 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
         onClose={() => setAlertVisible(false)}
       />
     </View>
+    </TVFocusSection>
   );
 };
 

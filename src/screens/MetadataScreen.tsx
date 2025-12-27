@@ -11,7 +11,11 @@ import {
   BackHandler,
   Platform,
   Alert,
+  ScrollView,
 } from 'react-native';
+import { useIsTV } from '../contexts/TVContext';
+import { TVScrollProvider } from '../contexts/TVScrollContext';
+import { Focusable } from '../components/tv/Focusable';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -99,6 +103,10 @@ const MetadataScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const { top: safeAreaTop } = useSafeAreaInsets();
   const { pauseTrailer } = useTrailer();
+  const isTVDevice = useIsTV();
+
+  // ScrollView ref for TV focus centering
+  const scrollViewRef = useRef<Animated.ScrollView>(null);
 
   // Trakt integration
   const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();
@@ -914,6 +922,7 @@ const MetadataScreen: React.FC = () => {
   }
 
   return (
+    <TVScrollProvider scrollViewRef={scrollViewRef} scrollY={animations.scrollY}>
     <Animated.View style={[animatedBackgroundStyle, { flex: 1 }]}>
       <AnimatedSafeAreaView
         style={[containerStyle, styles.container]}
@@ -939,6 +948,7 @@ const MetadataScreen: React.FC = () => {
             />
 
             <Animated.ScrollView
+              ref={scrollViewRef}
               style={styles.scrollView}
               showsVerticalScrollIndicator={false}
               onScroll={animations.scrollHandler}
@@ -948,6 +958,8 @@ const MetadataScreen: React.FC = () => {
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.scrollContent}
+              removeClippedSubviews={false}
+              focusable={false}
             >
               {/* Hero Section - Optimized */}
               <HeroSection
@@ -1012,11 +1024,14 @@ const MetadataScreen: React.FC = () => {
 
                 {/* Production info row — shown below description and above cast for series */}
                 {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.networks && metadata.networks.length > 0 && metadata?.description && (
-                  <Animated.View style={[
-                    styles.productionContainer,
-                    networkSectionAnimatedStyle,
-                    { paddingHorizontal: horizontalPadding }
-                  ]}>
+                  <Animated.View
+                    style={[
+                      styles.productionContainer,
+                      networkSectionAnimatedStyle,
+                      { paddingHorizontal: horizontalPadding }
+                    ]}
+                    focusable={false}
+                  >
                     <Text style={[
                       styles.productionHeader,
                       {
@@ -1082,11 +1097,14 @@ const MetadataScreen: React.FC = () => {
                   metadata?.networks && Array.isArray(metadata.networks) &&
                   metadata.networks.some((n: any) => !!n?.logo) &&
                   metadata?.description && (
-                    <Animated.View style={[
-                      styles.productionContainer,
-                      productionSectionAnimatedStyle,
-                      { paddingHorizontal: horizontalPadding }
-                    ]}>
+                    <Animated.View
+                      style={[
+                        styles.productionContainer,
+                        productionSectionAnimatedStyle,
+                        { paddingHorizontal: horizontalPadding }
+                      ]}
+                      focusable={false}
+                    >
                       <Text style={[
                         styles.productionHeader,
                         {
@@ -1151,10 +1169,102 @@ const MetadataScreen: React.FC = () => {
 
                 {/* Movie Details section - shown above recommendations for movies when TMDB enrichment is ON */}
                 {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.movieDetails && (
-                  <View style={[
-                    styles.tvDetailsContainer,
-                    { paddingHorizontal: horizontalPadding }
-                  ]}>
+                  isTVDevice ? (
+                  <Focusable
+                    style={[
+                      styles.tvDetailsContainer,
+                      { paddingHorizontal: horizontalPadding }
+                    ]}
+                    focusScale={1.0}
+                    animateBackground={false}
+                    showFocusBorder={true}
+                    borderRadius={12}
+                  >
+                    <Text style={[
+                      styles.tvDetailsHeader,
+                      {
+                        fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                        marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                      }
+                    ]}>Movie Details</Text>
+
+                    {metadata.movieDetails.tagline && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Tagline</Text>
+                        <Text style={[styles.tvDetailValue, { fontStyle: 'italic', fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          "{metadata.movieDetails.tagline}"
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.status && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.status}</Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.releaseDate && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Release Date</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {new Date(metadata.movieDetails.releaseDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.runtime && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Runtime</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {Math.floor(metadata.movieDetails.runtime / 60)}h {metadata.movieDetails.runtime % 60}m
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.budget && metadata.movieDetails.budget > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Budget</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          ${metadata.movieDetails.budget.toLocaleString()}
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.revenue && metadata.movieDetails.revenue > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Revenue</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          ${metadata.movieDetails.revenue.toLocaleString()}
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.originCountry && metadata.movieDetails.originCountry.length > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originCountry.join(', ')}</Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.originalLanguage && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originalLanguage.toUpperCase()}</Text>
+                      </View>
+                    )}
+                  </Focusable>
+                  ) : (
+                  <View
+                    style={[
+                      styles.tvDetailsContainer,
+                      { paddingHorizontal: horizontalPadding }
+                    ]}
+                  >
                     <Text style={[
                       styles.tvDetailsHeader,
                       {
@@ -1233,22 +1343,40 @@ const MetadataScreen: React.FC = () => {
                       </View>
                     )}
                   </View>
+                  )
                 )}
 
                 {/* Backdrop Gallery section - shown after movie details for movies when TMDB ID is available and enrichment is enabled */}
                 {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
                   <View style={styles.backdropGalleryContainer}>
-                    <TouchableOpacity
-                      style={styles.backdropGalleryButton}
-                      onPress={() => navigation.navigate('BackdropGallery' as any, {
-                        tmdbId: metadata.tmdbId,
-                        type: 'movie',
-                        title: metadata.name || 'Gallery'
-                      })}
-                    >
-                      <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
-                      <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
-                    </TouchableOpacity>
+                    {isTVDevice ? (
+                      <Focusable
+                        onPress={() => navigation.navigate('BackdropGallery' as any, {
+                          tmdbId: metadata.tmdbId,
+                          type: 'movie',
+                          title: metadata.name || 'Gallery'
+                        })}
+                        style={styles.backdropGalleryButton}
+                        borderRadius={8}
+                        focusScale={1.02}
+                        animateBackground={false}
+                      >
+                        <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                        <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                      </Focusable>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.backdropGalleryButton}
+                        onPress={() => navigation.navigate('BackdropGallery' as any, {
+                          tmdbId: metadata.tmdbId,
+                          type: 'movie',
+                          title: metadata.name || 'Gallery'
+                        })}
+                      >
+                        <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                        <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
 
@@ -1282,10 +1410,111 @@ const MetadataScreen: React.FC = () => {
 
                 {/* TV Details section - shown after episodes for series when TMDB enrichment is ON */}
                 {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tvDetails && (
-                  <View style={[
-                    styles.tvDetailsContainer,
-                    { paddingHorizontal: horizontalPadding }
-                  ]}>
+                  isTVDevice ? (
+                  <Focusable
+                    style={[
+                      styles.tvDetailsContainer,
+                      { paddingHorizontal: horizontalPadding }
+                    ]}
+                    focusScale={1.0}
+                    animateBackground={false}
+                    showFocusBorder={true}
+                    borderRadius={12}
+                  >
+                    <Text style={[
+                      styles.tvDetailsHeader,
+                      {
+                        fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                        marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                      }
+                    ]}>Show Details</Text>
+
+                    {metadata.tvDetails.status && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.status}</Text>
+                      </View>
+                    )}
+
+                    {metadata.tvDetails.firstAirDate && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>First Air Date</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {new Date(metadata.tvDetails.firstAirDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.tvDetails.lastAirDate && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Last Air Date</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {new Date(metadata.tvDetails.lastAirDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.tvDetails.numberOfSeasons && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Seasons</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfSeasons}</Text>
+                      </View>
+                    )}
+
+                    {metadata.tvDetails.numberOfEpisodes && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Total Episodes</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfEpisodes}</Text>
+                      </View>
+                    )}
+
+                    {metadata.tvDetails.episodeRunTime && metadata.tvDetails.episodeRunTime.length > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Episode Runtime</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {metadata.tvDetails.episodeRunTime.join(' - ')} min
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.tvDetails.originCountry && metadata.tvDetails.originCountry.length > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originCountry.join(', ')}</Text>
+                      </View>
+                    )}
+
+                    {metadata.tvDetails.originalLanguage && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originalLanguage.toUpperCase()}</Text>
+                      </View>
+                    )}
+
+                    {metadata.tvDetails.createdBy && metadata.tvDetails.createdBy.length > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Created By</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {metadata.tvDetails.createdBy.map(creator => creator.name).join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                  </Focusable>
+                  ) : (
+                  <View
+                    style={[
+                      styles.tvDetailsContainer,
+                      { paddingHorizontal: horizontalPadding }
+                    ]}
+                  >
                     <Text style={[
                       styles.tvDetailsHeader,
                       {
@@ -1373,22 +1602,40 @@ const MetadataScreen: React.FC = () => {
                       </View>
                     )}
                   </View>
+                  )
                 )}
 
                 {/* Backdrop Gallery section - shown after show details for TV shows when TMDB ID is available and enrichment is enabled */}
                 {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
                   <View style={styles.backdropGalleryContainer}>
-                    <TouchableOpacity
-                      style={styles.backdropGalleryButton}
-                      onPress={() => navigation.navigate('BackdropGallery' as any, {
-                        tmdbId: metadata.tmdbId,
-                        type: 'tv',
-                        title: metadata.name || 'Gallery'
-                      })}
-                    >
-                      <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
-                      <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
-                    </TouchableOpacity>
+                    {isTVDevice ? (
+                      <Focusable
+                        onPress={() => navigation.navigate('BackdropGallery' as any, {
+                          tmdbId: metadata.tmdbId,
+                          type: 'tv',
+                          title: metadata.name || 'Gallery'
+                        })}
+                        style={styles.backdropGalleryButton}
+                        borderRadius={8}
+                        focusScale={1.02}
+                        animateBackground={false}
+                      >
+                        <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                        <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                      </Focusable>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.backdropGalleryButton}
+                        onPress={() => navigation.navigate('BackdropGallery' as any, {
+                          tmdbId: metadata.tmdbId,
+                          type: 'tv',
+                          title: metadata.name || 'Gallery'
+                        })}
+                      >
+                        <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                        <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
 
@@ -1424,6 +1671,7 @@ const MetadataScreen: React.FC = () => {
         />
       </AnimatedSafeAreaView>
     </Animated.View>
+    </TVScrollProvider>
   );
 };
 

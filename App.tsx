@@ -17,6 +17,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider } from 'react-native-paper';
+import { PostHogProvider } from 'posthog-react-native';
 import { enableScreens, enableFreeze } from 'react-native-screens';
 import AppNavigator, {
   CustomNavigationDarkTheme,
@@ -200,43 +201,55 @@ const ThemedApp = () => {
   return (
     <AccountProvider>
       <PaperProvider theme={customDarkTheme}>
-        <NavigationContainer
-          ref={navigationRef}
-          theme={customNavigationTheme}
-          linking={undefined}
+        <PostHogProvider
+          apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C"
+          autocapture={{
+            captureScreens: false,
+            captureTouches: false,
+            captureLifecycleEvents: false,
+          }}
+          options={{
+            host: "https://us.i.posthog.com",
+          }}
         >
-          <DownloadsProvider>
-            <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-              <StatusBar style="light" />
-              {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
-              {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
-              <UpdatePopup
-                visible={showUpdatePopup}
-                updateInfo={updateInfo}
-                onUpdateNow={handleUpdateNow}
-                onUpdateLater={handleUpdateLater}
-                onDismiss={handleDismiss}
-                isInstalling={isInstalling}
-              />
-              <MajorUpdateOverlay
-                visible={githubUpdate.visible}
-                latestTag={githubUpdate.latestTag}
-                releaseNotes={githubUpdate.releaseNotes}
-                releaseUrl={githubUpdate.releaseUrl}
-                onDismiss={githubUpdate.onDismiss}
-                onLater={githubUpdate.onLater}
-              />
-              <AnnouncementOverlay
-                visible={showAnnouncement}
-                announcements={announcements}
-                onClose={handleAnnouncementClose}
-                onActionPress={handleNavigateToDebrid}
-                actionButtonText="Connect Now"
-              />
-              <CampaignManager />
-            </View>
-          </DownloadsProvider>
-        </NavigationContainer>
+          <NavigationContainer
+            ref={navigationRef}
+            theme={customNavigationTheme}
+            linking={undefined}
+          >
+            <DownloadsProvider>
+              <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+                <StatusBar style="light" />
+                {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
+                {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
+                <UpdatePopup
+                  visible={showUpdatePopup}
+                  updateInfo={updateInfo}
+                  onUpdateNow={handleUpdateNow}
+                  onUpdateLater={handleUpdateLater}
+                  onDismiss={handleDismiss}
+                  isInstalling={isInstalling}
+                />
+                <MajorUpdateOverlay
+                  visible={githubUpdate.visible}
+                  latestTag={githubUpdate.latestTag}
+                  releaseNotes={githubUpdate.releaseNotes}
+                  releaseUrl={githubUpdate.releaseUrl}
+                  onDismiss={githubUpdate.onDismiss}
+                  onLater={githubUpdate.onLater}
+                />
+                <AnnouncementOverlay
+                  visible={showAnnouncement}
+                  announcements={announcements}
+                  onClose={handleAnnouncementClose}
+                  onActionPress={handleNavigateToDebrid}
+                  actionButtonText="Connect Now"
+                />
+                <CampaignManager />
+              </View>
+            </DownloadsProvider>
+          </NavigationContainer>
+        </PostHogProvider>
       </PaperProvider>
     </AccountProvider>
   );

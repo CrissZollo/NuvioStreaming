@@ -5,7 +5,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { campaignService, Campaign, CampaignAction } from '../../services/campaignService';
 import { PosterModal } from './PosterModal';
-import { useNavigation } from '@react-navigation/native';
+import { NavigationContainerRefContext } from '@react-navigation/native';
 import { useAccount } from '../../contexts/AccountContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -191,10 +191,20 @@ const BottomSheetCampaign: React.FC<BottomSheetProps> = ({ campaign, onDismiss, 
     );
 };
 
+// Safe hook that doesn't throw if navigation isn't ready
+const useSafeNavigation = () => {
+    const navigationRef = React.useContext(NavigationContainerRefContext);
+    // Only use navigation if the container ref exists and is ready
+    if (!navigationRef?.current) {
+        return null;
+    }
+    return navigationRef.current;
+};
+
 export const CampaignManager: React.FC = () => {
     const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
     const [isVisible, setIsVisible] = useState(false);
-    const navigation = useNavigation();
+    const navigation = useSafeNavigation();
     const { user } = useAccount();
 
     const checkForCampaigns = useCallback(async () => {
@@ -239,7 +249,7 @@ export const CampaignManager: React.FC = () => {
     const handleAction = useCallback((action: CampaignAction) => {
         console.log('[CampaignManager] Action:', action);
 
-        if (action.type === 'navigate' && action.value) {
+        if (action.type === 'navigate' && action.value && navigation) {
             handleDismiss();
             setTimeout(() => {
                 try {

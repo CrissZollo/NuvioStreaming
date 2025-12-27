@@ -20,6 +20,9 @@ import { logger } from '../../utils/logger';
 import { useTraktComments } from '../../hooks/useTraktComments';
 import { useSettings } from '../../hooks/useSettings';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
+import { TVFocusSection } from '../tv/TVFocusSection';
 
 // Enhanced responsive breakpoints for Comments Section
 const BREAKPOINTS = {
@@ -185,7 +188,8 @@ const CompactCommentCard: React.FC<{
   onPress: () => void;
   isSpoilerRevealed: boolean;
   onSpoilerPress: () => void;
-}> = ({ comment, theme, onPress, isSpoilerRevealed, onSpoilerPress }) => {
+  isTVDevice?: boolean;
+}> = ({ comment, theme, onPress, isSpoilerRevealed, onSpoilerPress, isTVDevice = false }) => {
   const [isPressed, setIsPressed] = useState(false);
   const fadeInOpacity = useRef(new Animated.Value(0)).current;
 
@@ -327,33 +331,23 @@ const CompactCommentCard: React.FC<{
     return stars;
   };
 
-  return (
-    <Animated.View
-      style={[
-        styles.compactCard,
-        {
-          backgroundColor: theme.colors.card,
-          borderColor: theme.colors.border,
-          opacity: fadeInOpacity,
-          transform: isPressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
-          width: commentCardWidth,
-          height: commentCardHeight,
-          marginRight: commentCardSpacing,
-          padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
-          borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-        },
-      ]}
-    >
-      <TouchableOpacity
-        style={{ flex: 1 }}
-        onPressIn={() => setIsPressed(true)}
-        onPressOut={() => setIsPressed(false)}
-        onPress={() => {
-          console.log('CompactCommentCard: TouchableOpacity pressed for comment:', comment.id);
-          onPress();
-        }}
-        activeOpacity={1}
-      >
+  const cardStyle = [
+    styles.compactCard,
+    {
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      opacity: fadeInOpacity,
+      transform: isPressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
+      width: commentCardWidth,
+      height: commentCardHeight,
+      marginRight: commentCardSpacing,
+      padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+      borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+    },
+  ];
+
+  const cardContent = (
+    <>
         {/* Trakt Icon - Top Right Corner */}
         <View style={styles.traktIconContainer}>
           <TraktIcon width={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} height={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} />
@@ -504,7 +498,39 @@ const CompactCommentCard: React.FC<{
             )}
           </View>
         </View>
-      </TouchableOpacity>
+    </>
+  );
+
+  return (
+    <Animated.View style={cardStyle}>
+      {isTVDevice ? (
+        <Focusable
+          onPress={() => {
+            console.log('CompactCommentCard: Focusable pressed for comment:', comment.id);
+            onPress();
+          }}
+          style={{ flex: 1 }}
+          borderRadius={isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12}
+          focusScale={1.05}
+          animateBackground={false}
+          scrollOnFocus={false}
+        >
+          {cardContent}
+        </Focusable>
+      ) : (
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          onPressIn={() => setIsPressed(true)}
+          onPressOut={() => setIsPressed(false)}
+          onPress={() => {
+            console.log('CompactCommentCard: TouchableOpacity pressed for comment:', comment.id);
+            onPress();
+          }}
+          activeOpacity={1}
+        >
+          {cardContent}
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 };
@@ -727,6 +753,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
+  const isTVDevice = useIsTV();
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
 
   // Enhanced responsive sizing for tablets and TV screens
@@ -812,9 +839,10 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         onSpoilerPress={() => {
           // Do nothing for now - spoilers are handled by parent
         }}
+        isTVDevice={isTVDevice}
       />
     );
-  }, [currentTheme, onCommentPress]);
+  }, [currentTheme, onCommentPress, isTVDevice]);
 
   const renderEmpty = useCallback(() => {
     if (loading) return null;
@@ -913,6 +941,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   }
 
   return (
+    <TVFocusSection>
     <View style={[
       styles.container,
       { paddingHorizontal: horizontalPadding }
@@ -1008,6 +1037,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       )}
 
     </View>
+    </TVFocusSection>
   );
 };
 

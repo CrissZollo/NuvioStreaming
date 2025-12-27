@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
-import { View, TouchableOpacity, Animated, ActivityIndicator, StyleSheet, Image } from 'react-native';
+import { View, TouchableOpacity, Animated, ActivityIndicator, StyleSheet, Image, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useIsTV } from '../../../contexts/TVContext';
+import { Focusable } from '../../tv/Focusable';
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
@@ -36,6 +38,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   width,
   height,
 }) => {
+  const isTVDevice = useIsTV();
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(1);
 
@@ -82,12 +85,13 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   if (!visible) return null;
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         styles.openingOverlay,
         {
           opacity: backgroundFadeAnim,
           zIndex: 3000,
+          backgroundColor: '#000000',
         },
         // Cast to any to support both number and string dimensions
         { width, height } as any,
@@ -109,23 +113,34 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
       )}
       <LinearGradient
         colors={[
-          'rgba(0,0,0,0.3)',
-          'rgba(0,0,0,0.6)',
-          'rgba(0,0,0,0.8)',
-          'rgba(0,0,0,0.9)'
+          'rgba(0,0,0,0.5)',
+          'rgba(0,0,0,0.7)',
+          'rgba(0,0,0,0.85)',
+          'rgba(0,0,0,0.95)'
         ]}
         locations={[0, 0.3, 0.7, 1]}
         style={StyleSheet.absoluteFill}
       />
       
-      <TouchableOpacity 
-        style={styles.loadingCloseButton}
-        onPress={onClose}
-        activeOpacity={0.7}
-      >
-        <MaterialIcons name="close" size={24} color="#ffffff" />
-      </TouchableOpacity>
-      
+      {isTVDevice ? (
+        <Focusable
+          style={styles.loadingCloseButton}
+          onPress={onClose}
+          borderRadius={20}
+          autoFocus={true}
+        >
+          <MaterialIcons name="close" size={24} color="#ffffff" />
+        </Focusable>
+      ) : (
+        <TouchableOpacity
+          style={styles.loadingCloseButton}
+          onPress={onClose}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="close" size={24} color="#ffffff" />
+        </TouchableOpacity>
+      )}
+
       <View style={styles.openingContent}>
         {hasLogo && logo ? (
           <Reanimated.View style={[
@@ -144,7 +159,18 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             />
           </Reanimated.View>
         ) : (
-          <ActivityIndicator size="large" color="#E50914" />
+          <View style={{ alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#E50914" />
+            <Text style={{
+              color: '#ffffff',
+              fontSize: isTVDevice ? 20 : 16,
+              marginTop: 16,
+              fontWeight: '500',
+              opacity: 0.8
+            }}>
+              Loading...
+            </Text>
+          </View>
         )}
       </View>
     </Animated.View>

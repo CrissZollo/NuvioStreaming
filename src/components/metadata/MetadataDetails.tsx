@@ -22,6 +22,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { isMDBListEnabled } from '../../screens/MDBListSettingsScreen';
 import { getAgeRatingColor } from '../../utils/ageRatingColors';
 import AgeRatingBadge from '../common/AgeRatingBadge';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 
 // Enhanced responsive breakpoints for Metadata Details
 const BREAKPOINTS = {
@@ -52,6 +54,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   loadingMetadata = false,
 }) => {
   const { currentTheme } = useTheme();
+  const isTVDevice = useIsTV();
   const [isFullDescriptionOpen, setIsFullDescriptionOpen] = useState(false);
   const [isMDBEnabled, setIsMDBEnabled] = useState(false);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
@@ -364,52 +367,74 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
             {metadata.description}
           </Text>
 
-          <TouchableOpacity
-            onPress={toggleDescription}
-            activeOpacity={0.7}
-            disabled={!isTextTruncated && !isFullDescriptionOpen}
-          >
-            <Animated.View style={animatedDescriptionStyle}>
-              <Text
-                style={[
-                  styles.description,
-                  {
-                    color: currentTheme.colors.mediumEmphasis,
-                    fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
-                    lineHeight: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24
-                  }
-                ]}
-                numberOfLines={isFullDescriptionOpen ? undefined : 3}
-                onTextLayout={handleTextLayout}
+          {(() => {
+            const descriptionContent = (
+              <>
+                <Animated.View style={animatedDescriptionStyle}>
+                  <Text
+                    style={[
+                      styles.description,
+                      {
+                        color: currentTheme.colors.mediumEmphasis,
+                        fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
+                        lineHeight: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24
+                      }
+                    ]}
+                    numberOfLines={isFullDescriptionOpen ? undefined : 3}
+                    onTextLayout={handleTextLayout}
+                  >
+                    {metadata.description}
+                  </Text>
+                </Animated.View>
+                {(isTextTruncated || isFullDescriptionOpen) && (
+                  <View style={[
+                    styles.showMoreButton,
+                    {
+                      marginTop: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                      paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+                    }
+                  ]}>
+                    <Text style={[
+                      styles.showMoreText,
+                      {
+                        color: currentTheme.colors.textMuted,
+                        fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
+                      }
+                    ]}>
+                      {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
+                    </Text>
+                    <MaterialIcons
+                      name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                      size={isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18}
+                      color={currentTheme.colors.textMuted}
+                    />
+                  </View>
+                )}
+              </>
+            );
+
+            if (isTVDevice) {
+              return (
+                <Focusable
+                  onPress={toggleDescription}
+                  focusScale={1.02}
+                  animateBackground={false}
+                >
+                  {descriptionContent}
+                </Focusable>
+              );
+            }
+
+            return (
+              <TouchableOpacity
+                onPress={toggleDescription}
+                activeOpacity={0.7}
+                disabled={!isTextTruncated && !isFullDescriptionOpen}
               >
-                {metadata.description}
-              </Text>
-            </Animated.View>
-            {(isTextTruncated || isFullDescriptionOpen) && (
-              <View style={[
-                styles.showMoreButton,
-                {
-                  marginTop: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-                  paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
-                }
-              ]}>
-                <Text style={[
-                  styles.showMoreText,
-                  {
-                    color: currentTheme.colors.textMuted,
-                    fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
-                  }
-                ]}>
-                  {isFullDescriptionOpen ? 'Show Less' : 'Show More'}
-                </Text>
-                <MaterialIcons
-                  name={isFullDescriptionOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                  size={isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18}
-                  color={currentTheme.colors.textMuted}
-                />
-              </View>
-            )}
-          </TouchableOpacity>
+                {descriptionContent}
+              </TouchableOpacity>
+            );
+          })()}
         </Animated.View>
       ) : (
         /* Skeleton placeholder for description to prevent layout shift */

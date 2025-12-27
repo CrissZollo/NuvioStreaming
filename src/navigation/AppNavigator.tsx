@@ -15,7 +15,6 @@ import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import { PostHogProvider } from 'posthog-react-native';
 import { TVProvider, useIsTV } from '../contexts/TVContext';
 import TVNavigator from './TVNavigator';
 
@@ -1622,16 +1621,9 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
 
 const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => (
   <TVProvider>
-    <PostHogProvider
-      apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C"
-      options={{
-        host: "https://us.i.posthog.com",
-      }}
-    >
-      <LoadingProvider>
-        <InnerNavigator initialRouteName={initialRouteName} />
-      </LoadingProvider>
-    </PostHogProvider>
+    <LoadingProvider>
+      <InnerNavigator initialRouteName={initialRouteName} />
+    </LoadingProvider>
   </TVProvider>
 );
 

@@ -51,6 +51,8 @@ import { useToast } from '../../contexts/ToastContext';
 import { useTraktContext } from '../../contexts/TraktContext';
 import { useSettings } from '../../hooks/useSettings';
 import { useTrailer } from '../../contexts/TrailerContext';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerService from '../../services/trailerService';
@@ -107,13 +109,13 @@ interface HeroSectionProps {
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
-const ActionButtons = memo(({ 
-  handleShowStreams, 
-  toggleLibrary, 
-  inLibrary, 
-  type, 
-  id, 
-  navigation, 
+const ActionButtons = memo(({
+  handleShowStreams,
+  toggleLibrary,
+  inLibrary,
+  type,
+  id,
+  navigation,
   playButtonText,
   animatedStyle,
   isWatched,
@@ -126,7 +128,9 @@ const ActionButtons = memo(({
   isInWatchlist,
   isInCollection,
   onToggleWatchlist,
-  onToggleCollection
+  onToggleCollection,
+  // TV navigation
+  isTVDevice
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -147,6 +151,8 @@ const ActionButtons = memo(({
   isInCollection?: boolean;
   onToggleWatchlist?: () => void;
   onToggleCollection?: () => void;
+  // TV navigation
+  isTVDevice?: boolean;
 }) => {
   const { currentTheme } = useTheme();
   const { showSaved, showTraktSaved, showRemoved, showTraktRemoved, showSuccess, showInfo } = useToast();
@@ -340,71 +346,109 @@ const ActionButtons = memo(({
   // Count additional buttons (AI Chat removed - now in top right corner)
   const additionalButtonCount = (hasTraktCollection ? 1 : 0) + (hasRatings ? 1 : 0);
   
+  // Render a button - TV uses Focusable, mobile uses TouchableOpacity
+  const renderButton = (
+    onPress: () => void,
+    style: any,
+    content: React.ReactNode,
+    key: string,
+    autoFocus?: boolean
+  ) => {
+    if (isTVDevice) {
+      return (
+        <Focusable
+          key={key}
+          onPress={onPress}
+          style={style}
+          borderRadius={30}
+          focusScale={1.03}
+          animateBackground={false}
+          autoFocus={autoFocus}
+        >
+          {content}
+        </Focusable>
+      );
+    }
+    return (
+      <TouchableOpacity
+        key={key}
+        style={style}
+        onPress={onPress}
+        activeOpacity={0.85}
+      >
+        {content}
+      </TouchableOpacity>
+    );
+  };
+
+  const playIcon = (() => {
+    if (isWatched) {
+      return type === 'movie' ? 'replay' : 'play-arrow';
+    }
+    return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
+  })();
+
   return (
     <Animated.View style={[isTablet ? styles.tabletActionButtons : styles.actionButtons, animatedStyle]}>
       {/* Single Row Layout - Play, Save, and optionally Collection/Ratings */}
       <View style={styles.singleRowLayout}>
-          <TouchableOpacity
-            style={[
-              playButtonStyle, 
-              isTablet && styles.tabletPlayButton, 
+          {renderButton(
+            handleShowStreams,
+            [
+              playButtonStyle,
+              isTablet && styles.tabletPlayButton,
               additionalButtonCount === 0 ? styles.singleRowPlayButtonFullWidth : styles.primaryActionButton
-            ]}
-            onPress={handleShowStreams}
-            activeOpacity={0.85}
-          >
-            <MaterialIcons 
-              name={(() => {
-                if (isWatched) {
-                  return type === 'movie' ? 'replay' : 'play-arrow';
-                }
-                return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
-              })()} 
-              size={isTablet ? 28 : 24} 
-              color={isWatched && type === 'movie' ? "#fff" : "#000"} 
-            />
-            <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
-          </TouchableOpacity>
+            ],
+            <>
+              <MaterialIcons
+                name={playIcon}
+                size={isTablet ? 28 : 24}
+                color={isWatched && type === 'movie' ? "#fff" : "#000"}
+              />
+              <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
+            </>,
+            'play-button',
+            isTVDevice // Auto-focus on Play button for TV
+          )}
 
-          <TouchableOpacity
-            style={[
-              styles.actionButton, 
-              styles.infoButton, 
+          {renderButton(
+            handleSaveAction,
+            [
+              styles.actionButton,
+              styles.infoButton,
               isTablet && styles.tabletInfoButton,
               additionalButtonCount === 0 ? styles.singleRowSaveButtonFullWidth : styles.primaryActionButton
-            ]}
-            onPress={handleSaveAction}
-            activeOpacity={0.85}
-          >
-            {Platform.OS === 'ios' ? (
-              GlassViewComp && liquidGlassAvailable ? (
-                <GlassViewComp
-                  style={styles.blurBackground}
-                  glassEffectStyle="regular"
-                />
+            ],
+            <>
+              {Platform.OS === 'ios' ? (
+                GlassViewComp && liquidGlassAvailable ? (
+                  <GlassViewComp
+                    style={styles.blurBackground}
+                    glassEffectStyle="regular"
+                  />
+                ) : (
+                  <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
+                )
               ) : (
-                <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
-              )
-            ) : (
-              <View style={styles.androidFallbackBlur} />
-            )}
-            <MaterialIcons
-              name={inLibrary ? "bookmark" : "bookmark-outline"}
-              size={isTablet ? 28 : 24}
-              color={inLibrary ? (isAuthenticated && isInWatchlist ? "#E74C3C" : currentTheme.colors.white) : currentTheme.colors.white}
-            />
-            <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
-              {inLibrary ? 'Saved' : 'Save'}
-            </Text>
-          </TouchableOpacity>
+                <View style={styles.androidFallbackBlur} />
+              )}
+              <MaterialIcons
+                name={inLibrary ? "bookmark" : "bookmark-outline"}
+                size={isTablet ? 28 : 24}
+                color={inLibrary ? (isAuthenticated && isInWatchlist ? "#E74C3C" : currentTheme.colors.white) : currentTheme.colors.white}
+              />
+              <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
+                {inLibrary ? 'Saved' : 'Save'}
+              </Text>
+            </>,
+            'save-button'
+          )}
 
           {/* Trakt Collection Button */}
-          {hasTraktCollection && (
-            <TouchableOpacity
-              style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
-              onPress={handleCollectionAction}
-              activeOpacity={0.85}
-            >
+          {hasTraktCollection && renderButton(
+            handleCollectionAction,
+            [styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton],
+            <>
               {Platform.OS === 'ios' ? (
                 GlassViewComp && liquidGlassAvailable ? (
                   <GlassViewComp
@@ -417,21 +461,20 @@ const ActionButtons = memo(({
               ) : (
                 <View style={styles.androidFallbackBlurRound} />
               )}
-              <MaterialIcons 
-                name={isInCollection ? "video-library" : "video-library"} 
-                size={isTablet ? 28 : 24} 
+              <MaterialIcons
+                name={isInCollection ? "video-library" : "video-library"}
+                size={isTablet ? 28 : 24}
                 color={isInCollection ? "#3498DB" : currentTheme.colors.white}
               />
-            </TouchableOpacity>
+            </>,
+            'collection-button'
           )}
 
           {/* Ratings Button (for series) */}
-          {hasRatings && (
-            <TouchableOpacity
-              style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
-              onPress={handleRatingsPress}
-              activeOpacity={0.85}
-            >
+          {hasRatings && renderButton(
+            handleRatingsPress,
+            [styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton],
+            <>
               {Platform.OS === 'ios' ? (
                 GlassViewComp && liquidGlassAvailable ? (
                   <GlassViewComp
@@ -444,12 +487,13 @@ const ActionButtons = memo(({
               ) : (
                 <View style={styles.androidFallbackBlurRound} />
               )}
-              <MaterialIcons 
-                name="assessment" 
-                size={isTablet ? 28 : 24} 
+              <MaterialIcons
+                name="assessment"
+                size={isTablet ? 28 : 24}
                 color={currentTheme.colors.white}
               />
-            </TouchableOpacity>
+            </>,
+            'ratings-button'
           )}
       </View>
     </Animated.View>
@@ -866,6 +910,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const { settings, updateSetting } = useSettings();
   const { isTrailerPlaying: globalTrailerPlaying, setTrailerPlaying } = useTrailer();
   const isFocused = useIsFocused();
+  const isTVDevice = useIsTV();
 
   // Performance optimization: Refs for avoiding re-renders
   const interactionComplete = useRef(false);
@@ -1352,38 +1397,28 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     if (!shouldLoadSecondaryData || !metadata?.genres?.length) return null;
 
     const genresToDisplay = metadata.genres.slice(0, 3); // Reduced to 3 for performance
-    const elements: React.ReactNode[] = [];
-
-    genresToDisplay.forEach((genreName: string, index: number) => {
-      // Add genre text
-      elements.push(
-        <Text
-          key={`genre-${index}`}
-          style={[isTablet ? styles.tabletGenreText : styles.genreText, { color: themeColors.text }]}
-        >
-          {genreName}
-        </Text>
-      );
-
-      // Add dot separator if not the last element
-      if (index < genresToDisplay.length - 1) {
-        elements.push(
-          <Text
-            key={`dot-${index}`}
-            style={[isTablet ? styles.tabletGenreDot : styles.genreDot, { color: themeColors.text }]}
-          >
-            •
-          </Text>
-        );
-      }
-    });
 
     return (
       <Animated.View
         entering={FadeIn.duration(400).delay(200)}
         style={{ flexDirection: 'row', alignItems: 'center' }}
       >
-        {elements}
+        {genresToDisplay.map((genreName: string, index: number) => (
+          <React.Fragment key={`genre-${index}`}>
+            <Text
+              style={[isTablet ? styles.tabletGenreText : styles.genreText, { color: themeColors.text }]}
+            >
+              {genreName}
+            </Text>
+            {index < genresToDisplay.length - 1 && (
+              <Text
+                style={[isTablet ? styles.tabletGenreDot : styles.genreDot, { color: themeColors.text }]}
+              >
+                •
+              </Text>
+            )}
+          </React.Fragment>
+        ))}
       </Animated.View>
     );
   }, [metadata.genres, themeColors.text, shouldLoadSecondaryData, isTablet]);
@@ -1792,14 +1827,31 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       )}
 
       <Animated.View style={styles.backButtonContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <MaterialIcons 
-            name="arrow-back" 
-            size={28} 
-            color="#fff" 
-            style={styles.backButtonIcon}
-          />
-        </TouchableOpacity>
+        {isTVDevice ? (
+          <Focusable
+            style={styles.backButton}
+            onPress={handleBack}
+            borderRadius={24}
+            focusScale={1.1}
+            animateBackground={false}
+          >
+            <MaterialIcons
+              name="arrow-back"
+              size={28}
+              color="#fff"
+              style={styles.backButtonIcon}
+            />
+          </Focusable>
+        ) : (
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <MaterialIcons
+              name="arrow-back"
+              size={28}
+              color="#fff"
+              style={styles.backButtonIcon}
+            />
+          </TouchableOpacity>
+        )}
       </Animated.View>
 
       {/* Ultra-light Gradient with subtle dynamic background blend */}
@@ -1875,7 +1927,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
 
 
           {/* Optimized Action Buttons */}
-          <ActionButtons 
+          <ActionButtons
             handleShowStreams={handleShowStreams}
             toggleLibrary={handleToggleLibrary}
             inLibrary={inLibrary}
@@ -1895,6 +1947,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             isInCollection={isInCollection}
             onToggleWatchlist={onToggleWatchlist}
             onToggleCollection={onToggleCollection}
+            // TV navigation
+            isTVDevice={isTVDevice}
           />
         </View>
       </LinearGradient>
@@ -2051,7 +2105,7 @@ const styles = StyleSheet.create({
   },
   singleRowLayout: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
