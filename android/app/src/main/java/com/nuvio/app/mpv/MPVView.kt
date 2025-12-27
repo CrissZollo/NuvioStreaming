@@ -23,6 +23,8 @@ class MPVView @JvmOverloads constructor(
     private var isPaused: Boolean = true
     private var surface: Surface? = null
     private var httpHeaders: Map<String, String>? = null
+    private var loadHandler: android.os.Handler? = null
+    private var pendingLoadRunnable: Runnable? = null
 
     // Event listener for React Native
     var onLoadCallback: ((duration: Double, width: Int, height: Int) -> Unit)? = null
@@ -34,6 +36,7 @@ class MPVView @JvmOverloads constructor(
     init {
         surfaceTextureListener = this
         isOpaque = false
+        loadHandler = android.os.Handler(android.os.Looper.getMainLooper())
     }
 
     override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
@@ -49,12 +52,10 @@ class MPVView @JvmOverloads constructor(
             MPVLib.setPropertyString("android-surface-size", "${width}x${height}")
             observeProperties()
             isMpvInitialized = true
-            
-            // If a data source was set before surface was ready, load it now
-            pendingDataSource?.let { url ->
-                applyHttpHeaders()
-                loadFile(url)
-                pendingDataSource = null
+
+            // If a data source was set before surface was ready, schedule load now
+            if (pendingDataSource != null) {
+                scheduleLoad()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize MPV", e)
@@ -71,6 +72,10 @@ class MPVView @JvmOverloads constructor(
 
     override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
         Log.d(TAG, "Surface texture destroyed")
+        // Cancel any pending loads
+        pendingLoadRunnable?.let { loadHandler?.removeCallbacks(it) }
+        pendingLoadRunnable = null
+
         if (isMpvInitialized) {
             MPVLib.removeObserver(this)
             MPVLib.detachSurface()
@@ -183,18 +188,38 @@ class MPVView @JvmOverloads constructor(
     // Public API
 
     fun setDataSource(url: String) {
-        if (isMpvInitialized) {
-            // Apply headers before loading the file
-            applyHttpHeaders()
-            loadFile(url)
-        } else {
-            pendingDataSource = url
-        }
+        Log.d(TAG, "setDataSource called: $url")
+        pendingDataSource = url
+        scheduleLoad()
     }
 
     fun setHeaders(headers: Map<String, String>?) {
         httpHeaders = headers
         Log.d(TAG, "Headers set: $headers")
+        // If we already have a pending source, reschedule load to apply new headers
+        if (pendingDataSource != null) {
+            scheduleLoad()
+        }
+    }
+
+    private fun scheduleLoad() {
+        // Cancel any pending load
+        pendingLoadRunnable?.let { loadHandler?.removeCallbacks(it) }
+
+        // Schedule load with a small delay to allow both source and headers to be set
+        pendingLoadRunnable = Runnable {
+            pendingDataSource?.let { url ->
+                if (isMpvInitialized) {
+                    applyHttpHeaders()
+                    loadFile(url)
+                    pendingDataSource = null
+                }
+                // If not initialized yet, onSurfaceTextureAvailable will handle it
+            }
+        }
+
+        // 100ms delay allows React Native to set both props before we load
+        loadHandler?.postDelayed(pendingLoadRunnable!!, 100)
     }
 
     private fun applyHttpHeaders() {
