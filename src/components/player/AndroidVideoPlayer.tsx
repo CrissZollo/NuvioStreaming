@@ -637,6 +637,7 @@ const AndroidVideoPlayer: React.FC = () => {
             onSeek={(seconds) => controlsHook.skip(seconds)}
             onClose={handleClose}
             onShowControls={() => playerState.setShowControls(true)}
+            onHideControls={() => playerState.setShowControls(false)}
             onShowSubtitles={() => modals.setShowSubtitleModal(true)}
             onShowAudioTracks={() => modals.setShowAudioModal(true)}
             onShowEpisodes={type === 'series' ? () => modals.setShowEpisodesModal(true) : undefined}

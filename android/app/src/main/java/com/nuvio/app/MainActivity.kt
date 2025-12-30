@@ -1,5 +1,6 @@
 package com.nuvio.app
 import com.reactnative.googlecast.api.RNGCCastContext
+import com.nuvio.app.tv.TVKeyEventModule
 
 import android.os.Build
 import android.os.Bundle
@@ -19,6 +20,9 @@ class MainActivity : ReactActivity() {
   private val keyHeld = mutableMapOf<Int, Boolean>()
 
   override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    // Forward key events to React Native via TVKeyEventModule
+    TVKeyEventModule.getInstance()?.sendKeyEvent(event.keyCode, event.action)
+
     // Only throttle D-pad directional keys
     val isDpadNav = event.keyCode in listOf(
       KeyEvent.KEYCODE_DPAD_UP,

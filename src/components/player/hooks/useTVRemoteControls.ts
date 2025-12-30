@@ -32,6 +32,10 @@ interface TVRemoteControlsConfig {
   onUp?: () => void;
   /** Handler for down button (optional) */
   onDown?: () => void;
+  /** Handler for left button (optional) - if provided, overrides default seek */
+  onLeft?: () => void;
+  /** Handler for right button (optional) - if provided, overrides default seek */
+  onRight?: () => void;
   /** Handler for menu button (optional) */
   onMenu?: () => void;
   /** Seek interval in seconds for D-Pad (default 10) */
@@ -56,6 +60,8 @@ export const useTVRemoteControls = (config: TVRemoteControlsConfig) => {
     onSelect,
     onUp,
     onDown,
+    onLeft,
+    onRight,
     onMenu,
     seekInterval = 10,
     fastSeekInterval = 30,
@@ -89,11 +95,21 @@ export const useTVRemoteControls = (config: TVRemoteControlsConfig) => {
           break;
 
         case 'left':
-          onSeekBackward(seekInterval);
+          // If onLeft is provided, use it; otherwise default to seeking
+          if (onLeft) {
+            onLeft();
+          } else {
+            onSeekBackward(seekInterval);
+          }
           break;
 
         case 'right':
-          onSeekForward(seekInterval);
+          // If onRight is provided, use it; otherwise default to seeking
+          if (onRight) {
+            onRight();
+          } else {
+            onSeekForward(seekInterval);
+          }
           break;
 
         case 'up':
@@ -130,6 +146,8 @@ export const useTVRemoteControls = (config: TVRemoteControlsConfig) => {
       onSelect,
       onUp,
       onDown,
+      onLeft,
+      onRight,
       onMenu,
       seekInterval,
       fastSeekInterval,

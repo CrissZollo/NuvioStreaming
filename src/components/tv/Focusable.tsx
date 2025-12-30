@@ -62,6 +62,10 @@ interface FocusableProps {
   blockLeft?: boolean;
   /** Block right navigation (focus stays on this element) */
   blockRight?: boolean;
+  /** Callback when left is pressed while blocked (for custom handling like seeking) */
+  onBlockedLeft?: () => void;
+  /** Callback when right is pressed while blocked (for custom handling like seeking) */
+  onBlockedRight?: () => void;
   /** Test ID for testing */
   testID?: string;
   /** Whether to show focus border (default true on TV) */
@@ -116,6 +120,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       blockDown = false,
       blockLeft = false,
       blockRight = false,
+      onBlockedLeft,
+      onBlockedRight,
       testID,
       showFocusBorder = true,
       borderRadius = 8,
