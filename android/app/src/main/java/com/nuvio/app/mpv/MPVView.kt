@@ -92,69 +92,35 @@ class MPVView @JvmOverloads constructor(
     }
 
     private fun initOptions() {
-        // Mobile-optimized profile
-        MPVLib.setOptionString("profile", "fast")
+        Log.d(TAG, "========== INITIALIZING MPV OPTIONS ==========")
+
+        // MINIMAL CONFIG - trying to identify the root cause
+
+        // Video output - required for Android
         MPVLib.setOptionString("vo", "gpu")
         MPVLib.setOptionString("gpu-context", "android")
         MPVLib.setOptionString("opengl-es", "yes")
-        
-        // Hardware decoding - use mediacodec-copy to allow subtitle overlay
-        // 'mediacodec-copy' copies frames to CPU memory which enables subtitle blending
+        Log.d(TAG, "Video output: vo=gpu, gpu-context=android")
+
+        // Hardware decoding - auto for best compatibility
         MPVLib.setOptionString("hwdec", "auto")
-        MPVLib.setOptionString("hwdec-codecs", "all")
-        
+        Log.d(TAG, "Hardware decoding: hwdec=auto")
+
         // Audio output
         MPVLib.setOptionString("ao", "audiotrack,opensles")
-        
-        // Network caching for streaming
-        MPVLib.setOptionString("demuxer-max-bytes", "67108864") // 64MB
-        MPVLib.setOptionString("demuxer-max-back-bytes", "33554432") // 32MB
+
+        // Basic caching
         MPVLib.setOptionString("cache", "yes")
-        MPVLib.setOptionString("cache-secs", "30")
-        
-        // Network options
-        MPVLib.setOptionString("network-timeout", "60") // 60 second timeout
-        
-        // Subtitle configuration - CRITICAL for Android
-        MPVLib.setOptionString("sub-auto", "fuzzy") // Auto-load subtitles
-        MPVLib.setOptionString("sub-visibility", "yes") // Make subtitles visible by default
-        MPVLib.setOptionString("sub-font-size", "48") // Larger font size for mobile readability
-        MPVLib.setOptionString("sub-pos", "95") // Position at bottom (0-100, 100 = very bottom)
-        MPVLib.setOptionString("sub-color", "#FFFFFFFF") // White color
-        MPVLib.setOptionString("sub-border-size", "3") // Thicker border for readability
-        MPVLib.setOptionString("sub-border-color", "#FF000000") // Black border
-        MPVLib.setOptionString("sub-shadow-offset", "2") // Add shadow for better visibility
-        MPVLib.setOptionString("sub-shadow-color", "#80000000") // Semi-transparent black shadow
-        
-        // Font configuration - point to Android system fonts for all language support
-        MPVLib.setOptionString("osd-fonts-dir", "/system/fonts")
-        MPVLib.setOptionString("sub-fonts-dir", "/system/fonts")
-        MPVLib.setOptionString("sub-font", "Roboto") // Default fallback font
-        // Allow embedded fonts in ASS/SSA but fallback to system fonts
-        MPVLib.setOptionString("embeddedfonts", "yes")
-        
-        // Language/encoding support for various subtitle formats
-        MPVLib.setOptionString("sub-codepage", "auto") // Auto-detect encoding (supports UTF-8, Latin, CJK, etc.)
-        
-        MPVLib.setOptionString("osc", "no") // Disable on screen controller
-        MPVLib.setOptionString("osd-level", "1")
-    
-        // Critical for subtitle rendering on Android GPU
-        // blend-subtitles=no lets the GPU renderer handle subtitle overlay properly
-        MPVLib.setOptionString("blend-subtitles", "no")
-        MPVLib.setOptionString("sub-use-margins", "no")
-        // Use 'scale' to allow ASS styling but with our scale and font overrides
-        // This preserves styled subtitles while having font fallbacks
-        MPVLib.setOptionString("sub-ass-override", "scale")
-        MPVLib.setOptionString("sub-scale", "1.0")
-        MPVLib.setOptionString("sub-fix-timing", "yes") // Fix timing for SRT subtitles
-        
-        // Force subtitle rendering
-        MPVLib.setOptionString("sid", "auto") // Auto-select subtitle track
-        
-        // Disable terminal/input
+
+        // Disable unnecessary features
+        MPVLib.setOptionString("osc", "no")
         MPVLib.setOptionString("terminal", "no")
         MPVLib.setOptionString("input-default-bindings", "no")
+
+        // Verbose logging
+        MPVLib.setOptionString("msg-level", "all=v")
+
+        Log.d(TAG, "========== MPV OPTIONS COMPLETE ==========")
     }
 
     private fun observeProperties() {
@@ -163,7 +129,7 @@ class MPVView @JvmOverloads constructor(
         val MPV_FORMAT_FLAG = 3
         val MPV_FORMAT_INT64 = 4
         val MPV_FORMAT_DOUBLE = 5
-        
+
         MPVLib.observeProperty("time-pos", MPV_FORMAT_DOUBLE)
         MPVLib.observeProperty("duration/full", MPV_FORMAT_DOUBLE) // Use /full for complete HLS duration
         MPVLib.observeProperty("pause", MPV_FORMAT_FLAG)
@@ -173,16 +139,80 @@ class MPVView @JvmOverloads constructor(
         MPVLib.observeProperty("width", MPV_FORMAT_INT64)
         MPVLib.observeProperty("height", MPV_FORMAT_INT64)
         MPVLib.observeProperty("track-list", MPV_FORMAT_NONE)
-        
+
         // Observe subtitle properties for debugging
         MPVLib.observeProperty("sid", MPV_FORMAT_INT64)
         MPVLib.observeProperty("sub-visibility", MPV_FORMAT_FLAG)
         MPVLib.observeProperty("sub-text", MPV_FORMAT_NONE)
+
+        // Observe error/status properties for better debugging
+        MPVLib.observeProperty("path", MPV_FORMAT_NONE)
+        MPVLib.observeProperty("file-loaded-status", MPV_FORMAT_NONE)
     }
 
     private fun loadFile(url: String) {
-        Log.d(TAG, "Loading file: $url")
-        MPVLib.command(arrayOf("loadfile", url))
+        Log.d(TAG, "========== LOADING FILE ==========")
+        Log.d(TAG, "URL: $url")
+        Log.d(TAG, "URL length: ${url.length}")
+        Log.d(TAG, "URL starts with http: ${url.startsWith("http")}")
+        Log.d(TAG, "MPV initialized: $isMpvInitialized")
+        Log.d(TAG, "Surface ready: ${surface != null}")
+        Log.d(TAG, "Headers: $httpHeaders")
+
+        // Check if MPVLib methods are accessible
+        try {
+            val version = MPVLib.getPropertyString("mpv-version")
+            Log.d(TAG, "MPV Version: $version")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get MPV version: ${e.message}")
+        }
+
+        Log.d(TAG, "==================================")
+
+        // Test URL reachability in background
+        Thread {
+            try {
+                Log.d(TAG, "Starting URL reachability test...")
+                val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "HEAD"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.instanceFollowRedirects = true
+                // Add headers if we have them
+                httpHeaders?.forEach { (key, value) ->
+                    connection.setRequestProperty(key, value)
+                }
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; Android TV) AppleWebKit/537.36")
+                Log.d(TAG, "Connecting to URL...")
+                connection.connect()
+                val responseCode = connection.responseCode
+                val contentType = connection.contentType
+                val contentLength = connection.contentLength
+                val finalUrl = connection.url.toString()
+                Log.d(TAG, "========== URL TEST RESULT ==========")
+                Log.d(TAG, "Response code: $responseCode")
+                Log.d(TAG, "Content-Type: $contentType")
+                Log.d(TAG, "Content-Length: $contentLength")
+                Log.d(TAG, "Final URL (after redirects): $finalUrl")
+                Log.d(TAG, "=====================================")
+                connection.disconnect()
+            } catch (e: Exception) {
+                Log.e(TAG, "========== URL TEST FAILED ==========")
+                Log.e(TAG, "Error: ${e.message}")
+                Log.e(TAG, "Exception type: ${e.javaClass.simpleName}")
+                e.printStackTrace()
+                Log.e(TAG, "=====================================")
+            }
+        }.start()
+
+        try {
+            Log.d(TAG, "Sending loadfile command to MPV...")
+            MPVLib.command(arrayOf("loadfile", url))
+            Log.d(TAG, "loadfile command sent successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending loadfile command: ${e.message}", e)
+            onErrorCallback?.invoke("Failed to load file: ${e.message}")
+        }
     }
 
     // Public API
@@ -203,16 +233,21 @@ class MPVView @JvmOverloads constructor(
     }
 
     private fun scheduleLoad() {
+        Log.d(TAG, "scheduleLoad called, pendingDataSource: $pendingDataSource, isMpvInitialized: $isMpvInitialized")
         // Cancel any pending load
         pendingLoadRunnable?.let { loadHandler?.removeCallbacks(it) }
 
         // Schedule load with a small delay to allow both source and headers to be set
         pendingLoadRunnable = Runnable {
+            Log.d(TAG, "scheduleLoad runnable executing, pendingDataSource: $pendingDataSource, isMpvInitialized: $isMpvInitialized")
             pendingDataSource?.let { url ->
                 if (isMpvInitialized) {
+                    Log.d(TAG, "About to apply headers and load file")
                     applyHttpHeaders()
                     loadFile(url)
                     pendingDataSource = null
+                } else {
+                    Log.d(TAG, "MPV not initialized yet, will load when surface is available")
                 }
                 // If not initialized yet, onSurfaceTextureAvailable will handle it
             }
@@ -225,11 +260,29 @@ class MPVView @JvmOverloads constructor(
     private fun applyHttpHeaders() {
         httpHeaders?.let { headers ->
             if (headers.isNotEmpty()) {
-                // Format headers for MPV: comma-separated "Key: Value" pairs
+                Log.d(TAG, "========== APPLYING HEADERS ==========")
+                // Format headers for MPV - each header on its own line
+                // MPV expects headers separated by newlines or as separate options
+                headers.forEach { (key, value) ->
+                    Log.d(TAG, "Header: $key = $value")
+                }
+
+                // Method 1: http-header-fields with comma separation
                 val headerList = headers.map { (key, value) -> "$key: $value" }
                 val headerString = headerList.joinToString(",")
-                Log.d(TAG, "Applying HTTP headers: $headerString")
+                Log.d(TAG, "Setting http-header-fields: $headerString")
                 MPVLib.setOptionString("http-header-fields", headerString)
+
+                // Method 2: Also set referrer and user-agent separately if present
+                headers["Referer"]?.let { referer ->
+                    Log.d(TAG, "Setting referrer: $referer")
+                    MPVLib.setOptionString("referrer", referer)
+                }
+                headers["User-Agent"]?.let { ua ->
+                    Log.d(TAG, "Setting user-agent: $ua")
+                    MPVLib.setOptionString("user-agent", ua)
+                }
+                Log.d(TAG, "=======================================")
             }
         }
     }
@@ -339,30 +392,38 @@ class MPVView @JvmOverloads constructor(
         try {
             val trackCount = MPVLib.getPropertyInt("track-list/count") ?: 0
             Log.d(TAG, "Track count: $trackCount")
-            
+
             val audioTracks = mutableListOf<Map<String, Any>>()
             val subtitleTracks = mutableListOf<Map<String, Any>>()
-            
+
             for (i in 0 until trackCount) {
-                val type = MPVLib.getPropertyString("track-list/$i/type") ?: continue
-                val id = MPVLib.getPropertyInt("track-list/$i/id") ?: continue
+                val type = MPVLib.getPropertyString("track-list/$i/type")
+                val id = MPVLib.getPropertyInt("track-list/$i/id")
                 val title = MPVLib.getPropertyString("track-list/$i/title") ?: ""
                 val lang = MPVLib.getPropertyString("track-list/$i/lang") ?: ""
                 val codec = MPVLib.getPropertyString("track-list/$i/codec") ?: ""
-                
+
+                // Log ALL tracks regardless of type for debugging
+                Log.d(TAG, "Track $i: type=$type, id=$id, title=$title, lang=$lang, codec=$codec")
+
+                if (type == null || id == null) {
+                    Log.d(TAG, "Skipping track $i - type or id is null")
+                    continue
+                }
+
                 val trackName = when {
                     title.isNotEmpty() -> title
                     lang.isNotEmpty() -> lang.uppercase()
                     else -> "Track $id"
                 }
-                
+
                 val track = mapOf(
                     "id" to id,
                     "name" to trackName,
                     "language" to lang,
                     "codec" to codec
                 )
-                
+
                 when (type) {
                     "audio" -> {
                         Log.d(TAG, "Found audio track: $track")
@@ -372,9 +433,16 @@ class MPVView @JvmOverloads constructor(
                         Log.d(TAG, "Found subtitle track: $track")
                         subtitleTracks.add(track)
                     }
+                    "video" -> {
+                        Log.d(TAG, "Found video track: $track")
+                        // Video tracks are not sent to React Native but log them
+                    }
+                    else -> {
+                        Log.d(TAG, "Unknown track type '$type': $track")
+                    }
                 }
             }
-            
+
             Log.d(TAG, "Sending tracks - Audio: ${audioTracks.size}, Subtitles: ${subtitleTracks.size}")
             onTracksChangedCallback?.invoke(audioTracks, subtitleTracks)
         } catch (e: Exception) {
@@ -419,11 +487,55 @@ class MPVView @JvmOverloads constructor(
     override fun event(eventId: Int) {
         Log.d(TAG, "Event: $eventId")
         // MPV event constants (from MPVLib source)
-        val MPV_EVENT_FILE_LOADED = 8
+        val MPV_EVENT_NONE = 0
+        val MPV_EVENT_SHUTDOWN = 1
+        val MPV_EVENT_LOG_MESSAGE = 2
+        val MPV_EVENT_GET_PROPERTY_REPLY = 3
+        val MPV_EVENT_SET_PROPERTY_REPLY = 4
+        val MPV_EVENT_COMMAND_REPLY = 5
+        val MPV_EVENT_START_FILE = 6
         val MPV_EVENT_END_FILE = 7
-        
+        val MPV_EVENT_FILE_LOADED = 8
+        val MPV_EVENT_IDLE = 11
+        val MPV_EVENT_TICK = 14
+        val MPV_EVENT_CLIENT_MESSAGE = 16
+        val MPV_EVENT_VIDEO_RECONFIG = 17
+        val MPV_EVENT_AUDIO_RECONFIG = 18
+        val MPV_EVENT_SEEK = 20
+        val MPV_EVENT_PLAYBACK_RESTART = 21
+        val MPV_EVENT_PROPERTY_CHANGE = 22
+        val MPV_EVENT_QUEUE_OVERFLOW = 24
+        val MPV_EVENT_HOOK = 25
+
         when (eventId) {
+            MPV_EVENT_LOG_MESSAGE -> {
+                // Try to get the log message - this may vary by MPVLib implementation
+                Log.d(TAG, "MPV_EVENT_LOG_MESSAGE received")
+            }
+            MPV_EVENT_START_FILE -> {
+                Log.d(TAG, "MPV_EVENT_START_FILE - beginning to load file")
+            }
             MPV_EVENT_FILE_LOADED -> {
+                Log.d(TAG, "MPV_EVENT_FILE_LOADED - file loaded successfully")
+
+                // Log what was detected
+                val videoCodec = MPVLib.getPropertyString("video-codec")
+                val audioCodec = MPVLib.getPropertyString("audio-codec")
+                val hwdecCurrent = MPVLib.getPropertyString("hwdec-current")
+                val videoFormat = MPVLib.getPropertyString("video-format")
+                val fileFormat = MPVLib.getPropertyString("file-format")
+                val duration = MPVLib.getPropertyDouble("duration")
+                val width = MPVLib.getPropertyInt("width")
+                val height = MPVLib.getPropertyInt("height")
+                val trackCount = MPVLib.getPropertyInt("track-list/count")
+
+                Log.d(TAG, "========== FILE LOADED DIAGNOSTICS ==========")
+                Log.d(TAG, "Video codec: $videoCodec, Audio codec: $audioCodec")
+                Log.d(TAG, "Hwdec: $hwdecCurrent, Video format: $videoFormat")
+                Log.d(TAG, "File format: $fileFormat, Duration: $duration")
+                Log.d(TAG, "Resolution: ${width}x${height}, Tracks: $trackCount")
+                Log.d(TAG, "=============================================")
+
                 // File is loaded, start playback if not paused
                 if (!isPaused) {
                     MPVLib.setPropertyBoolean("pause", false)
@@ -431,21 +543,45 @@ class MPVView @JvmOverloads constructor(
             }
             MPV_EVENT_END_FILE -> {
                 Log.d(TAG, "MPV_EVENT_END_FILE")
-                
-                // Heuristic: If duration is effectively 0 at end of file, it's a load error
+
+                // Get detailed diagnostic info
                 val duration = MPVLib.getPropertyDouble("duration/full") ?: MPVLib.getPropertyDouble("duration") ?: 0.0
                 val timePos = MPVLib.getPropertyDouble("time-pos") ?: 0.0
                 val eofReached = MPVLib.getPropertyBoolean("eof-reached") ?: false
-                
-                Log.d(TAG, "End stats - Duration: $duration, Time: $timePos, EOF: $eofReached")
-                
+                val path = MPVLib.getPropertyString("path")
+
+                // Additional diagnostics
+                val videoCodec = MPVLib.getPropertyString("video-codec")
+                val audioCodec = MPVLib.getPropertyString("audio-codec")
+                val hwdecCurrent = MPVLib.getPropertyString("hwdec-current")
+                val videoFormat = MPVLib.getPropertyString("video-format")
+                val fileFormat = MPVLib.getPropertyString("file-format")
+                val containerFps = MPVLib.getPropertyDouble("container-fps")
+                val width = MPVLib.getPropertyInt("width")
+                val height = MPVLib.getPropertyInt("height")
+
+                Log.d(TAG, "========== END FILE DIAGNOSTICS ==========")
+                Log.d(TAG, "Duration: $duration, Time: $timePos, EOF: $eofReached")
+                Log.d(TAG, "Path: $path")
+                Log.d(TAG, "Video codec: $videoCodec, Audio codec: $audioCodec")
+                Log.d(TAG, "Hwdec current: $hwdecCurrent")
+                Log.d(TAG, "Video format: $videoFormat, File format: $fileFormat")
+                Log.d(TAG, "FPS: $containerFps, Resolution: ${width}x${height}")
+                Log.d(TAG, "===========================================")
+
                 if (duration < 1.0 && !eofReached) {
-                     val customError = "Unable to play media. Source may be unreachable."
-                     Log.e(TAG, "Playback error detected (heuristic): $customError")
-                     onErrorCallback?.invoke(customError)
+                     val customError = "Unable to play media. Video codec: $videoCodec, Audio codec: $audioCodec, hwdec: $hwdecCurrent"
+                     Log.e(TAG, "Playback error detected: $customError")
+                     onErrorCallback?.invoke("Unable to play media. Source may be unreachable.")
                 } else {
                     onEndCallback?.invoke()
                 }
+            }
+            MPV_EVENT_PLAYBACK_RESTART -> {
+                Log.d(TAG, "MPV_EVENT_PLAYBACK_RESTART - playback can resume")
+            }
+            else -> {
+                Log.d(TAG, "Unhandled MPV event: $eventId")
             }
         }
     }
