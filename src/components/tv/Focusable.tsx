@@ -6,7 +6,6 @@ import {
   ViewStyle,
   StyleProp,
   findNodeHandle,
-  Platform,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -55,8 +54,12 @@ interface FocusableProps {
   nextFocusLeft?: React.RefObject<View>;
   /** Reference to element that should receive focus when pressing right */
   nextFocusRight?: React.RefObject<View>;
+  /** Block up navigation (focus stays on this element) */
+  blockUp?: boolean;
   /** Block down navigation (focus stays on this element) */
   blockDown?: boolean;
+  /** Block left navigation (focus stays on this element) */
+  blockLeft?: boolean;
   /** Block right navigation (focus stays on this element) */
   blockRight?: boolean;
   /** Test ID for testing */
@@ -109,7 +112,9 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       nextFocusDown,
       nextFocusLeft,
       nextFocusRight,
+      blockUp = false,
       blockDown = false,
+      blockLeft = false,
       blockRight = false,
       testID,
       showFocusBorder = true,
@@ -133,8 +138,27 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     const [shouldAutoFocus, setShouldAutoFocus] = useState(autoFocus);
     // Unique ID for this focusable instance
     const focusableId = useRef(generateFocusableId()).current;
-    // Store own node handle for blockDown/blockRight - updated after layout
+    // Store own node handle for block* props - use state to trigger re-render
     const [selfNodeHandle, setSelfNodeHandle] = useState<number | null>(null);
+
+    // Ref callback to capture node handle synchronously when view mounts
+    const refCallback = useCallback((node: View | null) => {
+      // Update the internal ref
+      (innerRef as React.MutableRefObject<View | null>).current = node;
+
+      // Also update external viewRef if provided
+      if (viewRef) {
+        (viewRef as React.MutableRefObject<View | null>).current = node;
+      }
+
+      // Capture node handle for block* props
+      if (node && (blockUp || blockDown || blockLeft || blockRight)) {
+        const handle = findNodeHandle(node);
+        if (handle) {
+          setSelfNodeHandle(handle);
+        }
+      }
+    }, [blockUp, blockDown, blockLeft, blockRight, viewRef]);
 
     // Only apply autoFocus once on mount
     useEffect(() => {
@@ -256,25 +280,15 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     };
 
     // Add directional focus if refs are provided
-    const upHandle = getNodeHandle(nextFocusUp);
+    const upHandle = blockUp ? selfNodeHandle : getNodeHandle(nextFocusUp);
     const downHandle = blockDown ? selfNodeHandle : getNodeHandle(nextFocusDown);
-    const leftHandle = getNodeHandle(nextFocusLeft);
+    const leftHandle = blockLeft ? selfNodeHandle : getNodeHandle(nextFocusLeft);
     const rightHandle = blockRight ? selfNodeHandle : getNodeHandle(nextFocusRight);
 
     if (upHandle) tvProps.nextFocusUp = upHandle;
     if (downHandle) tvProps.nextFocusDown = downHandle;
     if (leftHandle) tvProps.nextFocusLeft = leftHandle;
     if (rightHandle) tvProps.nextFocusRight = rightHandle;
-
-    // Capture own node handle after layout for blockDown/blockRight
-    const handleLayout = useCallback(() => {
-      if ((blockDown || blockRight) && actualRef.current && !selfNodeHandle) {
-        const handle = findNodeHandle(actualRef.current);
-        if (handle) {
-          setSelfNodeHandle(handle);
-        }
-      }
-    }, [blockDown, blockRight, selfNodeHandle]);
 
     // Use border directly on the component instead of an overlay
     const animatedBorderDirectStyle = useAnimatedStyle(() => ({
@@ -288,11 +302,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
 
     return (
       <AnimatedPressable
-        ref={actualRef as any}
+        ref={refCallback}
         onPress={onPress}
         onLongPress={onLongPress}
         disabled={disabled}
-        onLayout={handleLayout}
         style={[
           style,
           animatedContainerStyle,

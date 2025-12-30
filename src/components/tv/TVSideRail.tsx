@@ -27,7 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'settings', icon: 'settings', label: 'Settings', screen: 'Settings' },
 ];
 
-const COLLAPSED_WIDTH = 80;
+const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 280;
 
 interface TVSideRailProps {
@@ -65,12 +65,22 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   const gradientWidthAnim = useRef(new Animated.Value(0)).current; // 0 when collapsed, 350 when expanded
   const gradientOpacityAnim = useRef(new Animated.Value(0)).current;
 
-  // Refs for each nav item to constrain focus navigation within the menu
-  // Using View refs directly for nextFocusUp/nextFocusDown
-  const navItemRefs = useMemo(() =>
+  // Create stable refs for each nav item's underlying View
+  const navItemViewRefs = useMemo(() =>
     NAV_ITEMS.map(() => React.createRef<View>()),
     []
   );
+  // Force re-render when refs are populated to apply directional focus
+  const [refsReady, setRefsReady] = useState(false);
+
+  // Mark refs as ready after mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setRefsReady(true);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
+
 
   // Animate rail width and gradient on expand/collapse
   useEffect(() => {
@@ -129,12 +139,13 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   const handleItemBlur = useCallback(() => {
     // Use timeout to check if focus moved to another rail item
     // If another rail item gets focus, the timeout will be cleared
+    // Using a longer timeout to handle fast navigation
     blurTimeoutRef.current = setTimeout(() => {
       focusedItemRef.current = null;
       setRailHasFocus(false);
       setIsExpanded(false);
       onRailBlur?.();
-    }, 150);
+    }, 300);
   }, [onRailBlur]);
 
   // Cleanup timeout on unmount
@@ -199,7 +210,11 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
         </View>
 
         {/* Navigation Items */}
-        <View style={styles.navItems}>
+        <View
+          style={styles.navItems}
+          // This helps Android TV focus stay within this container
+          collapsable={false}
+        >
           {NAV_ITEMS.map((item, index) => {
             const isActive = activeScreen === item.screen;
             const isFirst = index === 0;
@@ -207,28 +222,26 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
             return (
               <Focusable
                 key={item.key}
+                viewRef={navItemViewRefs[index]}
                 onPress={() => handleItemPress(item.screen)}
                 onFocus={() => handleItemFocus(index)}
                 onBlur={handleItemBlur}
                 style={styles.navItem}
-                borderRadius={12}
-                focusScale={1.05}
+                borderRadius={8}
+                focusScale={1.0}
                 animateBackground={false}
-                // Constrain vertical navigation within the menu
-                // First item: nextFocusUp points to itself to prevent escaping up
-                // Last item: nextFocusDown points to itself to prevent escaping down
-                nextFocusUp={isFirst ? navItemRefs[0] : navItemRefs[index - 1]}
-                nextFocusDown={isLast ? navItemRefs[NAV_ITEMS.length - 1] : navItemRefs[index + 1]}
-                // Point right navigation to first content item if provided
-                nextFocusRight={firstContentRef}
-                viewRef={navItemRefs[index]}
+                showFocusBorder={true}
+                blockUp={isFirst}
+                blockDown={isLast}
+                nextFocusUp={refsReady && !isFirst ? navItemViewRefs[index - 1] : undefined}
+                nextFocusDown={refsReady && !isLast ? navItemViewRefs[index + 1] : undefined}
               >
                 {(focused) => (
                   <>
                     <View style={styles.navItemContent}>
                       <MaterialIcons
                         name={item.icon}
-                        size={28}
+                        size={20}
                         color={
                           focused
                             ? '#FFFFFF'
@@ -301,30 +314,31 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   brandContainer: {
-    height: 60,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   brandText: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   navItems: {
     flex: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
   },
   navItem: {
-    height: 56,
-    borderRadius: 12,
-    marginBottom: 8,
+    height: 44,
+    borderRadius: 8,
+    marginBottom: 4,
     justifyContent: 'center',
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   navItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
   navLabel: {
     fontSize: 18,
