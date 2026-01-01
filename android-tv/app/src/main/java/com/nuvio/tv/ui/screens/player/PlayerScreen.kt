@@ -18,12 +18,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -60,6 +64,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.ui.PlayerView
 import com.nuvio.tv.domain.model.Stream
+import com.nuvio.tv.ui.screens.player.dialogs.AudioTrackDialog
+import com.nuvio.tv.ui.screens.player.dialogs.QualityDialog
+import com.nuvio.tv.ui.screens.player.dialogs.SpeedDialog
+import com.nuvio.tv.ui.screens.player.dialogs.SubtitleDialog
 import com.nuvio.tv.ui.theme.NuvioTypography
 import kotlinx.coroutines.delay
 
@@ -69,17 +77,31 @@ import kotlinx.coroutines.delay
 @Composable
 fun PlayerScreen(
     stream: Stream,
+    contentId: String,
+    contentType: String,
     contentTitle: String,
     episodeTitle: String? = null,
+    episodeId: String? = null,
+    seasonNumber: Int? = null,
+    episodeNumber: Int? = null,
+    poster: String? = null,
     startPosition: Long = 0L,
     viewModel: PlayerViewModel = hiltViewModel(),
     onBackClick: () -> Unit
 ) {
     val playerState by viewModel.playerState.collectAsState()
+    val externalSubtitles by viewModel.externalSubtitles.collectAsState()
+    val availableSpeeds by viewModel.availableSpeeds.collectAsState()
     val exoPlayer = viewModel.getExoPlayer()
 
     var showControls by remember { mutableStateOf(true) }
     var lastInteractionTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    // Dialog states
+    var showSubtitleDialog by remember { mutableStateOf(false) }
+    var showAudioDialog by remember { mutableStateOf(false) }
+    var showQualityDialog by remember { mutableStateOf(false) }
+    var showSpeedDialog by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
 
@@ -93,9 +115,19 @@ fun PlayerScreen(
         }
     }
 
-    // Start playback
+    // Start playback with tracking info
     LaunchedEffect(stream) {
-        viewModel.playStream(stream, startPosition)
+        val playbackInfo = PlaybackInfo(
+            contentId = contentId,
+            contentType = contentType,
+            contentTitle = contentTitle,
+            episodeId = episodeId,
+            episodeTitle = episodeTitle,
+            poster = poster,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber
+        )
+        viewModel.playStream(stream, startPosition, playbackInfo)
     }
 
     // Handle lifecycle
@@ -235,10 +267,58 @@ fun PlayerScreen(
                 currentPosition = playerState.currentPosition,
                 duration = playerState.duration,
                 bufferedPosition = playerState.bufferedPosition,
+                playbackSpeed = playerState.playbackSpeed,
+                hasSubtitles = playerState.subtitleTracks.isNotEmpty() || externalSubtitles.subtitles.isNotEmpty(),
+                hasAudioTracks = playerState.audioTracks.size > 1,
+                hasQualityLevels = playerState.qualityLevels.isNotEmpty(),
                 onPlayPauseClick = { viewModel.togglePlayPause() },
                 onSeekBackward = { viewModel.seekBackward() },
                 onSeekForward = { viewModel.seekForward() },
-                onSeek = { viewModel.seekTo(it) }
+                onSeek = { viewModel.seekTo(it) },
+                onSubtitleClick = { showSubtitleDialog = true },
+                onAudioClick = { showAudioDialog = true },
+                onQualityClick = { showQualityDialog = true },
+                onSpeedClick = { showSpeedDialog = true }
+            )
+        }
+
+        // Dialogs
+        if (showSubtitleDialog) {
+            SubtitleDialog(
+                embeddedTracks = playerState.subtitleTracks,
+                externalSubtitles = externalSubtitles.subtitles,
+                selectedEmbeddedIndex = playerState.selectedSubtitleTrack,
+                selectedExternalIndex = externalSubtitles.selectedIndex,
+                onSelectEmbedded = { viewModel.selectSubtitleTrack(it) },
+                onSelectExternal = { viewModel.selectExternalSubtitle(it) },
+                onDismiss = { showSubtitleDialog = false }
+            )
+        }
+
+        if (showAudioDialog) {
+            AudioTrackDialog(
+                tracks = playerState.audioTracks,
+                selectedIndex = playerState.selectedAudioTrack,
+                onSelect = { viewModel.selectAudioTrack(it) },
+                onDismiss = { showAudioDialog = false }
+            )
+        }
+
+        if (showQualityDialog) {
+            QualityDialog(
+                levels = playerState.qualityLevels,
+                selectedIndex = playerState.selectedQualityLevel,
+                onSelect = { viewModel.selectQualityLevel(it) },
+                onDismiss = { showQualityDialog = false }
+            )
+        }
+
+        if (showSpeedDialog) {
+            SpeedDialog(
+                speeds = availableSpeeds,
+                currentSpeed = playerState.playbackSpeed,
+                onSelect = { viewModel.setPlaybackSpeed(it) },
+                onDismiss = { showSpeedDialog = false }
             )
         }
 
@@ -282,10 +362,18 @@ private fun PlayerControlsOverlay(
     currentPosition: Long,
     duration: Long,
     bufferedPosition: Long,
+    playbackSpeed: Float,
+    hasSubtitles: Boolean,
+    hasAudioTracks: Boolean,
+    hasQualityLevels: Boolean,
     onPlayPauseClick: () -> Unit,
     onSeekBackward: () -> Unit,
     onSeekForward: () -> Unit,
-    onSeek: (Long) -> Unit
+    onSeek: (Long) -> Unit,
+    onSubtitleClick: () -> Unit,
+    onAudioClick: () -> Unit,
+    onQualityClick: () -> Unit,
+    onSpeedClick: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize()
@@ -305,21 +393,41 @@ private fun PlayerControlsOverlay(
                     )
                 )
         ) {
-            Column(
+            Row(
                 modifier = Modifier
-                    .padding(horizontal = 48.dp, vertical = 24.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 48.dp, vertical = 24.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = title,
-                    style = NuvioTypography.headlineMedium,
-                    color = Color.White
-                )
-                episodeTitle?.let {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = it,
-                        style = NuvioTypography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.7f)
+                        text = title,
+                        style = NuvioTypography.headlineMedium,
+                        color = Color.White
                     )
+                    episodeTitle?.let {
+                        Text(
+                            text = it,
+                            style = NuvioTypography.bodyLarge,
+                            color = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+
+                // Speed indicator
+                if (playbackSpeed != 1f) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${playbackSpeed}x",
+                            style = NuvioTypography.labelMedium,
+                            color = Color.Black
+                        )
+                    }
                 }
             }
         }
@@ -328,7 +436,7 @@ private fun PlayerControlsOverlay(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(220.dp)
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
@@ -379,37 +487,86 @@ private fun PlayerControlsOverlay(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Control Buttons
+                // Control Buttons Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Rewind Button
-                    ControlButton(
-                        icon = Icons.Filled.FastRewind,
-                        contentDescription = "Rewind 10 seconds",
-                        onClick = onSeekBackward
-                    )
+                    // Left side - Secondary controls
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Subtitles
+                        SmallControlButton(
+                            icon = Icons.Filled.Subtitles,
+                            contentDescription = "Subtitles",
+                            onClick = onSubtitleClick,
+                            enabled = hasSubtitles
+                        )
 
-                    Spacer(modifier = Modifier.width(24.dp))
+                        // Audio tracks
+                        SmallControlButton(
+                            icon = Icons.Filled.Headphones,
+                            contentDescription = "Audio",
+                            onClick = onAudioClick,
+                            enabled = hasAudioTracks
+                        )
+                    }
 
-                    // Play/Pause Button
-                    ControlButton(
-                        icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        onClick = onPlayPauseClick,
-                        isLarge = true
-                    )
+                    // Center - Main playback controls
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Rewind Button
+                        ControlButton(
+                            icon = Icons.Filled.FastRewind,
+                            contentDescription = "Rewind 10 seconds",
+                            onClick = onSeekBackward
+                        )
 
-                    Spacer(modifier = Modifier.width(24.dp))
+                        Spacer(modifier = Modifier.width(24.dp))
 
-                    // Fast Forward Button
-                    ControlButton(
-                        icon = Icons.Filled.FastForward,
-                        contentDescription = "Forward 10 seconds",
-                        onClick = onSeekForward
-                    )
+                        // Play/Pause Button
+                        ControlButton(
+                            icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            onClick = onPlayPauseClick,
+                            isLarge = true
+                        )
+
+                        Spacer(modifier = Modifier.width(24.dp))
+
+                        // Fast Forward Button
+                        ControlButton(
+                            icon = Icons.Filled.FastForward,
+                            contentDescription = "Forward 10 seconds",
+                            onClick = onSeekForward
+                        )
+                    }
+
+                    // Right side - Quality & Speed
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Quality
+                        SmallControlButton(
+                            icon = Icons.Filled.HighQuality,
+                            contentDescription = "Quality",
+                            onClick = onQualityClick,
+                            enabled = hasQualityLevels
+                        )
+
+                        // Speed
+                        SmallControlButton(
+                            icon = Icons.Filled.Speed,
+                            contentDescription = "Speed",
+                            onClick = onSpeedClick
+                        )
+                    }
                 }
             }
         }
@@ -457,7 +614,54 @@ private fun ControlButton(
             imageVector = icon,
             contentDescription = contentDescription,
             modifier = Modifier.size(iconSize),
-            tint = Color.White
+            tint = if (isFocused) Color.Black else Color.White
+        )
+    }
+}
+
+@Composable
+private fun SmallControlButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                when {
+                    isFocused -> MaterialTheme.colorScheme.primary
+                    !enabled -> Color.Transparent
+                    else -> Color.White.copy(alpha = 0.1f)
+                }
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable(enabled)
+            .onKeyEvent { event ->
+                if (enabled && event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.DirectionCenter || event.key == Key.Enter)
+                ) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(22.dp),
+            tint = when {
+                isFocused -> Color.Black
+                !enabled -> Color.White.copy(alpha = 0.3f)
+                else -> Color.White.copy(alpha = 0.8f)
+            }
         )
     }
 }

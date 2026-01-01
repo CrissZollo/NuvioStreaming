@@ -20,6 +20,7 @@ import com.nuvio.tv.ui.screens.library.LibraryScreen
 import com.nuvio.tv.ui.screens.metadata.MetadataScreen
 import com.nuvio.tv.ui.screens.search.SearchScreen
 import com.nuvio.tv.ui.screens.settings.SettingsScreen
+import com.nuvio.tv.ui.screens.settings.addons.AddonsSettingsScreen
 import com.nuvio.tv.ui.screens.streams.StreamsScreen
 
 /**
@@ -68,6 +69,9 @@ fun NuvioNavigation(
                         navController.navigate(
                             NavRoutes.catalog(catalog.addonId, catalog.type, catalog.catalogId)
                         )
+                    },
+                    onAddAddonsClick = {
+                        navController.navigate(NavRoutes.SETTINGS_ADDONS)
                     }
                 )
             }
@@ -194,7 +198,11 @@ fun NuvioNavigation(
             }
 
             composable(NavRoutes.SETTINGS_ADDONS) {
-                // AddonsSettingsScreen
+                AddonsSettingsScreen(
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
             }
 
             composable(NavRoutes.SETTINGS_ABOUT) {

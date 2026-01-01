@@ -1,15 +1,32 @@
 package com.nuvio.tv.ui.screens.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,24 +34,33 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.items
 import com.nuvio.tv.domain.model.CatalogConfig
 import com.nuvio.tv.domain.model.StreamingContent
+import com.nuvio.tv.ui.components.cards.ContinueWatchingCard
+import com.nuvio.tv.ui.components.cards.ThisWeekCard
 import com.nuvio.tv.ui.components.carousels.ContentCarousel
+import com.nuvio.tv.ui.components.carousels.GenericCarousel
 import com.nuvio.tv.ui.components.carousels.HeroCarousel
+import com.nuvio.tv.ui.theme.NuvioShapes
 import com.nuvio.tv.ui.theme.NuvioTypography
 
 /**
  * Home screen displaying featured content, continue watching, and catalog rows.
+ * Styled to match the mobile app's HomeScreen component.
  */
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onContentClick: (StreamingContent) -> Unit,
-    onCatalogClick: (CatalogConfig) -> Unit
+    onCatalogClick: (CatalogConfig) -> Unit,
+    onAddAddonsClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -43,79 +69,355 @@ fun HomeScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        if (uiState.isLoading && uiState.featuredContent.isEmpty()) {
-            // Loading state
+        // Main content with animated visibility
+        AnimatedVisibility(
+            visible = !uiState.isLoading || uiState.featuredContent.isNotEmpty(),
+            enter = fadeIn(animationSpec = tween(300)),
+            exit = fadeOut(animationSpec = tween(200))
+        ) {
+            when {
+                // No addons installed
+                !uiState.hasAddons -> {
+                    NoAddonsState(onAddAddonsClick = onAddAddonsClick)
+                }
+
+                // Error state (only show if no content at all)
+                uiState.error != null && uiState.featuredContent.isEmpty() && uiState.catalogs.isEmpty() -> {
+                    ErrorState(
+                        error = uiState.error ?: "Unknown error",
+                        onRetry = { viewModel.refresh() }
+                    )
+                }
+
+                // Content loaded (show even if still loading more)
+                else -> {
+                    HomeContent(
+                        uiState = uiState,
+                        onContentClick = onContentClick,
+                        onCatalogClick = onCatalogClick,
+                        onThisWeekItemClick = { item ->
+                            // Navigate to the show's metadata screen
+                            onContentClick(
+                                StreamingContent(
+                                    id = item.showId,
+                                    type = "series",
+                                    name = item.showTitle
+                                )
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        // Loading overlay (shows on initial load only)
+        AnimatedVisibility(
+            visible = uiState.isLoading && uiState.featuredContent.isEmpty() && uiState.catalogs.isEmpty(),
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            LoadingState()
+        }
+    }
+}
+
+@Composable
+private fun LoadingState() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp),
+                strokeWidth = 4.dp
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Loading content...",
+                style = NuvioTypography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun NoAddonsState(onAddAddonsClick: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(48.dp)
+        ) {
+            // Icon
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(40.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "Loading...",
-                    style = NuvioTypography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
                 )
             }
-        } else if (uiState.error != null && uiState.featuredContent.isEmpty()) {
-            // Error state
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "No Addons Installed",
+                style = NuvioTypography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Install addons to start browsing movies and TV shows.\nAddons provide catalogs and streaming sources.",
+                style = NuvioTypography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = onAddAddonsClick,
+                modifier = Modifier.focusable(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                shape = NuvioShapes.full
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Add Addons",
+                    style = NuvioTypography.labelLarge
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorState(
+    error: String,
+    onRetry: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(48.dp)
+        ) {
+            // Error Icon
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(40.dp))
+                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Error loading content",
-                        style = NuvioTypography.headlineMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = uiState.error ?: "",
-                        style = NuvioTypography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                Icon(
+                    imageVector = Icons.Filled.Error,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Error Loading Content",
+                style = NuvioTypography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = error,
+                style = NuvioTypography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = onRetry,
+                modifier = Modifier.focusable(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                shape = NuvioShapes.full
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Retry",
+                    style = NuvioTypography.labelLarge
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeContent(
+    uiState: HomeUiState,
+    onContentClick: (StreamingContent) -> Unit,
+    onCatalogClick: (CatalogConfig) -> Unit,
+    onThisWeekItemClick: (ThisWeekItem) -> Unit
+) {
+    TvLazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
+    ) {
+        // Hero Carousel - Full width, no padding
+        if (uiState.featuredContent.isNotEmpty()) {
+            item(key = "hero") {
+                HeroCarousel(
+                    items = uiState.featuredContent,
+                    onItemClick = onContentClick,
+                    onInfoClick = onContentClick, // Navigate to metadata screen for more info
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(480.dp) // Taller hero for TV
+                )
+            }
+        }
+
+        // Continue Watching Section
+        if (uiState.continueWatching.isNotEmpty()) {
+            item(key = "continue_watching") {
+                GenericCarousel(
+                    title = "Continue Watching",
+                    items = uiState.continueWatching,
+                    onItemClick = { item -> onContentClick(item.content) },
+                    itemKey = { it.content.id + (it.progress.episodeId ?: "") },
+                    modifier = Modifier.padding(horizontal = 48.dp)
+                ) { item ->
+                    ContinueWatchingCard(
+                        item = item,
+                        onClick = { onContentClick(item.content) }
                     )
                 }
             }
-        } else {
-            // Content
-            TvLazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                // Hero Carousel
-                if (uiState.featuredContent.isNotEmpty()) {
-                    item {
-                        HeroCarousel(
-                            items = uiState.featuredContent,
-                            onItemClick = onContentClick,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(400.dp)
-                        )
-                    }
-                }
+        }
 
-                // Continue Watching
-                if (uiState.continueWatching.isNotEmpty()) {
-                    item {
-                        ContentCarousel(
-                            title = "Continue Watching",
-                            items = uiState.continueWatching,
-                            onItemClick = onContentClick,
-                            modifier = Modifier.padding(horizontal = 48.dp)
-                        )
-                    }
-                }
-
-                // Catalog Rows
-                items(uiState.catalogs) { catalog ->
-                    ContentCarousel(
-                        title = catalog.config.catalogName,
-                        items = catalog.items,
-                        onItemClick = onContentClick,
-                        onSeeAllClick = { onCatalogClick(catalog.config) },
-                        modifier = Modifier.padding(horizontal = 48.dp)
+        // This Week Section (Trakt Calendar)
+        if (uiState.thisWeek.isNotEmpty()) {
+            item(key = "this_week") {
+                GenericCarousel(
+                    title = "This Week",
+                    items = uiState.thisWeek,
+                    onItemClick = onThisWeekItemClick,
+                    itemKey = { "${it.showId}:${it.episodeInfo}" },
+                    modifier = Modifier.padding(horizontal = 48.dp)
+                ) { item ->
+                    ThisWeekCard(
+                        item = item,
+                        onClick = { onThisWeekItemClick(item) }
                     )
+                }
+            }
+        }
+
+        // Catalog Rows - Each with their own section
+        items(
+            items = uiState.catalogs,
+            key = { "${it.config.addonId}:${it.config.catalogId}:${it.config.type}" }
+        ) { catalog ->
+            ContentCarousel(
+                title = catalog.config.catalogName,
+                items = catalog.items,
+                onItemClick = onContentClick,
+                onSeeAllClick = { onCatalogClick(catalog.config) },
+                modifier = Modifier.padding(horizontal = 48.dp)
+            )
+        }
+
+        // Empty state if no content at all (but has addons)
+        if (uiState.catalogs.isEmpty() && uiState.featuredContent.isEmpty() &&
+            uiState.continueWatching.isEmpty() && !uiState.isLoading && uiState.hasAddons) {
+            item(key = "empty") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                        .padding(horizontal = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No Content Available",
+                            style = NuvioTypography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Try adding more addons or check your connection",
+                            style = NuvioTypography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Loading indicator at bottom when loading more catalogs
+        if (uiState.isLoading && uiState.catalogs.isNotEmpty()) {
+            item(key = "loading_more") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Loading more...",
+                            style = NuvioTypography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        )
+                    }
                 }
             }
         }

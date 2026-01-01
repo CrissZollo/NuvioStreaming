@@ -14,7 +14,7 @@ import retrofit2.http.Url
  * Retrofit interface for Stremio addon protocol.
  *
  * Stremio addons follow a RESTful protocol where each addon is a separate HTTP server.
- * The base URL is the addon manifest URL, and resources are fetched relative to that.
+ * All methods use @Url to allow dynamic base URLs per addon.
  */
 interface StremioApi {
 
@@ -26,69 +26,32 @@ interface StremioApi {
     suspend fun getManifest(@Url manifestUrl: String): Response<ManifestDto>
 
     /**
-     * Fetch catalog content.
-     *
-     * @param baseUrl The addon base URL (without trailing slash)
-     * @param type Content type (movie, series, channel, etc.)
-     * @param id Catalog ID as defined in the manifest
-     * @param extra Optional extra parameters (genre, search, skip, etc.) formatted as "key=value:key2=value2"
+     * Fetch catalog content using dynamic URL.
+     * URL should be: {baseUrl}/catalog/{type}/{id}.json
      */
-    @GET("{baseUrl}/catalog/{type}/{id}.json")
-    suspend fun getCatalog(
-        @Path("baseUrl", encoded = true) baseUrl: String,
-        @Path("type") type: String,
-        @Path("id") id: String
-    ): Response<CatalogResponseDto>
-
-    @GET("{baseUrl}/catalog/{type}/{id}/{extra}.json")
-    suspend fun getCatalogWithExtra(
-        @Path("baseUrl", encoded = true) baseUrl: String,
-        @Path("type") type: String,
-        @Path("id") id: String,
-        @Path("extra", encoded = true) extra: String
-    ): Response<CatalogResponseDto>
+    @GET
+    suspend fun getCatalog(@Url url: String): Response<CatalogResponseDto>
 
     /**
      * Fetch content metadata.
-     *
-     * @param baseUrl The addon base URL
-     * @param type Content type
-     * @param id Content ID (e.g., "tt1234567" for IMDB IDs)
+     * URL should be: {baseUrl}/meta/{type}/{id}.json
      */
-    @GET("{baseUrl}/meta/{type}/{id}.json")
-    suspend fun getMeta(
-        @Path("baseUrl", encoded = true) baseUrl: String,
-        @Path("type") type: String,
-        @Path("id") id: String
-    ): Response<MetaResponseDto>
+    @GET
+    suspend fun getMeta(@Url url: String): Response<MetaResponseDto>
 
     /**
      * Fetch streams for content.
-     *
-     * @param baseUrl The addon base URL
-     * @param type Content type
-     * @param id Content ID, for episodes use format "imdb_id:season:episode"
+     * URL should be: {baseUrl}/stream/{type}/{id}.json
      */
-    @GET("{baseUrl}/stream/{type}/{id}.json")
-    suspend fun getStreams(
-        @Path("baseUrl", encoded = true) baseUrl: String,
-        @Path("type") type: String,
-        @Path("id") id: String
-    ): Response<StreamsResponseDto>
+    @GET
+    suspend fun getStreams(@Url url: String): Response<StreamsResponseDto>
 
     /**
      * Fetch subtitles for content.
-     *
-     * @param baseUrl The addon base URL
-     * @param type Content type
-     * @param id Content ID
+     * URL should be: {baseUrl}/subtitles/{type}/{id}.json
      */
-    @GET("{baseUrl}/subtitles/{type}/{id}.json")
-    suspend fun getSubtitles(
-        @Path("baseUrl", encoded = true) baseUrl: String,
-        @Path("type") type: String,
-        @Path("id") id: String
-    ): Response<SubtitlesResponseDto>
+    @GET
+    suspend fun getSubtitles(@Url url: String): Response<SubtitlesResponseDto>
 }
 
 /**

@@ -1,7 +1,20 @@
 package com.nuvio.tv.data.remote.dto
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Stremio addon manifest response.
@@ -14,6 +27,7 @@ data class ManifestDto(
     val description: String? = null,
     val url: String? = null,
     val catalogs: List<CatalogDto>? = null,
+    @Serializable(with = ResourceListSerializer::class)
     val resources: List<ResourceDto>? = null,
     val types: List<String>? = null,
     val idPrefixes: List<String>? = null,
@@ -40,12 +54,57 @@ data class CatalogExtraDto(
     val optionsLimit: Int? = null
 )
 
+/**
+ * Resource can be either a string ("catalog") or an object with name, types, idPrefixes.
+ */
 @Serializable
 data class ResourceDto(
     val name: String,
-    val types: List<String>,
+    val types: List<String>? = null,
     val idPrefixes: List<String>? = null
 )
+
+/**
+ * Custom serializer to handle resources as either strings or objects.
+ * Stremio manifests can have resources like ["catalog", "meta"] or [{name: "stream", types: ["movie"]}]
+ */
+@OptIn(ExperimentalSerializationApi::class)
+object ResourceListSerializer : KSerializer<List<ResourceDto>?> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ResourceList")
+
+    override fun serialize(encoder: Encoder, value: List<ResourceDto>?) {
+        if (value == null) {
+            encoder.encodeNull()
+        } else {
+            encoder.encodeSerializableValue(ListSerializer(ResourceDto.serializer()), value)
+        }
+    }
+
+    override fun deserialize(decoder: Decoder): List<ResourceDto>? {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: return decoder.decodeSerializableValue(ListSerializer(ResourceDto.serializer()))
+
+        val element = jsonDecoder.decodeJsonElement()
+        if (element !is JsonArray) return null
+
+        return element.map { item ->
+            when (item) {
+                is JsonPrimitive -> {
+                    // Simple string like "catalog"
+                    ResourceDto(name = item.content)
+                }
+                is JsonObject -> {
+                    // Full object like {name: "stream", types: ["movie"]}
+                    val name = item["name"]?.jsonPrimitive?.content ?: "unknown"
+                    val types = item["types"]?.jsonArray?.map { it.jsonPrimitive.content }
+                    val idPrefixes = item["idPrefixes"]?.jsonArray?.map { it.jsonPrimitive.content }
+                    ResourceDto(name = name, types = types, idPrefixes = idPrefixes)
+                }
+                else -> ResourceDto(name = "unknown")
+            }
+        }
+    }
+}
 
 @Serializable
 data class BehaviorHintsDto(
