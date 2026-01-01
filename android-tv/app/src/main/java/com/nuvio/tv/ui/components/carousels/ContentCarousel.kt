@@ -47,6 +47,12 @@ import com.nuvio.tv.domain.model.StreamingContent
 import com.nuvio.tv.ui.components.cards.ContentCard
 import com.nuvio.tv.ui.theme.NuvioTypography
 
+// Smaller card size for more content on screen
+private const val CARD_WIDTH = 120
+private const val CARD_HEIGHT = 180 // 120 / (2/3) = 180
+private const val TITLE_SPACE = 56 // Space for title below card
+private const val ROW_HEIGHT = CARD_HEIGHT + TITLE_SPACE // 236dp total
+
 /**
  * Horizontal content carousel for displaying content rows.
  * Supports D-pad navigation with smooth scrolling.
@@ -59,10 +65,13 @@ fun ContentCarousel(
     onItemClick: (StreamingContent) -> Unit,
     modifier: Modifier = Modifier,
     onSeeAllClick: (() -> Unit)? = null,
-    showTitle: Boolean = true
+    showTitle: Boolean = true,
+    onRowFocused: (() -> Unit)? = null,
+    cardWidth: Int = CARD_WIDTH
 ) {
     val listState = rememberLazyListState()
     var seeAllFocused by remember { mutableStateOf(false) }
+    var anyCardFocused by remember { mutableStateOf(false) }
 
     val seeAllScale by animateFloatAsState(
         targetValue = if (seeAllFocused) 1.1f else 1f,
@@ -150,15 +159,19 @@ fun ContentCarousel(
 
         // Content Row - with proper TV lazy list for D-pad navigation
         // Fixed height container prevents vertical jumping during horizontal scroll
+        // Calculate height based on card aspect ratio (2/3 for poster)
+        val cardHeight = (cardWidth / (2f / 3f)).toInt()
+        val rowHeight = cardHeight + TITLE_SPACE
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(296.dp) // 160dp card width / (2/3 aspect) = 240dp + 56dp title space
+                .height(rowHeight.dp)
         ) {
             LazyRow(
                 state = listState,
                 contentPadding = PaddingValues(end = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(
                     items = items,
@@ -166,7 +179,19 @@ fun ContentCarousel(
                 ) { content ->
                     ContentCard(
                         content = content,
-                        onClick = { onItemClick(content) }
+                        onClick = { onItemClick(content) },
+                        cardWidth = cardWidth,
+                        modifier = Modifier.onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                // Always trigger scroll when any card gets focus
+                                // This handles both horizontal navigation within row
+                                // and vertical navigation between rows
+                                onRowFocused?.invoke()
+                                anyCardFocused = true
+                            } else if (!focusState.isFocused) {
+                                anyCardFocused = false
+                            }
+                        }
                     )
                 }
             }
@@ -187,10 +212,12 @@ fun <T> GenericCarousel(
     itemKey: (T) -> Any,
     onSeeAllClick: (() -> Unit)? = null,
     rowHeight: Dp = 200.dp, // Default height for generic carousels
+    onRowFocused: (() -> Unit)? = null,
     itemContent: @Composable (T) -> Unit
 ) {
     val listState = rememberLazyListState()
     var seeAllFocused by remember { mutableStateOf(false) }
+    var anyCardFocused by remember { mutableStateOf(false) }
 
     val seeAllScale by animateFloatAsState(
         targetValue = if (seeAllFocused) 1.1f else 1f,
@@ -283,13 +310,27 @@ fun <T> GenericCarousel(
             LazyRow(
                 state = listState,
                 contentPadding = PaddingValues(end = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(
                     items = items,
                     key = itemKey
                 ) { item ->
-                    itemContent(item)
+                    Box(
+                        modifier = Modifier.onFocusChanged { focusState ->
+                            if (focusState.hasFocus) {
+                                // Always trigger scroll when any card gets focus
+                                // This handles both horizontal navigation within row
+                                // and vertical navigation between rows
+                                onRowFocused?.invoke()
+                                anyCardFocused = true
+                            } else if (!focusState.hasFocus) {
+                                anyCardFocused = false
+                            }
+                        }
+                    ) {
+                        itemContent(item)
+                    }
                 }
             }
         }

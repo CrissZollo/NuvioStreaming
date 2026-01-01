@@ -95,3 +95,22 @@ trakt-docss
 libmpv-android/
 mpv-android/
 mpvKt/
+
+# Android TV app build artifacts
+android-tv/build/
+android-tv/app/build/
+android-tv/.gradle/
+android-tv/.idea/
+android-tv/local.properties
+android-tv/*.iml
+android-tv/app/*.iml
+android-tv/captures/
+android-tv/.cxx/
+
+# Gradle
+.gradle/
+build/
+*.hprof
+
+# Root level gradle cache
+/.gradle/

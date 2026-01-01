@@ -32,7 +32,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +43,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
 import com.nuvio.tv.domain.model.CatalogConfig
@@ -298,6 +304,13 @@ private fun HomeContent(
 ) {
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    // Track catalog row positions for scroll-to-center on focus
+    val catalogPositions = remember { mutableMapOf<Int, Int>() }
+
+    // Screen height offset for centering (aim for ~1/4 from top)
+    val scrollOffset = with(density) { 120.dp.toPx().toInt() }
 
     // Use regular Column with verticalScroll instead of TvLazyColumn
     // This prevents the automatic "bring focused item into view" behavior
@@ -329,14 +342,25 @@ private fun HomeContent(
         }
 
         // Continue Watching Section
+        var continueWatchingPosition by remember { mutableIntStateOf(0) }
         if (uiState.continueWatching.isNotEmpty()) {
             GenericCarousel(
                 title = "Continue Watching",
                 items = uiState.continueWatching,
                 onItemClick = { item -> onContentClick(item.content) },
                 itemKey = { it.content.id + (it.progress.episodeId ?: "") },
-                modifier = Modifier.padding(horizontal = 48.dp),
-                rowHeight = 172.dp // 124dp card + 48dp title space
+                modifier = Modifier
+                    .padding(horizontal = 48.dp)
+                    .onGloballyPositioned { coordinates ->
+                        continueWatchingPosition = coordinates.positionInParent().y.toInt()
+                    },
+                rowHeight = 172.dp, // 124dp card + 48dp title space
+                onRowFocused = {
+                    coroutineScope.launch {
+                        val targetScroll = kotlin.math.max(0, continueWatchingPosition - scrollOffset)
+                        scrollState.animateScrollTo(targetScroll)
+                    }
+                }
             ) { item ->
                 ContinueWatchingCard(
                     item = item,
@@ -346,14 +370,25 @@ private fun HomeContent(
         }
 
         // This Week Section (Trakt Calendar)
+        var thisWeekPosition by remember { mutableIntStateOf(0) }
         if (uiState.thisWeek.isNotEmpty()) {
             GenericCarousel(
                 title = "This Week",
                 items = uiState.thisWeek,
                 onItemClick = onThisWeekItemClick,
                 itemKey = { "${it.showId}:${it.episodeInfo}" },
-                modifier = Modifier.padding(horizontal = 48.dp),
-                rowHeight = 160.dp // 112dp card + 48dp title space
+                modifier = Modifier
+                    .padding(horizontal = 48.dp)
+                    .onGloballyPositioned { coordinates ->
+                        thisWeekPosition = coordinates.positionInParent().y.toInt()
+                    },
+                rowHeight = 160.dp, // 112dp card + 48dp title space
+                onRowFocused = {
+                    coroutineScope.launch {
+                        val targetScroll = kotlin.math.max(0, thisWeekPosition - scrollOffset)
+                        scrollState.animateScrollTo(targetScroll)
+                    }
+                }
             ) { item ->
                 ThisWeekCard(
                     item = item,
@@ -363,7 +398,7 @@ private fun HomeContent(
         }
 
         // Catalog Rows - Each with their own section
-        uiState.catalogs.forEach { catalog ->
+        uiState.catalogs.forEachIndexed { index, catalog ->
             // Add content type suffix (Movies/TV Shows) to catalog name
             val typeLabel = when (catalog.config.type.lowercase()) {
                 "movie" -> "Movies"
@@ -377,7 +412,20 @@ private fun HomeContent(
                 items = catalog.items,
                 onItemClick = onContentClick,
                 onSeeAllClick = { onCatalogClick(catalog.config) },
-                modifier = Modifier.padding(horizontal = 48.dp)
+                modifier = Modifier
+                    .padding(horizontal = 48.dp)
+                    .onGloballyPositioned { coordinates ->
+                        catalogPositions[index] = coordinates.positionInParent().y.toInt()
+                    },
+                onRowFocused = {
+                    // Scroll to center the catalog title on screen
+                    catalogPositions[index]?.let { position ->
+                        coroutineScope.launch {
+                            val targetScroll = kotlin.math.max(0, position - scrollOffset)
+                            scrollState.animateScrollTo(targetScroll)
+                        }
+                    }
+                }
             )
         }
 
