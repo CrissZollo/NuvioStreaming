@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <include domain="sharedpref" path="." />
+    <exclude domain="no_backup" path="." />
+    <include domain="database" path="." />
+    <include domain="file" path="mmkv" />
+</full-backup-content>
