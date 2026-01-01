@@ -39,10 +39,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.tv.foundation.lazy.list.TvLazyColumn
-import androidx.tv.foundation.lazy.list.items
-import androidx.tv.foundation.lazy.list.rememberTvLazyListState
 import kotlinx.coroutines.launch
 import com.nuvio.tv.domain.model.CatalogConfig
 import com.nuvio.tv.domain.model.StreamingContent
@@ -297,81 +296,84 @@ private fun HomeContent(
     onCatalogClick: (CatalogConfig) -> Unit,
     onThisWeekItemClick: (ThisWeekItem) -> Unit
 ) {
-    val listState = rememberTvLazyListState()
+    val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
 
-    // Hero and catalogs in a single scrollable list
-    // Hero scrolls up when user navigates down to catalogs
-    TvLazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 48.dp),
+    // Use regular Column with verticalScroll instead of TvLazyColumn
+    // This prevents the automatic "bring focused item into view" behavior
+    // that causes vertical jumping during horizontal navigation
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         // Hero Carousel - Full width, scrolls with content
         if (uiState.featuredContent.isNotEmpty()) {
-            item(key = "hero") {
-                HeroCarousel(
-                    items = uiState.featuredContent,
-                    onItemClick = onContentClick,
-                    onHeroFocusChanged = { hasFocus ->
-                        if (hasFocus) {
-                            // Scroll to top when hero receives focus
-                            coroutineScope.launch {
-                                listState.scrollToItem(0, scrollOffset = 0)
-                            }
+            HeroCarousel(
+                items = uiState.featuredContent,
+                onItemClick = onContentClick,
+                onHeroFocusChanged = { hasFocus ->
+                    if (hasFocus) {
+                        // Scroll to top when hero receives focus
+                        coroutineScope.launch {
+                            scrollState.animateScrollTo(0)
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(480.dp)
-                )
-            }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(480.dp)
+            )
         }
 
         // Continue Watching Section
         if (uiState.continueWatching.isNotEmpty()) {
-            item(key = "continue_watching") {
-                GenericCarousel(
-                    title = "Continue Watching",
-                    items = uiState.continueWatching,
-                    onItemClick = { item -> onContentClick(item.content) },
-                    itemKey = { it.content.id + (it.progress.episodeId ?: "") },
-                    modifier = Modifier.padding(horizontal = 48.dp)
-                ) { item ->
-                    ContinueWatchingCard(
-                        item = item,
-                        onClick = { onContentClick(item.content) }
-                    )
-                }
+            GenericCarousel(
+                title = "Continue Watching",
+                items = uiState.continueWatching,
+                onItemClick = { item -> onContentClick(item.content) },
+                itemKey = { it.content.id + (it.progress.episodeId ?: "") },
+                modifier = Modifier.padding(horizontal = 48.dp),
+                rowHeight = 172.dp // 124dp card + 48dp title space
+            ) { item ->
+                ContinueWatchingCard(
+                    item = item,
+                    onClick = { onContentClick(item.content) }
+                )
             }
         }
 
         // This Week Section (Trakt Calendar)
         if (uiState.thisWeek.isNotEmpty()) {
-            item(key = "this_week") {
-                GenericCarousel(
-                    title = "This Week",
-                    items = uiState.thisWeek,
-                    onItemClick = onThisWeekItemClick,
-                    itemKey = { "${it.showId}:${it.episodeInfo}" },
-                    modifier = Modifier.padding(horizontal = 48.dp)
-                ) { item ->
-                    ThisWeekCard(
-                        item = item,
-                        onClick = { onThisWeekItemClick(item) }
-                    )
-                }
+            GenericCarousel(
+                title = "This Week",
+                items = uiState.thisWeek,
+                onItemClick = onThisWeekItemClick,
+                itemKey = { "${it.showId}:${it.episodeInfo}" },
+                modifier = Modifier.padding(horizontal = 48.dp),
+                rowHeight = 160.dp // 112dp card + 48dp title space
+            ) { item ->
+                ThisWeekCard(
+                    item = item,
+                    onClick = { onThisWeekItemClick(item) }
+                )
             }
         }
 
         // Catalog Rows - Each with their own section
-        items(
-            items = uiState.catalogs,
-            key = { "${it.config.addonId}:${it.config.catalogId}:${it.config.type}" }
-        ) { catalog ->
+        uiState.catalogs.forEach { catalog ->
+            // Add content type suffix (Movies/TV Shows) to catalog name
+            val typeLabel = when (catalog.config.type.lowercase()) {
+                "movie" -> "Movies"
+                "series" -> "TV Shows"
+                else -> catalog.config.type.replaceFirstChar { it.uppercase() }
+            }
+            val displayTitle = "${catalog.config.catalogName} - $typeLabel"
+
             ContentCarousel(
-                title = catalog.config.catalogName,
+                title = displayTitle,
                 items = catalog.items,
                 onItemClick = onContentClick,
                 onSeeAllClick = { onCatalogClick(catalog.config) },
@@ -382,58 +384,54 @@ private fun HomeContent(
         // Empty state if no content at all (but has addons)
         if (uiState.catalogs.isEmpty() && uiState.featuredContent.isEmpty() &&
             uiState.continueWatching.isEmpty() && !uiState.isLoading && uiState.hasAddons) {
-            item(key = "empty") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .padding(horizontal = 48.dp),
-                    contentAlignment = Alignment.Center
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+                    .padding(horizontal = 48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "No Content Available",
-                            style = NuvioTypography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Try adding more addons or check your connection",
-                            style = NuvioTypography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                        )
-                    }
+                    Text(
+                        text = "No Content Available",
+                        style = NuvioTypography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Try adding more addons or check your connection",
+                        style = NuvioTypography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    )
                 }
             }
         }
 
         // Loading indicator at bottom when loading more catalogs
         if (uiState.isLoading && uiState.catalogs.isNotEmpty()) {
-            item(key = "loading_more") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Loading more...",
-                            style = NuvioTypography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                        )
-                    }
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Loading more...",
+                        style = NuvioTypography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                    )
                 }
             }
         }

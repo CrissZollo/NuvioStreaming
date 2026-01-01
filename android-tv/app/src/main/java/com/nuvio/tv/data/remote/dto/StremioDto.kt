@@ -115,6 +115,43 @@ data class BehaviorHintsDto(
 )
 
 /**
+ * Custom serializer to handle year field that can be:
+ * - An integer: 2016
+ * - A string: "2016"
+ * - A year range: "2016–2025" or "2016-2025"
+ * Extracts the start year as Int.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+object YearSerializer : KSerializer<Int?> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Year")
+
+    override fun serialize(encoder: Encoder, value: Int?) {
+        if (value == null) {
+            encoder.encodeNull()
+        } else {
+            encoder.encodeInt(value)
+        }
+    }
+
+    override fun deserialize(decoder: Decoder): Int? {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: return try { decoder.decodeInt() } catch (e: Exception) { null }
+
+        val element = jsonDecoder.decodeJsonElement()
+        if (element !is JsonPrimitive) return null
+
+        // Try to parse as integer first
+        element.content.toIntOrNull()?.let { return it }
+
+        // Handle year ranges like "2016–2025" or "2016-2025"
+        val yearString = element.content
+        // Split by various dash types (en-dash, em-dash, hyphen)
+        val parts = yearString.split("–", "—", "-")
+        return parts.firstOrNull()?.trim()?.toIntOrNull()
+    }
+}
+
+/**
  * Stremio catalog response.
  */
 @Serializable
@@ -137,7 +174,8 @@ data class MetaDto(
     val description: String? = null,
     val releaseInfo: String? = null,
     val imdbRating: String? = null,
-    val year: Int? = null,
+    @Serializable(with = YearSerializer::class)
+    val year: Int? = null, // Can be "2016" or "2016–2025", we extract the start year
     val genres: List<String>? = null,
     val runtime: String? = null,
     val cast: List<String>? = null,
@@ -154,7 +192,7 @@ data class MetaDto(
 @Serializable
 data class VideoDto(
     val id: String,
-    val title: String,
+    val title: String? = null,
     val released: String? = null,
     val season: Int? = null,
     val episode: Int? = null,

@@ -5,7 +5,8 @@ coreKtx = "1.12.0"
 lifecycleRuntimeKtx = "2.7.0"
 activityCompose = "1.8.2"
 composeBom = "2024.02.00"
-tvCompose = "1.0.0-alpha10"
+tvFoundation = "1.0.0-alpha11"
+tvMaterial = "1.0.0-alpha10"
 media3 = "1.2.1"
 hilt = "2.50"
 retrofit = "2.9.0"
@@ -43,8 +44,8 @@ androidx-foundation = { group = "androidx.compose.foundation", name = "foundatio
 androidx-animation = { group = "androidx.compose.animation", name = "animation" }
 
 # TV Compose
-androidx-tv-foundation = { group = "androidx.tv", name = "tv-foundation", version.ref = "tvCompose" }
-androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvCompose" }
+androidx-tv-foundation = { group = "androidx.tv", name = "tv-foundation", version.ref = "tvFoundation" }
+androidx-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "tvMaterial" }
 
 # Media3 ExoPlayer
 androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }

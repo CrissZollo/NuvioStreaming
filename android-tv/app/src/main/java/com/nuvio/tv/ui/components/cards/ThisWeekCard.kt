@@ -25,8 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -65,15 +65,32 @@ fun ThisWeekCard(
         label = "borderWidth"
     )
 
+    // Fixed height container to prevent layout jumping
+    // 200dp width, 16/9 aspect = ~112dp + 40dp title space = 152dp
+    val cardHeight = 112.dp
+    val totalHeight = cardHeight + 48.dp
+
     Column(
-        modifier = modifier.width(200.dp)
+        modifier = modifier
+            .width(200.dp)
+            .height(totalHeight)
     ) {
+        // Fixed height box to contain the scaling card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(cardHeight),
+            contentAlignment = Alignment.Center
+        ) {
         Card(
             onClick = onClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .scale(scale)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .onFocusChanged { focusState ->
                     isFocused = focusState.isFocused
                 },
@@ -176,6 +193,7 @@ fun ThisWeekCard(
                     )
                 }
             }
+        }
         }
 
         // Show Title below card

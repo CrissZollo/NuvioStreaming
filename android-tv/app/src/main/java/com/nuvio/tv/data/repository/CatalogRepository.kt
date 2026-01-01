@@ -30,20 +30,30 @@ class CatalogRepository @Inject constructor(
     companion object {
         private const val TAG = "CatalogRepository"
         private const val DEFAULT_PAGE_SIZE = 100
-        private const val HOME_CATALOG_LIMIT = 5
     }
 
     /**
      * Get catalogs for the home screen.
-     * Returns a random sample of catalogs to avoid loading too many.
+     * Loads ALL catalogs from ALL installed addons (same as mobile app).
      */
     suspend fun getHomeCatalogs(
-        limit: Int = HOME_CATALOG_LIMIT
+        limit: Int = Int.MAX_VALUE
     ): List<CatalogContent> = withContext(Dispatchers.IO) {
         val catalogAddons = addonRepository.getCatalogAddons()
-        if (catalogAddons.isEmpty()) return@withContext emptyList()
+        if (catalogAddons.isEmpty()) {
+            Log.d(TAG, "No catalog addons installed")
+            return@withContext emptyList()
+        }
 
-        // Collect all available catalogs
+        Log.d(TAG, "Loading catalogs from ${catalogAddons.size} addons:")
+        catalogAddons.forEach { addon ->
+            Log.d(TAG, "  - ${addon.name} (${addon.id}): ${addon.catalogs.size} catalogs")
+            addon.catalogs.forEach { catalog ->
+                Log.d(TAG, "      * ${catalog.name} (${catalog.id}/${catalog.type})")
+            }
+        }
+
+        // Collect ALL catalogs from ALL addons (like the mobile app does)
         val allCatalogConfigs = catalogAddons.flatMap { addon ->
             addon.catalogs.map { catalog ->
                 CatalogConfig(
@@ -56,16 +66,24 @@ class CatalogRepository @Inject constructor(
             }
         }
 
-        // Sample random catalogs
-        val selectedConfigs = allCatalogConfigs.shuffled().take(limit)
+        Log.d(TAG, "Total catalogs to load: ${allCatalogConfigs.size}")
 
-        // Fetch catalogs in parallel
+        // Apply limit if specified
+        val selectedConfigs = if (limit < allCatalogConfigs.size) {
+            allCatalogConfigs.take(limit)
+        } else {
+            allCatalogConfigs
+        }
+
+        // Fetch all catalogs in parallel
         coroutineScope {
             selectedConfigs.map { (config, addon) ->
                 async {
                     try {
+                        Log.d(TAG, "Fetching catalog: ${config.catalogName} (${config.catalogId}/${config.type})")
                         fetchCatalog(addon, config)
                     } catch (e: Exception) {
+                        Log.e(TAG, "Failed to fetch catalog ${config.catalogName}: ${e.message}")
                         null
                     }
                 }

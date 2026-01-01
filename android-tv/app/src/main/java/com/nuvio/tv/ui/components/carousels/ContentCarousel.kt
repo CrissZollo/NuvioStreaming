@@ -38,10 +38,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.tv.foundation.lazy.list.TvLazyRow
-import androidx.tv.foundation.lazy.list.items
-import androidx.tv.foundation.lazy.list.rememberTvLazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.nuvio.tv.domain.model.StreamingContent
 import com.nuvio.tv.ui.components.cards.ContentCard
 import com.nuvio.tv.ui.theme.NuvioTypography
@@ -60,7 +61,7 @@ fun ContentCarousel(
     onSeeAllClick: (() -> Unit)? = null,
     showTitle: Boolean = true
 ) {
-    val listState = rememberTvLazyListState()
+    val listState = rememberLazyListState()
     var seeAllFocused by remember { mutableStateOf(false) }
 
     val seeAllScale by animateFloatAsState(
@@ -148,19 +149,26 @@ fun ContentCarousel(
         }
 
         // Content Row - with proper TV lazy list for D-pad navigation
-        TvLazyRow(
-            state = listState,
-            contentPadding = PaddingValues(end = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        // Fixed height container prevents vertical jumping during horizontal scroll
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(296.dp) // 160dp card width / (2/3 aspect) = 240dp + 56dp title space
         ) {
-            items(
-                items = items,
-                key = { it.id }
-            ) { content ->
-                ContentCard(
-                    content = content,
-                    onClick = { onItemClick(content) }
-                )
+            LazyRow(
+                state = listState,
+                contentPadding = PaddingValues(end = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(
+                    items = items,
+                    key = { it.id }
+                ) { content ->
+                    ContentCard(
+                        content = content,
+                        onClick = { onItemClick(content) }
+                    )
+                }
             }
         }
     }
@@ -178,9 +186,10 @@ fun <T> GenericCarousel(
     modifier: Modifier = Modifier,
     itemKey: (T) -> Any,
     onSeeAllClick: (() -> Unit)? = null,
+    rowHeight: Dp = 200.dp, // Default height for generic carousels
     itemContent: @Composable (T) -> Unit
 ) {
-    val listState = rememberTvLazyListState()
+    val listState = rememberLazyListState()
     var seeAllFocused by remember { mutableStateOf(false) }
 
     val seeAllScale by animateFloatAsState(
@@ -265,16 +274,23 @@ fun <T> GenericCarousel(
         }
 
         // Content Row
-        TvLazyRow(
-            state = listState,
-            contentPadding = PaddingValues(end = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        // Fixed height container prevents vertical jumping during horizontal scroll
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(rowHeight)
         ) {
-            items(
-                items = items,
-                key = itemKey
-            ) { item ->
-                itemContent(item)
+            LazyRow(
+                state = listState,
+                contentPadding = PaddingValues(end = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(
+                    items = items,
+                    key = itemKey
+                ) { item ->
+                    itemContent(item)
+                }
             }
         }
     }
