@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.items
+import androidx.tv.foundation.lazy.list.rememberTvLazyListState
+import kotlinx.coroutines.launch
 import com.nuvio.tv.domain.model.CatalogConfig
 import com.nuvio.tv.domain.model.StreamingContent
 import com.nuvio.tv.ui.components.cards.ContinueWatchingCard
@@ -294,21 +297,34 @@ private fun HomeContent(
     onCatalogClick: (CatalogConfig) -> Unit,
     onThisWeekItemClick: (ThisWeekItem) -> Unit
 ) {
+    val listState = rememberTvLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
+    // Hero and catalogs in a single scrollable list
+    // Hero scrolls up when user navigates down to catalogs
     TvLazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 48.dp),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Hero Carousel - Full width, no padding
+        // Hero Carousel - Full width, scrolls with content
         if (uiState.featuredContent.isNotEmpty()) {
             item(key = "hero") {
                 HeroCarousel(
                     items = uiState.featuredContent,
                     onItemClick = onContentClick,
-                    onInfoClick = onContentClick, // Navigate to metadata screen for more info
+                    onHeroFocusChanged = { hasFocus ->
+                        if (hasFocus) {
+                            // Scroll to top when hero receives focus
+                            coroutineScope.launch {
+                                listState.scrollToItem(0, scrollOffset = 0)
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(480.dp) // Taller hero for TV
+                        .height(480.dp)
                 )
             }
         }

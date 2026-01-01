@@ -126,17 +126,17 @@ fun ContentCard(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Gradient Overlay at bottom (for better text readability)
+                // Subtle gradient overlay at bottom
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .aspectRatio(2f)
+                        .aspectRatio(3f)
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    Color.Black.copy(alpha = 0.7f)
+                                    Color.Black.copy(alpha = 0.35f)
                                 )
                             )
                         )
