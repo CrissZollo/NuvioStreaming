@@ -1,6 +1,7 @@
 package com.nuvio.tv.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import com.nuvio.tv.data.api.TorBoxApi
 import com.nuvio.tv.data.remote.api.StremioApi
 import com.nuvio.tv.data.remote.api.TMDBApi
 import com.nuvio.tv.data.remote.api.TraktApi
@@ -154,5 +155,28 @@ object NetworkModule {
         @Named("stremio") retrofit: Retrofit
     ): StremioApi {
         return retrofit.create(StremioApi::class.java)
+    }
+
+    // ==================== TorBox API ====================
+
+    @Provides
+    @Singleton
+    @Named("torbox")
+    fun provideTorBoxRetrofit(
+        @Named("base") okHttpClient: OkHttpClient
+    ): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(TorBoxApi.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTorBoxApi(
+        @Named("torbox") retrofit: Retrofit
+    ): TorBoxApi {
+        return retrofit.create(TorBoxApi::class.java)
     }
 }

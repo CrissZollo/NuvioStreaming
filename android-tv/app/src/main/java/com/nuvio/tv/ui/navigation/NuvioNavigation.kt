@@ -25,6 +25,7 @@ import com.nuvio.tv.ui.screens.settings.addons.AddonsSettingsScreen
 import com.nuvio.tv.ui.screens.settings.appearance.AppearanceSettingsScreen
 import com.nuvio.tv.ui.screens.settings.backup.BackupRestoreSettingsScreen
 import com.nuvio.tv.ui.screens.settings.content.ContentDiscoverySettingsScreen
+import com.nuvio.tv.ui.screens.settings.debrid.DebridIntegrationScreen
 import com.nuvio.tv.ui.screens.settings.integrations.IntegrationsSettingsScreen
 import com.nuvio.tv.ui.screens.settings.playback.PlaybackSettingsScreen
 import com.nuvio.tv.ui.screens.streams.StreamsScreen
@@ -198,6 +199,7 @@ fun NuvioNavigation(
                 ContentDiscoverySettingsScreen(
                     onBackClick = { navController.popBackStack() },
                     onNavigateToAddons = { navController.navigate(NavRoutes.SETTINGS_ADDONS) },
+                    onNavigateToDebrid = { navController.navigate(NavRoutes.SETTINGS_DEBRID) },
                     onNavigateToCatalogs = { navController.navigate(NavRoutes.SETTINGS_CATALOGS) },
                     onNavigateToHomeScreen = { navController.navigate(NavRoutes.SETTINGS_HOME_SCREEN) },
                     onNavigateToContinueWatching = { navController.navigate(NavRoutes.SETTINGS_CONTINUE_WATCHING) }
@@ -253,6 +255,12 @@ fun NuvioNavigation(
             // Settings Sub-screens - Level 2 (placeholders for now)
             composable(NavRoutes.SETTINGS_ADDONS) {
                 AddonsSettingsScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
+            composable(NavRoutes.SETTINGS_DEBRID) {
+                DebridIntegrationScreen(
                     onBackClick = { navController.popBackStack() }
                 )
             }

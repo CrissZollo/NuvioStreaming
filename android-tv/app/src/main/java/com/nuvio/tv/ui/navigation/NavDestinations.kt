@@ -72,6 +72,7 @@ object NavRoutes {
 
     // Settings sub-sub-screens
     const val SETTINGS_ADDONS = "settings/addons"
+    const val SETTINGS_DEBRID = "settings/debrid"
     const val SETTINGS_CATALOGS = "settings/catalogs"
     const val SETTINGS_HOME_SCREEN = "settings/home-screen"
     const val SETTINGS_CONTINUE_WATCHING = "settings/continue-watching"

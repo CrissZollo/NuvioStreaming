@@ -58,6 +58,7 @@ fun ContentDiscoverySettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onBackClick: () -> Unit = {},
     onNavigateToAddons: () -> Unit = {},
+    onNavigateToDebrid: () -> Unit = {},
     onNavigateToCatalogs: () -> Unit = {},
     onNavigateToHomeScreen: () -> Unit = {},
     onNavigateToContinueWatching: () -> Unit = {}
@@ -101,7 +102,7 @@ fun ContentDiscoverySettingsScreen(
                         title = "Debrid Integration",
                         description = "Connect Torbox for premium streams",
                         icon = Icons.Filled.Source,
-                        onClick = { /* TODO: Navigate to Debrid settings */ }
+                        onClick = onNavigateToDebrid
                     )
                 }
 
