@@ -455,16 +455,34 @@ class ContentRepository @Inject constructor(
     }
 
     private fun StreamDto.toStream(addonId: String, addonName: String): Stream {
+        // Determine if this is a debrid stream based on addon name or cached status
+        val isDebridStream = addonName.contains("torbox", ignoreCase = true) ||
+            addonName.contains("debrid", ignoreCase = true) ||
+            addonName.contains("real-debrid", ignoreCase = true) ||
+            addonName.contains("premiumize", ignoreCase = true) ||
+            addonName.contains("alldebrid", ignoreCase = true) ||
+            behaviorHints?.cached == true
+
+        // Get size from behaviorHints.videoSize if main size is null
+        val streamSize = size ?: behaviorHints?.videoSize
+
+        // Use the actual description field - it often contains detailed metadata
+        // like codec, HDR, language info (especially from TorBox/debrid addons)
+        // Fallback to filename from behaviorHints if description is empty
+        val streamDescription = description ?: behaviorHints?.filename
+
         return Stream(
             url = url,
             title = title ?: name,
             name = name,
-            quality = parseQuality(name ?: title),
-            size = size,
+            description = streamDescription,
+            quality = parseQuality(name ?: title ?: description),
+            size = streamSize,
             addonId = addonId,
             addonName = addonName,
             infoHash = infoHash,
             fileIdx = fileIdx,
+            isDebrid = isDebridStream,
             isCached = behaviorHints?.cached ?: false,
             subtitles = subtitles?.map { it.toSubtitle(addonId, addonName) } ?: emptyList(),
             headers = behaviorHints?.proxyHeaders?.request ?: emptyMap()

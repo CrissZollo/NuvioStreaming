@@ -42,6 +42,7 @@ class SettingsRepository @Inject constructor() {
         private const val KEY_DEBRID_API_KEY = "debrid_api_key"
         private const val KEY_PLAYER_TYPE = "player_type"
         private const val KEY_CACHE_SIZE_MB = "cache_size_mb"
+        private const val KEY_STREAM_SORT_MODE = "stream_sort_mode"
 
         // Default values
         const val DEFAULT_THEME = "nuvio"
@@ -51,6 +52,7 @@ class SettingsRepository @Inject constructor() {
         const val DEFAULT_QUALITY = "auto"
         const val DEFAULT_PLAYER_TYPE = "exoplayer"
         const val DEFAULT_CACHE_SIZE = 500 // MB
+        const val DEFAULT_STREAM_SORT_MODE = "addon_order" // addon_order (respects addon sorting), quality, size, or addon
     }
 
     private val mmkv: MMKV by lazy {
@@ -305,6 +307,29 @@ class SettingsRepository @Inject constructor() {
         }
     }
 
+    // ==================== STREAM SETTINGS ====================
+
+    /**
+     * Get the stream sort mode.
+     * Options:
+     * - "addon_order" (default): Respects the sorting provided by each addon (Stremio addons often have their own quality/relevance sorting)
+     * - "quality": Sort by quality (4K > 1080p > 720p > 480p)
+     * - "size": Sort by file size (largest first)
+     * - "addon": Sort alphabetically by addon name
+     *
+     * Note: Cached/instant streams are always prioritized first regardless of sort mode.
+     */
+    fun getStreamSortMode(): String {
+        return mmkv.decodeString(KEY_STREAM_SORT_MODE, DEFAULT_STREAM_SORT_MODE) ?: DEFAULT_STREAM_SORT_MODE
+    }
+
+    suspend fun setStreamSortMode(mode: String) {
+        withContext(Dispatchers.IO) {
+            mmkv.encode(KEY_STREAM_SORT_MODE, mode)
+            loadSettings()
+        }
+    }
+
     // ==================== BULK SETTINGS ====================
 
     /**
@@ -327,7 +352,8 @@ class SettingsRepository @Inject constructor() {
             showThisWeek = isShowThisWeekEnabled(),
             debridService = getDebridService(),
             playerType = getPlayerType(),
-            cacheSizeMB = getCacheSizeMB()
+            cacheSizeMB = getCacheSizeMB(),
+            streamSortMode = getStreamSortMode()
         )
     }
 
@@ -368,5 +394,6 @@ data class AppSettings(
     val showThisWeek: Boolean = true,
     val debridService: String? = null,
     val playerType: String = SettingsRepository.DEFAULT_PLAYER_TYPE,
-    val cacheSizeMB: Int = SettingsRepository.DEFAULT_CACHE_SIZE
+    val cacheSizeMB: Int = SettingsRepository.DEFAULT_CACHE_SIZE,
+    val streamSortMode: String = SettingsRepository.DEFAULT_STREAM_SORT_MODE
 )

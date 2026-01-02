@@ -3,6 +3,7 @@ package com.nuvio.tv.ui.screens.settings.debrid
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.data.repository.DebridRepository
+import com.nuvio.tv.data.repository.SettingsRepository
 import com.nuvio.tv.domain.model.DebridService
 import com.nuvio.tv.domain.model.TorBoxConfig
 import com.nuvio.tv.domain.model.TorBoxUser
@@ -29,6 +30,9 @@ data class DebridUiState(
     // Torrentio
     val torrentioConfig: TorrentioConfig = TorrentioConfig(),
 
+    // Stream settings
+    val streamSortMode: String = "quality",
+
     // UI state
     val showDisconnectDialog: Boolean = false,
     val showRemoveTorrentioDialog: Boolean = false
@@ -36,7 +40,8 @@ data class DebridUiState(
 
 @HiltViewModel
 class DebridViewModel @Inject constructor(
-    private val debridRepository: DebridRepository
+    private val debridRepository: DebridRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DebridUiState())
@@ -45,6 +50,7 @@ class DebridViewModel @Inject constructor(
     init {
         observeDebridState()
         initializeRepository()
+        loadStreamSettings()
     }
 
     private fun observeDebridState() {
@@ -76,6 +82,20 @@ class DebridViewModel @Inject constructor(
     private fun initializeRepository() {
         viewModelScope.launch {
             debridRepository.initialize()
+        }
+    }
+
+    private fun loadStreamSettings() {
+        val sortMode = settingsRepository.getStreamSortMode()
+        _uiState.update { it.copy(streamSortMode = sortMode) }
+    }
+
+    // ==================== Stream Settings ====================
+
+    fun setStreamSortMode(mode: String) {
+        viewModelScope.launch {
+            settingsRepository.setStreamSortMode(mode)
+            _uiState.update { it.copy(streamSortMode = mode) }
         }
     }
 

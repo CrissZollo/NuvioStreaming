@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -13,6 +12,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.nuvio.tv.ui.screens.home.HomeScreen
@@ -41,24 +41,34 @@ fun NuvioNavigation(
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
 
+    // Track current route to determine if nav rail should be hidden
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    // Routes where navigation rail should be hidden (full-screen experiences)
+    val isFullScreenRoute = currentRoute?.startsWith("streams/") == true ||
+        currentRoute == NavRoutes.PLAYER
+
     Row(modifier = modifier.fillMaxSize()) {
-        // Navigation Rail
-        NuvioNavigationRail(
-            selectedDestination = selectedDestination,
-            onDestinationSelected = { destination ->
-                selectedDestination = destination
-                navController.navigate(destination.route) {
-                    // Pop up to the start destination to avoid building up a large stack
-                    popUpTo(NavRoutes.HOME) {
-                        saveState = true
+        // Navigation Rail - hidden on full-screen routes
+        if (!isFullScreenRoute) {
+            NuvioNavigationRail(
+                selectedDestination = selectedDestination,
+                onDestinationSelected = { destination ->
+                    selectedDestination = destination
+                    navController.navigate(destination.route) {
+                        // Pop up to the start destination to avoid building up a large stack
+                        popUpTo(NavRoutes.HOME) {
+                            saveState = true
+                        }
+                        // Avoid multiple copies of the same destination
+                        launchSingleTop = true
+                        // Restore state when reselecting a previously selected item
+                        restoreState = true
                     }
-                    // Avoid multiple copies of the same destination
-                    launchSingleTop = true
-                    // Restore state when reselecting a previously selected item
-                    restoreState = true
                 }
-            }
-        )
+            )
+        }
 
         // Main Content Area
         NavHost(

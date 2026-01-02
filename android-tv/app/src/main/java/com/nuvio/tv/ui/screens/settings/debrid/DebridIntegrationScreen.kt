@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -122,6 +123,19 @@ fun DebridIntegrationScreen(
                                 error = uiState.error
                             )
                         }
+                    }
+
+                    // Stream Sort Settings Section
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        SettingsSectionHeader(title = "STREAM SETTINGS")
+                    }
+
+                    item {
+                        StreamSortSettingsCard(
+                            currentSortMode = uiState.streamSortMode,
+                            onSortModeChange = { viewModel.setStreamSortMode(it) }
+                        )
                     }
 
                     // Info Section
@@ -574,6 +588,124 @@ private fun DebridInfoCard() {
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun StreamSortSettingsCard(
+    currentSortMode: String,
+    onSortModeChange: (String) -> Unit
+) {
+    val sortOptions = listOf(
+        "addon_order" to "Addon Order (Recommended)",
+        "quality" to "Quality (4K > 1080p > 720p)",
+        "size" to "File Size (Largest first)",
+        "addon" to "Addon Name (Alphabetically)"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(NuvioShapes.medium)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(24.dp)
+    ) {
+        // Header
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column {
+                Text(
+                    text = "Sort Streams By",
+                    style = NuvioTypography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Choose how streams are sorted. Instant streams always appear first.",
+                    style = NuvioTypography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Sort Options
+        sortOptions.forEach { (mode, label) ->
+            var optionFocused by remember { mutableStateOf(false) }
+            val isSelected = currentSortMode == mode
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(NuvioShapes.small)
+                    .background(
+                        when {
+                            isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            optionFocused -> MaterialTheme.colorScheme.surfaceVariant
+                            else -> MaterialTheme.colorScheme.surface
+                        }
+                    )
+                    .border(
+                        width = if (optionFocused) 2.dp else 1.dp,
+                        color = when {
+                            isSelected && optionFocused -> MaterialTheme.colorScheme.primary
+                            optionFocused -> MaterialTheme.colorScheme.primary
+                            isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        },
+                        shape = NuvioShapes.small
+                    )
+                    .onFocusChanged { optionFocused = it.isFocused }
+                    .focusable()
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown &&
+                            (event.key == Key.DirectionCenter || event.key == Key.Enter)
+                        ) {
+                            onSortModeChange(mode)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = label,
+                    style = NuvioTypography.bodyMedium,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface
+                )
+
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

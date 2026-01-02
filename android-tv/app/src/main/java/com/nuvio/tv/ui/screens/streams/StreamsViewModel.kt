@@ -146,13 +146,54 @@ class StreamsViewModel @Inject constructor(
     }
 
     private fun sortStreams(streams: List<Stream>): List<Stream> {
-        // Sort streams by quality (4K > 1080p > 720p > 480p), then by cached/debrid status
-        return streams.sortedWith(
-            compareByDescending<Stream> { getQualityPriority(it.quality) }
-                .thenByDescending { it.isCached }
-                .thenByDescending { it.isDebrid }
-                .thenByDescending { it.size ?: 0 }
-        )
+        val sortMode = settingsRepository.getStreamSortMode()
+
+        return when (sortMode) {
+            "addon_order" -> {
+                // Respect addon's original sorting order
+                // Only move cached/instant streams to the top, but keep their relative order
+                // This preserves the sorting that Stremio addons provide (often by relevance, seeds, etc.)
+                val cached = streams.filter { it.isCached }
+                val debrid = streams.filter { it.isDebrid && !it.isCached }
+                val others = streams.filter { !it.isDebrid && !it.isCached }
+                cached + debrid + others
+            }
+            "size" -> {
+                // Cached first, then sort by file size (largest first), then by quality
+                streams.sortedWith(
+                    compareByDescending<Stream> { it.isCached }
+                        .thenByDescending { it.isDebrid }
+                        .thenByDescending { it.size ?: 0 }
+                        .thenByDescending { getQualityPriority(it.parsedQuality ?: it.quality) }
+                )
+            }
+            "addon" -> {
+                // Cached first, then sort by addon name, then by quality within each addon
+                streams.sortedWith(
+                    compareByDescending<Stream> { it.isCached }
+                        .thenByDescending { it.isDebrid }
+                        .thenBy { it.addonName }
+                        .thenByDescending { getQualityPriority(it.parsedQuality ?: it.quality) }
+                        .thenByDescending { it.size ?: 0 }
+                )
+            }
+            "quality" -> {
+                // Sort by quality (4K > 1080p > 720p > 480p), then by size
+                streams.sortedWith(
+                    compareByDescending<Stream> { it.isCached }
+                        .thenByDescending { it.isDebrid }
+                        .thenByDescending { getQualityPriority(it.parsedQuality ?: it.quality) }
+                        .thenByDescending { it.size ?: 0 }
+                )
+            }
+            else -> {
+                // Fallback to addon_order (default)
+                val cached = streams.filter { it.isCached }
+                val debrid = streams.filter { it.isDebrid && !it.isCached }
+                val others = streams.filter { !it.isDebrid && !it.isCached }
+                cached + debrid + others
+            }
+        }
     }
 
     private fun getQualityPriority(quality: String?): Int {
