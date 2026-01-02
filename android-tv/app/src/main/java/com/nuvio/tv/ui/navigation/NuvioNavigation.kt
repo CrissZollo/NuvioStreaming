@@ -20,7 +20,13 @@ import com.nuvio.tv.ui.screens.library.LibraryScreen
 import com.nuvio.tv.ui.screens.metadata.MetadataScreen
 import com.nuvio.tv.ui.screens.search.SearchScreen
 import com.nuvio.tv.ui.screens.settings.SettingsScreen
+import com.nuvio.tv.ui.screens.settings.about.AboutSettingsScreen
 import com.nuvio.tv.ui.screens.settings.addons.AddonsSettingsScreen
+import com.nuvio.tv.ui.screens.settings.appearance.AppearanceSettingsScreen
+import com.nuvio.tv.ui.screens.settings.backup.BackupRestoreSettingsScreen
+import com.nuvio.tv.ui.screens.settings.content.ContentDiscoverySettingsScreen
+import com.nuvio.tv.ui.screens.settings.integrations.IntegrationsSettingsScreen
+import com.nuvio.tv.ui.screens.settings.playback.PlaybackSettingsScreen
 import com.nuvio.tv.ui.screens.streams.StreamsScreen
 
 /**
@@ -94,17 +100,20 @@ fun NuvioNavigation(
 
             composable(NavRoutes.SETTINGS) {
                 SettingsScreen(
-                    onNavigateToTheme = {
-                        navController.navigate(NavRoutes.SETTINGS_THEME)
+                    onNavigateToContentDiscovery = {
+                        navController.navigate(NavRoutes.SETTINGS_CONTENT_DISCOVERY)
                     },
-                    onNavigateToPlayback = {
-                        navController.navigate(NavRoutes.SETTINGS_PLAYBACK)
+                    onNavigateToAppearance = {
+                        navController.navigate(NavRoutes.SETTINGS_APPEARANCE)
                     },
                     onNavigateToIntegrations = {
                         navController.navigate(NavRoutes.SETTINGS_INTEGRATIONS)
                     },
-                    onNavigateToAddons = {
-                        navController.navigate(NavRoutes.SETTINGS_ADDONS)
+                    onNavigateToPlayback = {
+                        navController.navigate(NavRoutes.SETTINGS_PLAYBACK)
+                    },
+                    onNavigateToBackup = {
+                        navController.navigate(NavRoutes.SETTINGS_BACKUP)
                     },
                     onNavigateToAbout = {
                         navController.navigate(NavRoutes.SETTINGS_ABOUT)
@@ -184,29 +193,120 @@ fun NuvioNavigation(
                 // PlayerScreen will be implemented in Phase 3
             }
 
-            // Settings Sub-screens
-            composable(NavRoutes.SETTINGS_THEME) {
-                // ThemeSettingsScreen
+            // Settings Sub-screens - Level 1
+            composable(NavRoutes.SETTINGS_CONTENT_DISCOVERY) {
+                ContentDiscoverySettingsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onNavigateToAddons = { navController.navigate(NavRoutes.SETTINGS_ADDONS) },
+                    onNavigateToCatalogs = { navController.navigate(NavRoutes.SETTINGS_CATALOGS) },
+                    onNavigateToHomeScreen = { navController.navigate(NavRoutes.SETTINGS_HOME_SCREEN) },
+                    onNavigateToContinueWatching = { navController.navigate(NavRoutes.SETTINGS_CONTINUE_WATCHING) }
+                )
             }
 
-            composable(NavRoutes.SETTINGS_PLAYBACK) {
-                // PlaybackSettingsScreen
+            composable(NavRoutes.SETTINGS_APPEARANCE) {
+                AppearanceSettingsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onNavigateToTheme = { navController.navigate(NavRoutes.SETTINGS_THEME) }
+                )
             }
 
             composable(NavRoutes.SETTINGS_INTEGRATIONS) {
-                // IntegrationsSettingsScreen
+                IntegrationsSettingsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onNavigateToTrakt = { navController.navigate(NavRoutes.SETTINGS_TRAKT) },
+                    onNavigateToMdblist = { navController.navigate(NavRoutes.SETTINGS_MDBLIST) },
+                    onNavigateToTmdb = { navController.navigate(NavRoutes.SETTINGS_TMDB) },
+                    onNavigateToAI = { navController.navigate(NavRoutes.SETTINGS_AI) }
+                )
             }
 
-            composable(NavRoutes.SETTINGS_ADDONS) {
-                AddonsSettingsScreen(
-                    onBackClick = {
-                        navController.popBackStack()
-                    }
+            composable(NavRoutes.SETTINGS_PLAYBACK) {
+                PlaybackSettingsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onNavigateToPlayer = { navController.navigate(NavRoutes.SETTINGS_PLAYER) },
+                    onNavigateToAudioLanguage = { navController.navigate(NavRoutes.SETTINGS_AUDIO_LANGUAGE) },
+                    onNavigateToSubtitleLanguage = { navController.navigate(NavRoutes.SETTINGS_SUBTITLE_LANGUAGE) },
+                    onNavigateToSubtitleSource = { navController.navigate(NavRoutes.SETTINGS_SUBTITLE_SOURCE) },
+                    onNavigateToNotifications = { navController.navigate(NavRoutes.SETTINGS_NOTIFICATIONS) }
+                )
+            }
+
+            composable(NavRoutes.SETTINGS_BACKUP) {
+                BackupRestoreSettingsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onCreateBackup = { /* TODO: Implement backup */ },
+                    onRestoreBackup = { /* TODO: Implement restore */ }
                 )
             }
 
             composable(NavRoutes.SETTINGS_ABOUT) {
-                // AboutSettingsScreen
+                AboutSettingsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onPrivacyPolicyClick = { /* TODO: Open privacy policy */ },
+                    onReportIssueClick = { /* TODO: Open issue reporter */ },
+                    onContributorsClick = { /* TODO: Show contributors */ },
+                    onLicensesClick = { /* TODO: Show licenses */ }
+                )
+            }
+
+            // Settings Sub-screens - Level 2 (placeholders for now)
+            composable(NavRoutes.SETTINGS_ADDONS) {
+                AddonsSettingsScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
+            composable(NavRoutes.SETTINGS_THEME) {
+                // ThemeSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_CATALOGS) {
+                // CatalogsSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_HOME_SCREEN) {
+                // HomeScreenSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_CONTINUE_WATCHING) {
+                // ContinueWatchingSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_TRAKT) {
+                // TraktSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_MDBLIST) {
+                // MDBListSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_TMDB) {
+                // TMDBSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_AI) {
+                // AISettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_PLAYER) {
+                // PlayerSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_AUDIO_LANGUAGE) {
+                // AudioLanguageSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_SUBTITLE_LANGUAGE) {
+                // SubtitleLanguageSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_SUBTITLE_SOURCE) {
+                // SubtitleSourceSettingsScreen - TODO
+            }
+
+            composable(NavRoutes.SETTINGS_NOTIFICATIONS) {
+                // NotificationsSettingsScreen - TODO
             }
         }
     }

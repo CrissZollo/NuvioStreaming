@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,47 +50,70 @@ import com.nuvio.tv.ui.theme.NuvioTypography
 
 /**
  * Settings screen with navigation to sub-settings.
+ * Matches the mobile app's settings menu structure.
  */
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
-    onNavigateToTheme: () -> Unit,
-    onNavigateToPlayback: () -> Unit,
+    onNavigateToContentDiscovery: () -> Unit,
+    onNavigateToAppearance: () -> Unit,
     onNavigateToIntegrations: () -> Unit,
-    onNavigateToAddons: () -> Unit,
+    onNavigateToPlayback: () -> Unit,
+    onNavigateToBackup: () -> Unit,
     onNavigateToAbout: () -> Unit
 ) {
     val settingsItems = remember {
         listOf(
-            SettingsItem(
-                title = "Theme",
-                description = "Customize colors and appearance",
-                icon = Icons.Filled.ColorLens,
-                onClick = onNavigateToTheme
+            SettingsSection(
+                title = "GENERAL",
+                items = listOf(
+                    SettingsItem(
+                        title = "Content & Discovery",
+                        description = "Addons, catalogs, and sources",
+                        icon = Icons.Filled.VideoLibrary,
+                        onClick = onNavigateToContentDiscovery
+                    ),
+                    SettingsItem(
+                        title = "Appearance",
+                        description = "Theme and layout",
+                        icon = Icons.Filled.ColorLens,
+                        onClick = onNavigateToAppearance
+                    ),
+                    SettingsItem(
+                        title = "Integrations",
+                        description = "Trakt, MDBList, TMDB, AI",
+                        icon = Icons.Filled.Sync,
+                        onClick = onNavigateToIntegrations
+                    ),
+                    SettingsItem(
+                        title = "Playback",
+                        description = "Player, audio, subtitles",
+                        icon = Icons.Filled.PlayCircle,
+                        onClick = onNavigateToPlayback
+                    )
+                )
             ),
-            SettingsItem(
-                title = "Playback",
-                description = "Video player settings",
-                icon = Icons.Filled.PlayCircle,
-                onClick = onNavigateToPlayback
+            SettingsSection(
+                title = "DATA",
+                items = listOf(
+                    SettingsItem(
+                        title = "Backup & Restore",
+                        description = "Create and restore app backups",
+                        icon = Icons.Filled.Backup,
+                        onClick = onNavigateToBackup
+                    )
+                )
             ),
-            SettingsItem(
-                title = "Integrations",
-                description = "Trakt, TMDB, and other services",
-                icon = Icons.Filled.Settings,
-                onClick = onNavigateToIntegrations
-            ),
-            SettingsItem(
-                title = "Addons",
-                description = "Manage content sources",
-                icon = Icons.Filled.Extension,
-                onClick = onNavigateToAddons
-            ),
-            SettingsItem(
-                title = "About",
-                description = "App info and support",
-                icon = Icons.Filled.Info,
-                onClick = onNavigateToAbout
+            SettingsSection(
+                title = "ABOUT",
+                items = listOf(
+                    SettingsItem(
+                        title = "About Nuvio",
+                        description = "App info and support",
+                        icon = Icons.Filled.Info,
+                        onClick = onNavigateToAbout
+                    )
+                )
             )
         )
     }
@@ -109,16 +135,36 @@ fun SettingsScreen(
             TvLazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(settingsItems) { item ->
-                    SettingsListItem(
-                        item = item,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                settingsItems.forEach { section ->
+                    item {
+                        Text(
+                            text = section.title,
+                            style = NuvioTypography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
+                        )
+                    }
+
+                    items(section.items) { item ->
+                        SettingsListItem(
+                            item = item,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
         }
     }
 }
+
+private data class SettingsSection(
+    val title: String,
+    val items: List<SettingsItem>
+)
 
 private data class SettingsItem(
     val title: String,

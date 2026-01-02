@@ -63,11 +63,28 @@ object NavRoutes {
     const val PLAYER = "player"
 
     // Settings sub-screens
-    const val SETTINGS_THEME = "settings/theme"
-    const val SETTINGS_PLAYBACK = "settings/playback"
+    const val SETTINGS_CONTENT_DISCOVERY = "settings/content-discovery"
+    const val SETTINGS_APPEARANCE = "settings/appearance"
     const val SETTINGS_INTEGRATIONS = "settings/integrations"
-    const val SETTINGS_ADDONS = "settings/addons"
+    const val SETTINGS_PLAYBACK = "settings/playback"
+    const val SETTINGS_BACKUP = "settings/backup"
     const val SETTINGS_ABOUT = "settings/about"
+
+    // Settings sub-sub-screens
+    const val SETTINGS_ADDONS = "settings/addons"
+    const val SETTINGS_CATALOGS = "settings/catalogs"
+    const val SETTINGS_HOME_SCREEN = "settings/home-screen"
+    const val SETTINGS_CONTINUE_WATCHING = "settings/continue-watching"
+    const val SETTINGS_THEME = "settings/theme"
+    const val SETTINGS_TRAKT = "settings/trakt"
+    const val SETTINGS_MDBLIST = "settings/mdblist"
+    const val SETTINGS_TMDB = "settings/tmdb"
+    const val SETTINGS_AI = "settings/ai"
+    const val SETTINGS_PLAYER = "settings/player"
+    const val SETTINGS_AUDIO_LANGUAGE = "settings/audio-language"
+    const val SETTINGS_SUBTITLE_LANGUAGE = "settings/subtitle-language"
+    const val SETTINGS_SUBTITLE_SOURCE = "settings/subtitle-source"
+    const val SETTINGS_NOTIFICATIONS = "settings/notifications"
 
     // Helper functions for building routes with arguments
     fun metadata(type: String, id: String): String = "metadata/$type/$id"
