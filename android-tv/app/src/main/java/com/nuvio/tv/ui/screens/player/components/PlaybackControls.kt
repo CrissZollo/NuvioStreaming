@@ -134,6 +134,7 @@ fun SkipNextButton(
 
 /**
  * Generic player control button with focus handling.
+ * Always focusable for TV navigation, but action only works when enabled.
  */
 @Composable
 fun PlayerControlButton(
@@ -154,7 +155,8 @@ fun PlayerControlButton(
             .clip(NuvioShapes.playerButton)
             .background(
                 when {
-                    isFocused -> MaterialTheme.colorScheme.primary
+                    isFocused && enabled -> MaterialTheme.colorScheme.primary
+                    isFocused && !enabled -> Color.White.copy(alpha = 0.2f)
                     !enabled -> Color.White.copy(alpha = 0.05f)
                     else -> Color.White.copy(alpha = 0.15f)
                 }
@@ -164,13 +166,15 @@ fun PlayerControlButton(
                 else Modifier
             )
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable(enabled)
+            .focusable() // Always focusable for TV navigation
             .onKeyEvent { event ->
-                if (enabled && event.type == KeyEventType.KeyDown &&
+                if (event.type == KeyEventType.KeyDown &&
                     (event.key == Key.DirectionCenter || event.key == Key.Enter)
                 ) {
-                    onClick()
-                    true
+                    if (enabled) {
+                        onClick()
+                    }
+                    true // Consume the event even if disabled
                 } else {
                     false
                 }
@@ -182,7 +186,8 @@ fun PlayerControlButton(
             contentDescription = contentDescription,
             modifier = Modifier.size(iconSize),
             tint = when {
-                isFocused -> Color.Black
+                isFocused && enabled -> Color.Black
+                isFocused && !enabled -> Color.White.copy(alpha = 0.5f)
                 !enabled -> Color.White.copy(alpha = 0.3f)
                 else -> Color.White
             }
@@ -192,6 +197,7 @@ fun PlayerControlButton(
 
 /**
  * Secondary control button (smaller, for audio/subtitle/quality).
+ * Always focusable for TV navigation, but action only works when enabled.
  */
 @Composable
 fun SecondaryControlButton(
@@ -210,7 +216,8 @@ fun SecondaryControlButton(
             .clip(RoundedCornerShape(8.dp))
             .background(
                 when {
-                    isFocused -> MaterialTheme.colorScheme.primary
+                    isFocused && enabled -> MaterialTheme.colorScheme.primary
+                    isFocused && !enabled -> Color.White.copy(alpha = 0.2f)
                     !enabled -> Color.Transparent
                     else -> Color.White.copy(alpha = 0.1f)
                 }
@@ -220,13 +227,15 @@ fun SecondaryControlButton(
                 else Modifier
             )
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable(enabled)
+            .focusable() // Always focusable for TV navigation
             .onKeyEvent { event ->
-                if (enabled && event.type == KeyEventType.KeyDown &&
+                if (event.type == KeyEventType.KeyDown &&
                     (event.key == Key.DirectionCenter || event.key == Key.Enter)
                 ) {
-                    onClick()
-                    true
+                    if (enabled) {
+                        onClick()
+                    }
+                    true // Consume the event even if disabled
                 } else {
                     false
                 }
@@ -245,7 +254,8 @@ fun SecondaryControlButton(
                     contentDescription = contentDescription,
                     modifier = Modifier.size(22.dp),
                     tint = when {
-                        isFocused -> Color.Black
+                        isFocused && enabled -> Color.Black
+                        isFocused && !enabled -> Color.White.copy(alpha = 0.5f)
                         !enabled -> Color.White.copy(alpha = 0.3f)
                         else -> Color.White.copy(alpha = 0.8f)
                     }
@@ -255,7 +265,8 @@ fun SecondaryControlButton(
                     text = label,
                     style = NuvioTypography.labelSmall,
                     color = when {
-                        isFocused -> Color.Black
+                        isFocused && enabled -> Color.Black
+                        isFocused && !enabled -> Color.White.copy(alpha = 0.5f)
                         !enabled -> Color.White.copy(alpha = 0.3f)
                         else -> Color.White.copy(alpha = 0.8f)
                     }
@@ -271,7 +282,8 @@ fun SecondaryControlButton(
                     contentDescription = contentDescription,
                     modifier = Modifier.size(24.dp),
                     tint = when {
-                        isFocused -> Color.Black
+                        isFocused && enabled -> Color.Black
+                        isFocused && !enabled -> Color.White.copy(alpha = 0.5f)
                         !enabled -> Color.White.copy(alpha = 0.3f)
                         else -> Color.White.copy(alpha = 0.8f)
                     }

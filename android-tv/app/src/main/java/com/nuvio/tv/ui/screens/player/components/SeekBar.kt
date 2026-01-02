@@ -19,11 +19,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -48,6 +50,7 @@ fun SeekBar(
     onSeekEnd: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val focusManager = LocalFocusManager.current
     var isFocused by remember { mutableStateOf(false) }
     var localProgress by remember(progress) { mutableFloatStateOf(progress) }
 
@@ -92,6 +95,22 @@ fun SeekBar(
                             if (!isSeeking) onSeekStart()
                             localProgress = (localProgress + 0.01f).coerceIn(0f, 1f)
                             onSeekChange(localProgress)
+                            true
+                        }
+                        Key.DirectionDown -> {
+                            // Move focus to controls below
+                            if (isSeeking) {
+                                onSeekEnd(localProgress)
+                            }
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        Key.DirectionUp -> {
+                            // Move focus to top bar
+                            if (isSeeking) {
+                                onSeekEnd(localProgress)
+                            }
+                            focusManager.moveFocus(FocusDirection.Up)
                             true
                         }
                         Key.DirectionCenter, Key.Enter -> {
@@ -179,6 +198,7 @@ fun EnhancedSeekBar(
     onSeekEnd: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val focusManager = LocalFocusManager.current
     var isFocused by remember { mutableStateOf(false) }
     var localProgress by remember(progress) { mutableFloatStateOf(progress) }
 
@@ -223,6 +243,22 @@ fun EnhancedSeekBar(
                             if (!isSeeking) onSeekStart()
                             localProgress = (localProgress + 0.01f).coerceIn(0f, 1f)
                             onSeekChange(localProgress)
+                            true
+                        }
+                        Key.DirectionDown -> {
+                            // Move focus to controls below
+                            if (isSeeking) {
+                                onSeekEnd(localProgress)
+                            }
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        Key.DirectionUp -> {
+                            // Move focus to top bar
+                            if (isSeeking) {
+                                onSeekEnd(localProgress)
+                            }
+                            focusManager.moveFocus(FocusDirection.Up)
                             true
                         }
                         Key.DirectionCenter, Key.Enter -> {

@@ -1,6 +1,7 @@
 package com.nuvio.tv.ui.screens.player.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,6 +84,7 @@ fun PlayerBottomBar(
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .padding(horizontal = 48.dp, vertical = 32.dp)
+                .focusGroup()
         ) {
             // Seek bar
             SeekBar(
@@ -117,9 +119,11 @@ fun PlayerBottomBar(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Controls row
+            // Controls row - use focusGroup for proper TV navigation
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusGroup(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {

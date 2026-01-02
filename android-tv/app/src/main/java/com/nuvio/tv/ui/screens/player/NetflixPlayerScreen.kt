@@ -94,6 +94,13 @@ fun NetflixPlayerScreen(
     val backButtonFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
     val seekBarFocusRequester = remember { FocusRequester() }
+    // Additional focus requesters for controls below the seek bar
+    val subtitleFocusRequester = remember { FocusRequester() }
+    val audioFocusRequester = remember { FocusRequester() }
+    val rewindFocusRequester = remember { FocusRequester() }
+    val forwardFocusRequester = remember { FocusRequester() }
+    val qualityFocusRequester = remember { FocusRequester() }
+    val speedFocusRequester = remember { FocusRequester() }
 
     // UI state
     var showControls by remember { mutableStateOf(true) }
@@ -207,37 +214,40 @@ fun NetflixPlayerScreen(
 
                     when (event.key) {
                         Key.DirectionCenter, Key.Enter -> {
-                            if (showControls) {
-                                viewModel.togglePlayPause()
-                                playPauseTrigger++
-                            } else {
+                            if (!showControls) {
                                 showControls = true
+                                true
+                            } else {
+                                // Let focused control handle the click
+                                false
                             }
-                            true
                         }
                         Key.DirectionLeft -> {
-                            if (showControls) {
-                                viewModel.seekBackward()
-                                showSkipIndicator = SkipDirection.BACKWARD
-                            } else {
+                            if (!showControls) {
                                 showControls = true
+                                true
+                            } else {
+                                // Let focus navigation handle it when controls are visible
+                                false
                             }
-                            true
                         }
                         Key.DirectionRight -> {
-                            if (showControls) {
-                                viewModel.seekForward()
-                                showSkipIndicator = SkipDirection.FORWARD
-                            } else {
+                            if (!showControls) {
                                 showControls = true
+                                true
+                            } else {
+                                // Let focus navigation handle it when controls are visible
+                                false
                             }
-                            true
                         }
                         Key.DirectionUp, Key.DirectionDown -> {
                             if (!showControls) {
                                 showControls = true
+                                true
+                            } else {
+                                // Let focus navigation handle it when controls are visible
+                                false
                             }
-                            true
                         }
                         Key.Back, Key.Escape -> {
                             if (showControls) {
@@ -351,8 +361,15 @@ fun NetflixPlayerScreen(
                     currentQuality = playerState.engineState.qualityLevels
                         .getOrNull(playerState.engineState.selectedQualityLevel)?.label,
                     currentSpeed = playerState.engineState.playbackSpeed,
+                    // Focus requesters for all controls
                     seekBarFocusRequester = seekBarFocusRequester,
+                    subtitleFocusRequester = subtitleFocusRequester,
+                    audioFocusRequester = audioFocusRequester,
+                    rewindFocusRequester = rewindFocusRequester,
                     playPauseFocusRequester = playPauseFocusRequester,
+                    forwardFocusRequester = forwardFocusRequester,
+                    qualityFocusRequester = qualityFocusRequester,
+                    speedFocusRequester = speedFocusRequester,
                     onSeekStart = {
                         isSeeking = true
                         seekPreviewPosition = playerState.engineState.currentPosition
@@ -477,6 +494,17 @@ fun NetflixPlayerScreen(
     // Request focus when screen appears
     LaunchedEffect(Unit) {
         screenFocusRequester.requestFocus()
+    }
+
+    // Request focus on play/pause button when controls become visible
+    LaunchedEffect(showControls) {
+        if (showControls) {
+            try {
+                playPauseFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Focus requester may not be attached yet
+            }
+        }
     }
 }
 
