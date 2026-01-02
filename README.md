@@ -33,12 +33,14 @@
 <details>
   <summary>Table of Contents</summary>
   <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-    </li>
+    <li><a href="#about-the-project">About The Project</a></li>
     <li><a href="#installation">Installation</a></li>
-
-    <li><a href="#getting-started">Getting Started</a></li>
+    <li><a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#development-build">Development Build</a></li>
+        <li><a href="#android-tv">Android TV</a></li>
+      </ul>
+    </li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#support">Support</a></li>
     <li><a href="#license">License</a></li>
@@ -107,9 +109,82 @@ npx expo run:ios      # iOS
 
 </details>
 
+### Android TV
+
+<details>
+  <summary>Build & Run Android TV App</summary>
+
+The Android TV app is a native Kotlin application located in the `android-tv/` directory.
+
+#### Prerequisites
+
+- **Java 17** (required for Gradle)
+- **Android SDK** with Android TV system images
+- **Android Studio** (recommended) or command-line tools
+
+#### Building the APK
+
+```bash
+cd android-tv
+
+# Set Java 17 (adjust path for your system)
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk  # Linux
+# export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home  # macOS
+
+# Build debug APK
+./gradlew assembleDebug
+
+# Build release APK
+./gradlew assembleRelease
+```
+
+The APK will be generated at:
+- Debug: `android-tv/app/build/outputs/apk/debug/app-debug.apk`
+- Release: `android-tv/app/build/outputs/apk/release/app-release.apk`
+
+#### Running in Android TV Emulator
+
+1. **Create an Android TV emulator** (if you don't have one):
+   ```bash
+   # List available TV system images
+   sdkmanager --list | grep tv
+
+   # Install a TV system image (example)
+   sdkmanager "system-images;android-34;google_apis;x86_64"
+
+   # Create the AVD
+   avdmanager create avd -n AndroidTV -k "system-images;android-34;google_apis;x86_64" --device "tv_1080p"
+   ```
+
+2. **Start the emulator**:
+   ```bash
+   emulator -avd AndroidTV
+   ```
+
+3. **Install and run the app**:
+   ```bash
+   # Check device is connected
+   adb devices
+
+   # Install the APK
+   adb install -r android-tv/app/build/outputs/apk/debug/app-debug.apk
+
+   # Launch the app
+   adb shell am start -n com.nuvio.tv/.MainActivity
+   ```
+
+#### D-pad Navigation
+
+Use these keys in the emulator for navigation:
+- **Arrow keys** - Navigate between items
+- **Enter** - Select/confirm
+- **Backspace** - Go back
+
+</details>
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
- 
+
 
 ## Contributing
 
