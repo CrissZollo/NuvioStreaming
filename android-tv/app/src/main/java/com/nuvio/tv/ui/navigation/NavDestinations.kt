@@ -60,7 +60,7 @@ object NavRoutes {
     const val METADATA = "metadata/{type}/{id}"
     const val STREAMS = "streams/{type}/{id}"
     const val CATALOG = "catalog/{addonId}/{type}/{catalogId}"
-    const val PLAYER = "player"
+    const val PLAYER = "player/{type}/{id}"
 
     // Settings sub-screens
     const val SETTINGS_CONTENT_DISCOVERY = "settings/content-discovery"
@@ -92,6 +92,7 @@ object NavRoutes {
     fun streams(type: String, id: String): String = "streams/$type/$id"
     fun catalog(addonId: String, type: String, catalogId: String): String =
         "catalog/$addonId/$type/$catalogId"
+    fun player(type: String, id: String): String = "player/$type/$id"
 }
 
 /**

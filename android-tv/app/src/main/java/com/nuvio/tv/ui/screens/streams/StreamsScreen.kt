@@ -133,7 +133,10 @@ fun StreamsScreen(
             ) {
                 RightPanel(
                     uiState = uiState,
-                    onStreamClick = onStreamSelected,
+                    onStreamClick = { stream ->
+                        viewModel.selectStream(stream)
+                        onStreamSelected(stream)
+                    },
                     onRetry = { viewModel.refresh() },
                     modifier = Modifier.fillMaxSize()
                 )

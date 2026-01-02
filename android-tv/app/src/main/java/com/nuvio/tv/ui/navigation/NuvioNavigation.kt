@@ -28,6 +28,7 @@ import com.nuvio.tv.ui.screens.settings.content.ContentDiscoverySettingsScreen
 import com.nuvio.tv.ui.screens.settings.debrid.DebridIntegrationScreen
 import com.nuvio.tv.ui.screens.settings.integrations.IntegrationsSettingsScreen
 import com.nuvio.tv.ui.screens.settings.playback.PlaybackSettingsScreen
+import com.nuvio.tv.ui.screens.player.NetflixPlayerScreen
 import com.nuvio.tv.ui.screens.streams.StreamsScreen
 
 /**
@@ -47,7 +48,7 @@ fun NuvioNavigation(
 
     // Routes where navigation rail should be hidden (full-screen experiences)
     val isFullScreenRoute = currentRoute?.startsWith("streams/") == true ||
-        currentRoute == NavRoutes.PLAYER
+        currentRoute?.startsWith("player/") == true
 
     Row(modifier = modifier.fillMaxSize()) {
         // Navigation Rail - hidden on full-screen routes
@@ -169,7 +170,9 @@ fun NuvioNavigation(
                     contentType = type,
                     contentId = id,
                     onStreamSelected = { stream ->
-                        navController.navigate(NavRoutes.PLAYER)
+                        // The viewModel.selectStream() is called from StreamsScreen
+                        // Navigate to player with content info
+                        navController.navigate(NavRoutes.player(type, id))
                     },
                     onBackClick = {
                         navController.popBackStack()
@@ -200,8 +203,25 @@ fun NuvioNavigation(
             }
 
             // Player Screen (full-screen, no navigation rail)
-            composable(NavRoutes.PLAYER) {
-                // PlayerScreen will be implemented in Phase 3
+            composable(
+                route = NavRoutes.PLAYER,
+                arguments = listOf(
+                    navArgument(NavArgs.TYPE) { type = NavType.StringType },
+                    navArgument(NavArgs.ID) { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val type = backStackEntry.arguments?.getString(NavArgs.TYPE) ?: "movie"
+                val id = backStackEntry.arguments?.getString(NavArgs.ID) ?: ""
+
+                // Get the stream from the PlaybackStateHolder
+                // The stream should be set before navigating here from StreamsScreen
+                NetflixPlayerScreen(
+                    contentType = type,
+                    contentId = id,
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
             }
 
             // Settings Sub-screens - Level 1

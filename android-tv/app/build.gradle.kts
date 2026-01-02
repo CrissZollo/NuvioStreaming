@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.nuvio.tv"
-        minSdk = 21
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
@@ -124,6 +124,9 @@ dependencies {
     // Leanback (for home channels)
     implementation(libs.leanback)
     implementation(libs.tvprovider)
+
+    // MPV Player (libmpv for Android)
+    implementation(libs.libmpv)
 
     // Debug
     debugImplementation(libs.androidx.ui.tooling)

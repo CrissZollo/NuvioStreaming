@@ -7,6 +7,8 @@ import com.nuvio.tv.data.repository.SettingsRepository
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.domain.model.StreamingContent
 import com.nuvio.tv.domain.model.Subtitle
+import com.nuvio.tv.player.PlaybackRequest
+import com.nuvio.tv.player.PlaybackStateHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +49,8 @@ data class StreamsUiState(
 @HiltViewModel
 class StreamsViewModel @Inject constructor(
     private val contentRepository: ContentRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val playbackStateHolder: PlaybackStateHolder
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StreamsUiState())
@@ -56,6 +59,25 @@ class StreamsViewModel @Inject constructor(
     private var contentType: String = ""
     private var contentId: String = ""
     private var episodeId: String? = null
+
+    /**
+     * Set the selected stream and prepare for navigation.
+     * Call this before navigating to the player screen.
+     */
+    fun selectStream(stream: Stream) {
+        _uiState.update { it.copy(selectedStream = stream) }
+
+        // Set the playback request for the player to consume
+        playbackStateHolder.setPlaybackRequest(
+            PlaybackRequest(
+                stream = stream,
+                content = _uiState.value.content,
+                episodeId = episodeId,
+                episodeTitle = _uiState.value.episodeTitle,
+                subtitles = _uiState.value.subtitles
+            )
+        )
+    }
 
     /**
      * Load streams for content.
@@ -226,13 +248,6 @@ class StreamsViewModel @Inject constructor(
         } catch (e: Exception) {
             // Subtitles are optional, don't fail the whole screen
         }
-    }
-
-    /**
-     * Select a stream for playback.
-     */
-    fun selectStream(stream: Stream) {
-        _uiState.update { it.copy(selectedStream = stream) }
     }
 
     /**

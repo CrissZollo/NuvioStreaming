@@ -23,6 +23,7 @@ lottie = "6.3.0"
 ksp = "2.0.0-1.0.21"
 leanback = "1.0.0"
 tvprovider = "1.0.0"
+libmpv = "0.5.1"
 
 [libraries]
 # Core Android
@@ -96,6 +97,9 @@ lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", versio
 # Leanback (for home channels)
 leanback = { group = "androidx.leanback", name = "leanback", version.ref = "leanback" }
 tvprovider = { group = "androidx.tvprovider", name = "tvprovider", version.ref = "tvprovider" }
+
+# MPV Player (libmpv for Android)
+libmpv = { group = "dev.jdtech.mpv", name = "libmpv", version.ref = "libmpv" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

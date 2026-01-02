@@ -71,3 +71,12 @@
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *
 -dontwarn androidx.room.paging.**
+
+# MPV Player (libmpv-android)
+-keep class dev.jdtech.mpv.** { *; }
+-keepclassmembers class dev.jdtech.mpv.** { *; }
+-keep class is.xyz.mpv.** { *; }
+-keepclassmembers class is.xyz.mpv.** { *; }
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
