@@ -38,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -69,7 +71,8 @@ import com.nuvio.tv.ui.theme.NuvioTypography
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
-    onContentClick: (StreamingContent) -> Unit
+    onContentClick: (StreamingContent) -> Unit,
+    focusRequester: FocusRequester? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -124,7 +127,8 @@ fun LibraryScreen(
                         tab = tab,
                         isSelected = uiState.selectedTab == tab,
                         count = getTabCount(uiState, tab),
-                        onClick = { viewModel.selectTab(tab) }
+                        onClick = { viewModel.selectTab(tab) },
+                        focusRequester = if (tab == LibraryTab.FAVORITES) focusRequester else null
                     )
                 }
             }
@@ -225,7 +229,8 @@ private fun TabItem(
     tab: LibraryTab,
     isSelected: Boolean,
     count: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
@@ -248,6 +253,10 @@ private fun TabItem(
 
     Row(
         modifier = Modifier
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester)
+                else Modifier
+            )
             .clip(RoundedCornerShape(8.dp))
             .background(backgroundColor)
             .onFocusChanged { isFocused = it.isFocused }

@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -65,7 +67,8 @@ import com.nuvio.tv.ui.theme.NuvioTypography
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
-    onContentClick: (StreamingContent) -> Unit
+    onContentClick: (StreamingContent) -> Unit,
+    focusRequester: FocusRequester? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -86,7 +89,11 @@ fun SearchScreen(
                     onValueChange = { viewModel.onQueryChange(it) },
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 16.dp),
+                        .padding(end = 16.dp)
+                        .then(
+                            if (focusRequester != null) Modifier.focusRequester(focusRequester)
+                            else Modifier
+                        ),
                     placeholder = {
                         Text(
                             text = "Search movies and TV shows",

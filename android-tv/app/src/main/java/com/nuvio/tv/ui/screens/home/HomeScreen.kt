@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,7 +69,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onContentClick: (StreamingContent) -> Unit,
     onCatalogClick: (CatalogConfig) -> Unit,
-    onAddAddonsClick: () -> Unit = {}
+    onAddAddonsClick: () -> Unit = {},
+    focusRequester: FocusRequester? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -103,6 +105,7 @@ fun HomeScreen(
                         uiState = uiState,
                         onContentClick = onContentClick,
                         onCatalogClick = onCatalogClick,
+                        focusRequester = focusRequester,
                         onThisWeekItemClick = { item ->
                             // Navigate to the show's metadata screen
                             onContentClick(
@@ -300,6 +303,7 @@ private fun HomeContent(
     uiState: HomeUiState,
     onContentClick: (StreamingContent) -> Unit,
     onCatalogClick: (CatalogConfig) -> Unit,
+    focusRequester: FocusRequester? = null,
     onThisWeekItemClick: (ThisWeekItem) -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -327,6 +331,7 @@ private fun HomeContent(
             HeroCarousel(
                 items = uiState.featuredContent,
                 onItemClick = onContentClick,
+                focusRequester = focusRequester,
                 onHeroFocusChanged = { hasFocus ->
                     if (hasFocus) {
                         // Scroll to top when hero receives focus

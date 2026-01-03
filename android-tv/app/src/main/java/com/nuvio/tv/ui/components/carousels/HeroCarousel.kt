@@ -33,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -69,6 +71,7 @@ fun HeroCarousel(
     items: List<StreamingContent>,
     onItemClick: (StreamingContent) -> Unit,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
     onHeroFocusChanged: ((Boolean) -> Unit)? = null,
     autoAdvanceDelayMs: Long = 8000
 ) {
@@ -139,6 +142,8 @@ fun HeroCarousel(
                         true
                     } else false
                 },
+                // Only attach focusRequester to the first (current) page
+                focusRequester = if (page == 0) focusRequester else null,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -205,6 +210,7 @@ private fun HeroItem(
     onFocusChanged: (Boolean) -> Unit,
     onNavigateLeft: () -> Boolean,
     onNavigateRight: () -> Boolean,
+    focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -218,6 +224,10 @@ private fun HeroItem(
     Card(
         onClick = onClick,
         modifier = modifier
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester)
+                else Modifier
+            )
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale

@@ -3,11 +3,15 @@ package com.nuvio.tv.ui.navigation
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import kotlinx.coroutines.delay
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -43,6 +47,16 @@ fun NuvioNavigation(
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
 
+    // FocusRequesters for each main screen's initial focus target
+    val homeFocusRequester = remember { FocusRequester() }
+    val libraryFocusRequester = remember { FocusRequester() }
+    val searchFocusRequester = remember { FocusRequester() }
+    val settingsFocusRequester = remember { FocusRequester() }
+
+    // Track route changes to request focus after navigation
+    var previousRoute by remember { mutableStateOf<String?>(null) }
+    var pendingFocusDestination by remember { mutableStateOf<MainNavDestination?>(null) }
+
     // Track current route to determine if nav rail should be hidden
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -52,6 +66,27 @@ fun NuvioNavigation(
         currentRoute?.startsWith("streams/") == true ||
         currentRoute?.startsWith("player/") == true
 
+    // Request focus on the target element after navigation completes
+    LaunchedEffect(currentRoute) {
+        if (pendingFocusDestination != null && currentRoute != null && currentRoute != previousRoute) {
+            // Route has changed - wait for new screen to render then request focus
+            delay(200)
+            try {
+                when (pendingFocusDestination) {
+                    MainNavDestination.HOME -> homeFocusRequester.requestFocus()
+                    MainNavDestination.LIBRARY -> libraryFocusRequester.requestFocus()
+                    MainNavDestination.SEARCH -> searchFocusRequester.requestFocus()
+                    MainNavDestination.SETTINGS -> settingsFocusRequester.requestFocus()
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                // Focus request may fail if element not yet composed
+            }
+            pendingFocusDestination = null
+        }
+        previousRoute = currentRoute
+    }
+
     Row(modifier = modifier.fillMaxSize()) {
         // Navigation Rail - hidden on full-screen routes
         if (!isFullScreenRoute) {
@@ -59,6 +94,7 @@ fun NuvioNavigation(
                 selectedDestination = selectedDestination,
                 onDestinationSelected = { destination ->
                     selectedDestination = destination
+                    pendingFocusDestination = destination
                     navController.navigate(destination.route) {
                         // Pop up to the start destination to avoid building up a large stack
                         popUpTo(NavRoutes.HOME) {
@@ -103,7 +139,8 @@ fun NuvioNavigation(
                     },
                     onAddAddonsClick = {
                         navController.navigate(NavRoutes.SETTINGS_ADDONS)
-                    }
+                    },
+                    focusRequester = homeFocusRequester
                 )
             }
 
@@ -111,7 +148,8 @@ fun NuvioNavigation(
                 LibraryScreen(
                     onContentClick = { content ->
                         navController.navigate(NavRoutes.metadata(content.type, content.id))
-                    }
+                    },
+                    focusRequester = libraryFocusRequester
                 )
             }
 
@@ -119,7 +157,8 @@ fun NuvioNavigation(
                 SearchScreen(
                     onContentClick = { content ->
                         navController.navigate(NavRoutes.metadata(content.type, content.id))
-                    }
+                    },
+                    focusRequester = searchFocusRequester
                 )
             }
 
@@ -142,7 +181,8 @@ fun NuvioNavigation(
                     },
                     onNavigateToAbout = {
                         navController.navigate(NavRoutes.SETTINGS_ABOUT)
-                    }
+                    },
+                    focusRequester = settingsFocusRequester
                 )
             }
 
