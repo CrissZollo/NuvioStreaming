@@ -195,6 +195,10 @@ fun NuvioNavigation(
                         // Navigate to streams with the stremio episode ID (imdbId:season:episode format)
                         navController.navigate(NavRoutes.streams(content.type, content.id, episode.stremioId))
                     },
+                    onContentClick = { content ->
+                        // Navigate to metadata screen for recommended content
+                        navController.navigate(NavRoutes.metadata(content.type, content.id))
+                    },
                     onFilmographyClick = { personId, personName ->
                         navController.navigate(NavRoutes.filmography(personId, personName))
                     },
