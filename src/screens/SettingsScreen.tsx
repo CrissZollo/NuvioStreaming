@@ -594,11 +594,11 @@ const SettingsScreen: React.FC = () => {
     />
   );
 
-  const ChevronRight = () => (
+  const ChevronRight = (focused?: boolean) => (
     <Feather
       name="chevron-right"
       size={isTablet ? 24 : 20}
-      color={currentTheme.colors.mediumEmphasis}
+      color={focused ? '#0A0A0A' : currentTheme.colors.mediumEmphasis}
     />
   );
 

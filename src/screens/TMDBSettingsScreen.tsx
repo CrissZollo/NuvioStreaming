@@ -28,7 +28,8 @@ import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CustomAlert from '../components/CustomAlert';
-// (duplicate import removed)
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
@@ -80,6 +81,17 @@ const TMDBSettingsScreen = () => {
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const { settings, updateSetting } = useSettings();
+  const isTV = useIsTV();
+
+  // TV focus refs
+  const backButtonRef = useRef<FocusableRef>(null);
+  const enrichToggleRef = useRef<FocusableRef>(null);
+  const localizedToggleRef = useRef<FocusableRef>(null);
+  const customKeyToggleRef = useRef<FocusableRef>(null);
+  const apiKeyInputRef2 = useRef<FocusableRef>(null);
+  const saveButtonRef = useRef<FocusableRef>(null);
+  const clearButtonRef = useRef<FocusableRef>(null);
+  const clearCacheRef = useRef<FocusableRef>(null);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [languageSearch, setLanguageSearch] = useState('');
 
@@ -516,13 +528,34 @@ const TMDBSettingsScreen = () => {
       <StatusBar barStyle="light-content" />
       <View style={[styles.headerContainer, { paddingTop: topSpacing }]}>
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.primary} />
-            <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              ref={backButtonRef}
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+              autoFocus
+              borderRadius={8}
+              focusScale={1.05}
+              animateBackground={true}
+              showFocusBorder={true}
+              nextFocusDown={enrichToggleRef.current?.getViewRef()}
+            >
+              {(focused) => (
+                <>
+                  <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : currentTheme.colors.primary} />
+                  <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.primary }]}>Settings</Text>
+                </>
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.primary} />
+              <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
           TMDb Settings
@@ -545,41 +578,115 @@ const TMDBSettingsScreen = () => {
             Enhance your content metadata with TMDb data for better details and information.
           </Text>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingTextContainer}>
-              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Enable Enrichment</Text>
-              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                Augments addon metadata with TMDb for cast, certification, logos/posters, and episode fallback.
-              </Text>
+          {isTV ? (
+            <Focusable
+              ref={enrichToggleRef}
+              onPress={() => updateSetting('enrichMetadataWithTMDB', !settings.enrichMetadataWithTMDB)}
+              style={styles.settingRow}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+              nextFocusUp={backButtonRef.current?.getViewRef()}
+              nextFocusDown={settings.enrichMetadataWithTMDB ? localizedToggleRef.current?.getViewRef() : customKeyToggleRef.current?.getViewRef()}
+            >
+              {(focused) => (
+                <>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={[styles.settingTitle, { color: focused ? '#000' : currentTheme.colors.text }]}>Enable Enrichment</Text>
+                    <Text style={[styles.settingDescription, { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }]}>
+                      Augments addon metadata with TMDb for cast, certification, logos/posters, and episode fallback.
+                    </Text>
+                  </View>
+                  <View style={styles.tvSwitchContainer}>
+                    <View style={[
+                      styles.tvSwitchTrack,
+                      { backgroundColor: focused ? (settings.enrichMetadataWithTMDB ? '#333' : '#666') : (settings.enrichMetadataWithTMDB ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                    ]}>
+                      <View style={[
+                        styles.tvSwitchThumb,
+                        settings.enrichMetadataWithTMDB ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                        { backgroundColor: focused ? '#000' : (settings.enrichMetadataWithTMDB ? '#fff' : '#888') }
+                      ]} />
+                    </View>
+                  </View>
+                </>
+              )}
+            </Focusable>
+          ) : (
+            <View style={styles.settingRow}>
+              <View style={styles.settingTextContainer}>
+                <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Enable Enrichment</Text>
+                <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                  Augments addon metadata with TMDb for cast, certification, logos/posters, and episode fallback.
+                </Text>
+              </View>
+              <Switch
+                value={settings.enrichMetadataWithTMDB}
+                onValueChange={(v) => updateSetting('enrichMetadataWithTMDB', v)}
+                trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                thumbColor={Platform.OS === 'android' ? (settings.enrichMetadataWithTMDB ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+                ios_backgroundColor={'rgba(255,255,255,0.1)'}
+              />
             </View>
-            <Switch
-              value={settings.enrichMetadataWithTMDB}
-              onValueChange={(v) => updateSetting('enrichMetadataWithTMDB', v)}
-              trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
-              thumbColor={Platform.OS === 'android' ? (settings.enrichMetadataWithTMDB ? currentTheme.colors.white : currentTheme.colors.white) : ''}
-              ios_backgroundColor={'rgba(255,255,255,0.1)'}
-            />
-          </View>
+          )}
 
           {settings.enrichMetadataWithTMDB && (
             <>
               <View style={styles.divider} />
 
-              <View style={styles.settingRow}>
-                <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Localized Text</Text>
-                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Fetch titles and descriptions in your preferred language from TMDb.
-                  </Text>
+              {isTV ? (
+                <Focusable
+                  ref={localizedToggleRef}
+                  onPress={() => updateSetting('useTmdbLocalizedMetadata', !settings.useTmdbLocalizedMetadata)}
+                  style={styles.settingRow}
+                  borderRadius={8}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                  nextFocusUp={enrichToggleRef.current?.getViewRef()}
+                  nextFocusDown={customKeyToggleRef.current?.getViewRef()}
+                >
+                  {(focused) => (
+                    <>
+                      <View style={styles.settingTextContainer}>
+                        <Text style={[styles.settingTitle, { color: focused ? '#000' : currentTheme.colors.text }]}>Localized Text</Text>
+                        <Text style={[styles.settingDescription, { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }]}>
+                          Fetch titles and descriptions in your preferred language from TMDb.
+                        </Text>
+                      </View>
+                      <View style={styles.tvSwitchContainer}>
+                        <View style={[
+                          styles.tvSwitchTrack,
+                          { backgroundColor: focused ? (settings.useTmdbLocalizedMetadata ? '#333' : '#666') : (settings.useTmdbLocalizedMetadata ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                        ]}>
+                          <View style={[
+                            styles.tvSwitchThumb,
+                            settings.useTmdbLocalizedMetadata ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                            { backgroundColor: focused ? '#000' : (settings.useTmdbLocalizedMetadata ? '#fff' : '#888') }
+                          ]} />
+                        </View>
+                      </View>
+                    </>
+                  )}
+                </Focusable>
+              ) : (
+                <View style={styles.settingRow}>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Localized Text</Text>
+                    <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                      Fetch titles and descriptions in your preferred language from TMDb.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={settings.useTmdbLocalizedMetadata}
+                    onValueChange={(v) => updateSetting('useTmdbLocalizedMetadata', v)}
+                    trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                    thumbColor={Platform.OS === 'android' ? (settings.useTmdbLocalizedMetadata ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+                    ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                  />
                 </View>
-                <Switch
-                  value={settings.useTmdbLocalizedMetadata}
-                  onValueChange={(v) => updateSetting('useTmdbLocalizedMetadata', v)}
-                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
-                  thumbColor={Platform.OS === 'android' ? (settings.useTmdbLocalizedMetadata ? currentTheme.colors.white : currentTheme.colors.white) : ''}
-                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
-                />
-              </View>
+              )}
 
               {settings.useTmdbLocalizedMetadata && (
                 <>
@@ -665,21 +772,58 @@ const TMDBSettingsScreen = () => {
             Configure your TMDb API access for enhanced functionality.
           </Text>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingTextContainer}>
-              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Custom API Key</Text>
-              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                Use your own TMDb API key for better performance and dedicated rate limits.
-              </Text>
+          {isTV ? (
+            <Focusable
+              ref={customKeyToggleRef}
+              onPress={() => toggleUseCustomKey(!useCustomKey)}
+              style={styles.settingRow}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+              nextFocusUp={settings.enrichMetadataWithTMDB ? localizedToggleRef.current?.getViewRef() : enrichToggleRef.current?.getViewRef()}
+              nextFocusDown={useCustomKey ? apiKeyInputRef2.current?.getViewRef() : clearCacheRef.current?.getViewRef()}
+            >
+              {(focused) => (
+                <>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={[styles.settingTitle, { color: focused ? '#000' : currentTheme.colors.text }]}>Custom API Key</Text>
+                    <Text style={[styles.settingDescription, { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }]}>
+                      Use your own TMDb API key for better performance and dedicated rate limits.
+                    </Text>
+                  </View>
+                  <View style={styles.tvSwitchContainer}>
+                    <View style={[
+                      styles.tvSwitchTrack,
+                      { backgroundColor: focused ? (useCustomKey ? '#333' : '#666') : (useCustomKey ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                    ]}>
+                      <View style={[
+                        styles.tvSwitchThumb,
+                        useCustomKey ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                        { backgroundColor: focused ? '#000' : (useCustomKey ? '#fff' : '#888') }
+                      ]} />
+                    </View>
+                  </View>
+                </>
+              )}
+            </Focusable>
+          ) : (
+            <View style={styles.settingRow}>
+              <View style={styles.settingTextContainer}>
+                <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Custom API Key</Text>
+                <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                  Use your own TMDb API key for better performance and dedicated rate limits.
+                </Text>
+              </View>
+              <Switch
+                value={useCustomKey}
+                onValueChange={toggleUseCustomKey}
+                trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                thumbColor={Platform.OS === 'android' ? (useCustomKey ? currentTheme.colors.white : currentTheme.colors.white) : ''}
+                ios_backgroundColor={'rgba(255,255,255,0.1)'}
+              />
             </View>
-            <Switch
-              value={useCustomKey}
-              onValueChange={toggleUseCustomKey}
-              trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
-              thumbColor={Platform.OS === 'android' ? (useCustomKey ? currentTheme.colors.white : currentTheme.colors.white) : ''}
-              ios_backgroundColor={'rgba(255,255,255,0.1)'}
-            />
-          </View>
+          )}
 
           {useCustomKey && (
             <>
@@ -701,85 +845,198 @@ const TMDBSettingsScreen = () => {
 
               {/* API Key Input */}
               <View style={styles.apiKeyContainer}>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    ref={apiKeyInputRef}
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: currentTheme.colors.elevation1,
-                        color: currentTheme.colors.text,
-                        borderColor: isInputFocused ? currentTheme.colors.primary : 'transparent'
-                      }
-                    ]}
-                    value={apiKey}
-                    onChangeText={(text) => {
-                      setApiKey(text);
-                      if (testResult) setTestResult(null);
-                    }}
-                    placeholder="Paste your TMDb API key (v3)"
-                    placeholderTextColor={currentTheme.colors.mediumEmphasis}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    spellCheck={false}
-                    onFocus={() => setIsInputFocused(true)}
-                    onBlur={() => setIsInputFocused(false)}
-                  />
-                  <TouchableOpacity
-                    style={styles.pasteButton}
-                    onPress={pasteFromClipboard}
-                  >
-                    <MaterialIcons name="content-paste" size={20} color={currentTheme.colors.primary} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
-                    onPress={saveApiKey}
-                  >
-                    <Text style={[styles.buttonText, { color: currentTheme.colors.white }]}>Save</Text>
-                  </TouchableOpacity>
-
-                  {isKeySet && (
-                    <TouchableOpacity
-                      style={[styles.button, styles.clearButton, { borderColor: currentTheme.colors.error }]}
-                      onPress={clearApiKey}
+                {isTV ? (
+                  <>
+                    <Focusable
+                      ref={apiKeyInputRef2}
+                      onPress={() => {
+                        apiKeyInputRef.current?.focus();
+                      }}
+                      style={styles.inputContainer}
+                      borderRadius={12}
+                      focusScale={1}
+                      animateBackground={false}
+                      showFocusBorder={true}
+                      nextFocusUp={customKeyToggleRef.current?.getViewRef()}
+                      nextFocusDown={saveButtonRef.current?.getViewRef()}
                     >
-                      <Text style={[styles.buttonText, { color: currentTheme.colors.error }]}>Clear</Text>
+                      {(focused) => (
+                        <>
+                          <TextInput
+                            ref={apiKeyInputRef}
+                            style={[
+                              styles.input,
+                              {
+                                backgroundColor: currentTheme.colors.elevation1,
+                                color: currentTheme.colors.text,
+                                borderColor: focused ? currentTheme.colors.primary : 'transparent'
+                              }
+                            ]}
+                            value={apiKey}
+                            onChangeText={(text) => {
+                              setApiKey(text);
+                              if (testResult) setTestResult(null);
+                            }}
+                            placeholder="Paste your TMDb API key (v3)"
+                            placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            spellCheck={false}
+                            onFocus={() => setIsInputFocused(true)}
+                            onBlur={() => setIsInputFocused(false)}
+                          />
+                          <View style={styles.pasteButton}>
+                            <MaterialIcons
+                              name="content-paste"
+                              size={20}
+                              color={focused ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis}
+                            />
+                          </View>
+                        </>
+                      )}
+                    </Focusable>
+
+                    <View style={styles.buttonRow}>
+                      <Focusable
+                        ref={saveButtonRef}
+                        onPress={saveApiKey}
+                        style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
+                        borderRadius={12}
+                        focusScale={1.02}
+                        animateBackground={false}
+                        showFocusBorder={true}
+                        nextFocusUp={apiKeyInputRef2.current?.getViewRef()}
+                        nextFocusDown={isKeySet ? clearButtonRef.current?.getViewRef() : clearCacheRef.current?.getViewRef()}
+                        nextFocusRight={isKeySet ? clearButtonRef.current?.getViewRef() : undefined}
+                      >
+                        {(focused) => (
+                          <Text style={[styles.buttonText, { color: focused ? '#000' : currentTheme.colors.white }]}>Save</Text>
+                        )}
+                      </Focusable>
+
+                      {isKeySet && (
+                        <Focusable
+                          ref={clearButtonRef}
+                          onPress={clearApiKey}
+                          style={[styles.button, styles.clearButton, { borderColor: currentTheme.colors.error }]}
+                          borderRadius={12}
+                          focusScale={1.02}
+                          animateBackground={false}
+                          showFocusBorder={true}
+                          nextFocusUp={apiKeyInputRef2.current?.getViewRef()}
+                          nextFocusDown={clearCacheRef.current?.getViewRef()}
+                          nextFocusLeft={saveButtonRef.current?.getViewRef()}
+                        >
+                          {(focused) => (
+                            <Text style={[styles.buttonText, { color: focused ? '#000' : currentTheme.colors.error }]}>Clear</Text>
+                          )}
+                        </Focusable>
+                      )}
+                    </View>
+
+                    {testResult && (
+                      <View style={[
+                        styles.resultMessage,
+                        { backgroundColor: testResult.success ? currentTheme.colors.success + '1A' : currentTheme.colors.error + '1A' }
+                      ]}>
+                        <MaterialIcons
+                          name={testResult.success ? "check-circle" : "error"}
+                          size={16}
+                          color={testResult.success ? currentTheme.colors.success : currentTheme.colors.error}
+                          style={styles.resultIcon}
+                        />
+                        <Text style={[
+                          styles.resultText,
+                          { color: testResult.success ? currentTheme.colors.success : currentTheme.colors.error }
+                        ]}>
+                          {testResult.message}
+                        </Text>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        ref={apiKeyInputRef}
+                        style={[
+                          styles.input,
+                          {
+                            backgroundColor: currentTheme.colors.elevation1,
+                            color: currentTheme.colors.text,
+                            borderColor: isInputFocused ? currentTheme.colors.primary : 'transparent'
+                          }
+                        ]}
+                        value={apiKey}
+                        onChangeText={(text) => {
+                          setApiKey(text);
+                          if (testResult) setTestResult(null);
+                        }}
+                        placeholder="Paste your TMDb API key (v3)"
+                        placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        spellCheck={false}
+                        onFocus={() => setIsInputFocused(true)}
+                        onBlur={() => setIsInputFocused(false)}
+                      />
+                      <TouchableOpacity
+                        style={styles.pasteButton}
+                        onPress={pasteFromClipboard}
+                      >
+                        <MaterialIcons name="content-paste" size={20} color={currentTheme.colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
+                        onPress={saveApiKey}
+                      >
+                        <Text style={[styles.buttonText, { color: currentTheme.colors.white }]}>Save</Text>
+                      </TouchableOpacity>
+
+                      {isKeySet && (
+                        <TouchableOpacity
+                          style={[styles.button, styles.clearButton, { borderColor: currentTheme.colors.error }]}
+                          onPress={clearApiKey}
+                        >
+                          <Text style={[styles.buttonText, { color: currentTheme.colors.error }]}>Clear</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {testResult && (
+                      <View style={[
+                        styles.resultMessage,
+                        { backgroundColor: testResult.success ? currentTheme.colors.success + '1A' : currentTheme.colors.error + '1A' }
+                      ]}>
+                        <MaterialIcons
+                          name={testResult.success ? "check-circle" : "error"}
+                          size={16}
+                          color={testResult.success ? currentTheme.colors.success : currentTheme.colors.error}
+                          style={styles.resultIcon}
+                        />
+                        <Text style={[
+                          styles.resultText,
+                          { color: testResult.success ? currentTheme.colors.success : currentTheme.colors.error }
+                        ]}>
+                          {testResult.message}
+                        </Text>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={styles.helpLink}
+                      onPress={openTMDBWebsite}
+                    >
+                      <MaterialIcons name="help" size={16} color={currentTheme.colors.primary} style={styles.helpIcon} />
+                      <Text style={[styles.helpText, { color: currentTheme.colors.primary }]}>
+                        How to get a TMDb API key?
+                      </Text>
                     </TouchableOpacity>
-                  )}
-                </View>
-
-                {testResult && (
-                  <View style={[
-                    styles.resultMessage,
-                    { backgroundColor: testResult.success ? currentTheme.colors.success + '1A' : currentTheme.colors.error + '1A' }
-                  ]}>
-                    <MaterialIcons
-                      name={testResult.success ? "check-circle" : "error"}
-                      size={16}
-                      color={testResult.success ? currentTheme.colors.success : currentTheme.colors.error}
-                      style={styles.resultIcon}
-                    />
-                    <Text style={[
-                      styles.resultText,
-                      { color: testResult.success ? currentTheme.colors.success : currentTheme.colors.error }
-                    ]}>
-                      {testResult.message}
-                    </Text>
-                  </View>
+                  </>
                 )}
-
-                <TouchableOpacity
-                  style={styles.helpLink}
-                  onPress={openTMDBWebsite}
-                >
-                  <MaterialIcons name="help" size={16} color={currentTheme.colors.primary} style={styles.helpIcon} />
-                  <Text style={[styles.helpText, { color: currentTheme.colors.primary }]}>
-                    How to get a TMDb API key?
-                  </Text>
-                </TouchableOpacity>
               </View>
             </>
           )}
@@ -805,15 +1062,35 @@ const TMDBSettingsScreen = () => {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: currentTheme.colors.error }]}
-            onPress={handleClearCache}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <MaterialIcons name="delete-outline" size={18} color={currentTheme.colors.white} />
-              <Text style={[styles.buttonText, { color: currentTheme.colors.white, marginLeft: 8 }]}>Clear Cache</Text>
-            </View>
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              ref={clearCacheRef}
+              onPress={handleClearCache}
+              style={[styles.button, { backgroundColor: currentTheme.colors.error }]}
+              borderRadius={12}
+              focusScale={1.02}
+              animateBackground={false}
+              showFocusBorder={true}
+              nextFocusUp={useCustomKey ? (isKeySet ? clearButtonRef.current?.getViewRef() : saveButtonRef.current?.getViewRef()) : customKeyToggleRef.current?.getViewRef()}
+            >
+              {(focused) => (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialIcons name="delete-outline" size={18} color={focused ? '#000' : currentTheme.colors.white} />
+                  <Text style={[styles.buttonText, { color: focused ? '#000' : currentTheme.colors.white, marginLeft: 8 }]}>Clear Cache</Text>
+                </View>
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: currentTheme.colors.error }]}
+              onPress={handleClearCache}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialIcons name="delete-outline" size={18} color={currentTheme.colors.white} />
+                <Text style={[styles.buttonText, { color: currentTheme.colors.white, marginLeft: 8 }]}>Clear Cache</Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           <View style={[styles.infoContainer, { marginTop: 12 }]}>
             <MaterialIcons name="info-outline" size={18} color={currentTheme.colors.primary} />
@@ -1519,6 +1796,31 @@ const styles = StyleSheet.create({
   logoSourceLabel: {
     fontSize: 11,
     marginTop: 6,
+  },
+  // TV Toggle styles - thin track with floating thumb
+  tvSwitchContainer: {
+    width: 51,
+    height: 26,
+    justifyContent: 'center',
+  },
+  tvSwitchTrack: {
+    width: 51,
+    height: 14,
+    borderRadius: 7,
+    position: 'relative' as const,
+  },
+  tvSwitchThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    position: 'absolute' as const,
+    top: -6,
+  },
+  tvSwitchThumbOn: {
+    right: 0,
+  },
+  tvSwitchThumbOff: {
+    left: 0,
   },
 });
 

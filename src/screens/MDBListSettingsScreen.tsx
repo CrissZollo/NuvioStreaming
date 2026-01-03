@@ -22,6 +22,9 @@ import { mmkvStorage } from '../services/mmkvStorage';
 import { useTheme } from '../contexts/ThemeContext';
 import { logger } from '../utils/logger';
 import { RATING_PROVIDERS } from '../components/metadata/RatingsSection';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
+import QRCode from 'react-native-qrcode-svg';
 
 export const MDBLIST_API_KEY_STORAGE_KEY = 'mdblist_api_key';
 export const RATING_PROVIDERS_STORAGE_KEY = 'rating_providers_config';
@@ -353,6 +356,31 @@ const createStyles = (colors: any) => StyleSheet.create({
   darkGray: {
     color: colors.darkGray || '#555555',
   },
+  // TV Toggle styles - thin track with floating thumb
+  tvSwitchContainer: {
+    width: 51,
+    height: 26,
+    justifyContent: 'center',
+  },
+  tvSwitchTrack: {
+    width: 51,
+    height: 14,
+    borderRadius: 7,
+    position: 'relative' as const,
+  },
+  tvSwitchThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    position: 'absolute' as const,
+    top: -6,
+  },
+  tvSwitchThumbOn: {
+    right: 0,
+  },
+  tvSwitchThumbOff: {
+    left: 0,
+  },
 });
 
 const MDBListSettingsScreen = () => {
@@ -360,7 +388,16 @@ const MDBListSettingsScreen = () => {
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
-  
+  const isTV = useIsTV();
+
+  // TV focus refs
+  const backButtonRef = useRef<FocusableRef>(null);
+  const enableToggleRef = useRef<FocusableRef>(null);
+  const apiKeyInputRef2 = useRef<FocusableRef>(null);
+  const saveButtonRef = useRef<FocusableRef>(null);
+  const clearButtonRef = useRef<FocusableRef>(null);
+  const providerRefs = useRef<(FocusableRef | null)[]>([]);
+
   // Custom alert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -564,13 +601,34 @@ const MDBListSettingsScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="chevron-left" size={28} color={colors.primary} /> 
-          <Text style={styles.backText}>Settings</Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            autoFocus
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+            nextFocusDown={enableToggleRef.current?.getViewRef()}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.primary} />
+                <Text style={[styles.backText, { color: focused ? '#000' : colors.primary }]}>Settings</Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
+            <Text style={styles.backText}>Settings</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <Text style={styles.headerTitle}>Rating Sources</Text>
 
@@ -605,109 +663,278 @@ const MDBListSettingsScreen = () => {
         </View>
 
         <View style={styles.card}>
-          <View style={styles.masterToggleContainer}>
-            <View style={styles.masterToggleInfo}>
-              <Text style={styles.masterToggleTitle}>Enable MDBList</Text>
-              <Text style={styles.masterToggleDescription}>
-                Turn on/off all MDBList functionality
-              </Text>
+          {isTV ? (
+            <Focusable
+              ref={enableToggleRef}
+              onPress={toggleMdbListEnabled}
+              style={styles.masterToggleContainer}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+              nextFocusUp={backButtonRef.current?.getViewRef()}
+              nextFocusDown={isMdbListEnabled ? apiKeyInputRef2.current?.getViewRef() : providerRefs.current[0]?.getViewRef()}
+            >
+              {(focused) => (
+                <>
+                  <View style={styles.masterToggleInfo}>
+                    <Text style={[styles.masterToggleTitle, { color: focused ? '#000' : colors.white }]}>Enable MDBList</Text>
+                    <Text style={[styles.masterToggleDescription, { color: focused ? '#333' : colors.mediumGray }]}>
+                      Turn on/off all MDBList functionality
+                    </Text>
+                  </View>
+                  <View style={styles.tvSwitchContainer}>
+                    <View style={[
+                      styles.tvSwitchTrack,
+                      { backgroundColor: focused ? (isMdbListEnabled ? '#333' : '#666') : (isMdbListEnabled ? colors.primary : 'rgba(255,255,255,0.2)') }
+                    ]}>
+                      <View style={[
+                        styles.tvSwitchThumb,
+                        isMdbListEnabled ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                        { backgroundColor: focused ? '#000' : (isMdbListEnabled ? '#fff' : '#888') }
+                      ]} />
+                    </View>
+                  </View>
+                </>
+              )}
+            </Focusable>
+          ) : (
+            <View style={styles.masterToggleContainer}>
+              <View style={styles.masterToggleInfo}>
+                <Text style={styles.masterToggleTitle}>Enable MDBList</Text>
+                <Text style={styles.masterToggleDescription}>
+                  Turn on/off all MDBList functionality
+                </Text>
+              </View>
+              <Switch
+                value={isMdbListEnabled}
+                onValueChange={toggleMdbListEnabled}
+                trackColor={{ false: colors.elevation1, true: colors.primary + '50' }}
+                thumbColor={isMdbListEnabled ? colors.primary : colors.mediumGray}
+              />
             </View>
-            <Switch
-              value={isMdbListEnabled}
-              onValueChange={toggleMdbListEnabled}
-              trackColor={{ false: colors.elevation1, true: colors.primary + '50' }}
-              thumbColor={isMdbListEnabled ? colors.primary : colors.mediumGray}
-            />
-          </View>
+          )}
         </View>
 
         <View style={[styles.card, !isMdbListEnabled && styles.disabledCard]}>
           <Text style={styles.sectionTitle}>API Key</Text>
-          <View style={[styles.inputWrapper, !isMdbListEnabled && styles.disabledInput]}>
-            <TextInput
-              ref={apiKeyInputRef}
-              style={[
-                styles.input, 
-                isInputFocused && styles.inputFocused,
-                !isMdbListEnabled && styles.disabledText
-              ]}
-              value={apiKey}
-              onChangeText={(text) => {
-                setApiKey(text);
-                if (testResult) setTestResult(null);
-              }}
-              placeholder="Paste your MDBList API key"
-              placeholderTextColor={!isMdbListEnabled ? colors.darkGray : colors.mediumGray}
-              autoCapitalize="none"
-              autoCorrect={false}
-              spellCheck={false}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={() => setIsInputFocused(false)}
-              editable={isMdbListEnabled}
-            />
-            <TouchableOpacity 
-              style={styles.pasteButton} 
-              onPress={pasteFromClipboard}
-              disabled={!isMdbListEnabled}
-            >
-               <MaterialIcons 
-                 name="content-paste" 
-                 size={20} 
-                 color={!isMdbListEnabled ? colors.darkGray : colors.primary} 
-               />
-            </TouchableOpacity>
-          </View>
-          
-          {testResult && (
-            <View style={[
-              styles.testResultContainer,
-              testResult.success ? styles.testResultSuccess : styles.testResultError
-            ]}>
-              <MaterialIcons 
-                name={testResult.success ? "check" : "warning"} 
-                size={18}
-                color={testResult.success ? colors.success : colors.error} 
-              />
-              <Text style={styles.testResultText}>
-                {testResult.message}
-              </Text>
-            </View>
-          )}
-          
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.saveButton, 
-                (!apiKey.trim() || !isMdbListEnabled) && styles.saveButtonDisabled
-              ]}
-              onPress={saveApiKey}
-              disabled={!apiKey.trim() || !isMdbListEnabled}
-            >
-              <MaterialIcons name="save" size={18} color={colors.white} style={styles.buttonIcon} />
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
-            
-            {isKeySet && (
-              <TouchableOpacity
-                style={[styles.clearButton, !isMdbListEnabled && styles.clearButtonDisabled]}
-                onPress={clearApiKey}
+          {isTV ? (
+            <>
+              <Focusable
+                ref={apiKeyInputRef2}
+                onPress={() => {
+                  if (isMdbListEnabled) {
+                    apiKeyInputRef.current?.focus();
+                  }
+                }}
                 disabled={!isMdbListEnabled}
+                style={[styles.inputWrapper, !isMdbListEnabled && styles.disabledInput]}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={false}
+                showFocusBorder={true}
+                nextFocusUp={enableToggleRef.current?.getViewRef()}
+                nextFocusDown={saveButtonRef.current?.getViewRef()}
               >
-                <MaterialIcons 
-                  name="delete-outline" 
-                  size={18} 
-                  color={!isMdbListEnabled ? colors.darkGray : colors.error} 
-                  style={styles.buttonIcon} 
-                />
-                <Text style={[
-                  styles.clearButtonText, 
-                  !isMdbListEnabled && styles.clearButtonTextDisabled
+                {(focused) => (
+                  <>
+                    <TextInput
+                      ref={apiKeyInputRef}
+                      style={[
+                        styles.input,
+                        focused && styles.inputFocused,
+                        !isMdbListEnabled && styles.disabledText
+                      ]}
+                      value={apiKey}
+                      onChangeText={(text) => {
+                        setApiKey(text);
+                        if (testResult) setTestResult(null);
+                      }}
+                      placeholder="Paste your MDBList API key"
+                      placeholderTextColor={!isMdbListEnabled ? colors.darkGray : colors.mediumGray}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      spellCheck={false}
+                      onFocus={() => setIsInputFocused(true)}
+                      onBlur={() => setIsInputFocused(false)}
+                      editable={isMdbListEnabled}
+                    />
+                    <View style={styles.pasteButton}>
+                      <MaterialIcons
+                        name="content-paste"
+                        size={20}
+                        color={!isMdbListEnabled ? colors.darkGray : (focused ? colors.primary : colors.mediumGray)}
+                      />
+                    </View>
+                  </>
+                )}
+              </Focusable>
+
+              {testResult && (
+                <View style={[
+                  styles.testResultContainer,
+                  testResult.success ? styles.testResultSuccess : styles.testResultError
                 ]}>
-                  Clear Key
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+                  <MaterialIcons
+                    name={testResult.success ? "check" : "warning"}
+                    size={18}
+                    color={testResult.success ? colors.success : colors.error}
+                  />
+                  <Text style={styles.testResultText}>
+                    {testResult.message}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.buttonContainer}>
+                <Focusable
+                  ref={saveButtonRef}
+                  onPress={saveApiKey}
+                  disabled={!apiKey.trim() || !isMdbListEnabled}
+                  style={[
+                    styles.saveButton,
+                    (!apiKey.trim() || !isMdbListEnabled) && styles.saveButtonDisabled
+                  ]}
+                  borderRadius={8}
+                  focusScale={1.02}
+                  animateBackground={false}
+                  showFocusBorder={true}
+                  nextFocusUp={apiKeyInputRef2.current?.getViewRef()}
+                  nextFocusDown={isKeySet ? clearButtonRef.current?.getViewRef() : providerRefs.current[0]?.getViewRef()}
+                  nextFocusRight={isKeySet ? clearButtonRef.current?.getViewRef() : undefined}
+                >
+                  {(focused) => (
+                    <>
+                      <MaterialIcons name="save" size={18} color={focused ? '#000' : colors.white} style={styles.buttonIcon} />
+                      <Text style={[styles.saveButtonText, focused && { color: '#000' }]}>Save</Text>
+                    </>
+                  )}
+                </Focusable>
+
+                {isKeySet && (
+                  <Focusable
+                    ref={clearButtonRef}
+                    onPress={clearApiKey}
+                    disabled={!isMdbListEnabled}
+                    style={[styles.clearButton, !isMdbListEnabled && styles.clearButtonDisabled]}
+                    borderRadius={8}
+                    focusScale={1.02}
+                    animateBackground={false}
+                    showFocusBorder={true}
+                    nextFocusUp={apiKeyInputRef2.current?.getViewRef()}
+                    nextFocusDown={providerRefs.current[0]?.getViewRef()}
+                    nextFocusLeft={saveButtonRef.current?.getViewRef()}
+                  >
+                    {(focused) => (
+                      <>
+                        <MaterialIcons
+                          name="delete-outline"
+                          size={18}
+                          color={!isMdbListEnabled ? colors.darkGray : (focused ? '#000' : colors.error)}
+                          style={styles.buttonIcon}
+                        />
+                        <Text style={[
+                          styles.clearButtonText,
+                          !isMdbListEnabled && styles.clearButtonTextDisabled,
+                          focused && { color: '#000' }
+                        ]}>
+                          Clear Key
+                        </Text>
+                      </>
+                    )}
+                  </Focusable>
+                )}
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={[styles.inputWrapper, !isMdbListEnabled && styles.disabledInput]}>
+                <TextInput
+                  ref={apiKeyInputRef}
+                  style={[
+                    styles.input,
+                    isInputFocused && styles.inputFocused,
+                    !isMdbListEnabled && styles.disabledText
+                  ]}
+                  value={apiKey}
+                  onChangeText={(text) => {
+                    setApiKey(text);
+                    if (testResult) setTestResult(null);
+                  }}
+                  placeholder="Paste your MDBList API key"
+                  placeholderTextColor={!isMdbListEnabled ? colors.darkGray : colors.mediumGray}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
+                  editable={isMdbListEnabled}
+                />
+                <TouchableOpacity
+                  style={styles.pasteButton}
+                  onPress={pasteFromClipboard}
+                  disabled={!isMdbListEnabled}
+                >
+                  <MaterialIcons
+                    name="content-paste"
+                    size={20}
+                    color={!isMdbListEnabled ? colors.darkGray : colors.primary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {testResult && (
+                <View style={[
+                  styles.testResultContainer,
+                  testResult.success ? styles.testResultSuccess : styles.testResultError
+                ]}>
+                  <MaterialIcons
+                    name={testResult.success ? "check" : "warning"}
+                    size={18}
+                    color={testResult.success ? colors.success : colors.error}
+                  />
+                  <Text style={styles.testResultText}>
+                    {testResult.message}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.saveButton,
+                    (!apiKey.trim() || !isMdbListEnabled) && styles.saveButtonDisabled
+                  ]}
+                  onPress={saveApiKey}
+                  disabled={!apiKey.trim() || !isMdbListEnabled}
+                >
+                  <MaterialIcons name="save" size={18} color={colors.white} style={styles.buttonIcon} />
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </TouchableOpacity>
+
+                {isKeySet && (
+                  <TouchableOpacity
+                    style={[styles.clearButton, !isMdbListEnabled && styles.clearButtonDisabled]}
+                    onPress={clearApiKey}
+                    disabled={!isMdbListEnabled}
+                  >
+                    <MaterialIcons
+                      name="delete-outline"
+                      size={18}
+                      color={!isMdbListEnabled ? colors.darkGray : colors.error}
+                      style={styles.buttonIcon}
+                    />
+                    <Text style={[
+                      styles.clearButtonText,
+                      !isMdbListEnabled && styles.clearButtonTextDisabled
+                    ]}>
+                      Clear Key
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
+          )}
         </View>
 
         <View style={[styles.card, !isMdbListEnabled && styles.disabledCard]}>
@@ -715,25 +942,75 @@ const MDBListSettingsScreen = () => {
           <Text style={styles.sectionDescription}>
             Choose which ratings to display in the app
           </Text>
-          {Object.entries(RATING_PROVIDERS).map(([id, provider]) => (
-            <View key={id} style={styles.providerItem}>
-              <View style={styles.providerInfo}>
-                <Text style={[
-                  styles.providerName,
-                  !isMdbListEnabled && styles.disabledText
-                ]}>
-                  {provider.name}
-                </Text>
+          {Object.entries(RATING_PROVIDERS).map(([id, provider], index) => {
+            const providerKeys = Object.keys(RATING_PROVIDERS);
+            const isLast = index === providerKeys.length - 1;
+
+            if (isTV) {
+              return (
+                <Focusable
+                  key={id}
+                  ref={(ref) => { providerRefs.current[index] = ref; }}
+                  onPress={() => isMdbListEnabled && toggleProvider(id)}
+                  disabled={!isMdbListEnabled}
+                  style={[styles.providerItem, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                  borderRadius={8}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                  nextFocusUp={index === 0 ? (isMdbListEnabled && isKeySet ? clearButtonRef.current?.getViewRef() : (isMdbListEnabled ? saveButtonRef.current?.getViewRef() : enableToggleRef.current?.getViewRef())) : providerRefs.current[index - 1]?.getViewRef()}
+                  nextFocusDown={index < providerKeys.length - 1 ? providerRefs.current[index + 1]?.getViewRef() : undefined}
+                >
+                  {(focused) => (
+                    <>
+                      <View style={styles.providerInfo}>
+                        <Text style={[
+                          styles.providerName,
+                          { color: !isMdbListEnabled ? colors.darkGray : (focused ? '#000' : colors.white) }
+                        ]}>
+                          {provider.name}
+                        </Text>
+                      </View>
+                      <View style={styles.tvSwitchContainer}>
+                        <View style={[
+                          styles.tvSwitchTrack,
+                          { backgroundColor: !isMdbListEnabled
+                            ? 'rgba(255,255,255,0.1)'
+                            : (focused ? ((enabledProviders[id] ?? true) ? '#333' : '#666') : ((enabledProviders[id] ?? true) ? colors.primary : 'rgba(255,255,255,0.2)')) }
+                        ]}>
+                          <View style={[
+                            styles.tvSwitchThumb,
+                            (enabledProviders[id] ?? true) ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                            { backgroundColor: !isMdbListEnabled ? '#555' : (focused ? '#000' : ((enabledProviders[id] ?? true) ? '#fff' : '#888')) }
+                          ]} />
+                        </View>
+                      </View>
+                    </>
+                  )}
+                </Focusable>
+              );
+            }
+
+            return (
+              <View key={id} style={styles.providerItem}>
+                <View style={styles.providerInfo}>
+                  <Text style={[
+                    styles.providerName,
+                    !isMdbListEnabled && styles.disabledText
+                  ]}>
+                    {provider.name}
+                  </Text>
+                </View>
+                <Switch
+                  value={enabledProviders[id] ?? true}
+                  onValueChange={() => toggleProvider(id)}
+                  trackColor={{ false: colors.elevation1, true: colors.primary + '50' }}
+                  thumbColor={enabledProviders[id] ? colors.primary : colors.mediumGray}
+                  disabled={!isMdbListEnabled}
+                />
               </View>
-              <Switch
-                value={enabledProviders[id] ?? true}
-                onValueChange={() => toggleProvider(id)}
-                trackColor={{ false: colors.elevation1, true: colors.primary + '50' }}
-                thumbColor={enabledProviders[id] ? colors.primary : colors.mediumGray}
-                disabled={!isMdbListEnabled}
-              />
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <View style={[styles.infoCard, !isMdbListEnabled && styles.disabledCard]}>
