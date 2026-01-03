@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import { useSettings } from '../hooks/useSettings';
 import { localScraperService, pluginService, ScraperInfo, RepositoryInfo } from '../services/pluginService';
 import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -771,16 +773,39 @@ const CollapsibleSection: React.FC<{
   onToggle: () => void;
   colors: any;
   styles: any;
-}> = ({ title, children, isExpanded, onToggle, colors, styles }) => (
+  isTV?: boolean;
+}> = ({ title, children, isExpanded, onToggle, colors, styles, isTV = false }) => (
   <View style={styles.collapsibleSection}>
-    <TouchableOpacity style={styles.collapsibleHeader} onPress={onToggle}>
-      <Text style={styles.collapsibleTitle}>{title}</Text>
-      <Ionicons
-        name={isExpanded ? "chevron-up" : "chevron-down"}
-        size={20}
-        color={colors.mediumGray}
-      />
-    </TouchableOpacity>
+    {isTV ? (
+      <Focusable
+        onPress={onToggle}
+        style={styles.collapsibleHeader}
+        borderRadius={8}
+        focusScale={1.02}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <>
+            <Text style={[styles.collapsibleTitle, focused && { color: '#000' }]}>{title}</Text>
+            <Ionicons
+              name={isExpanded ? "chevron-up" : "chevron-down"}
+              size={20}
+              color={focused ? '#000' : colors.mediumGray}
+            />
+          </>
+        )}
+      </Focusable>
+    ) : (
+      <TouchableOpacity style={styles.collapsibleHeader} onPress={onToggle}>
+        <Text style={styles.collapsibleTitle}>{title}</Text>
+        <Ionicons
+          name={isExpanded ? "chevron-up" : "chevron-down"}
+          size={20}
+          color={colors.mediumGray}
+        />
+      </TouchableOpacity>
+    )}
     {isExpanded && <View style={styles.collapsibleContent}>{children}</View>}
   </View>
 );
@@ -842,6 +867,10 @@ const PluginsScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
+
+  // TV navigation
+  const isTV = useIsTV();
+  const backButtonRef = useRef<FocusableRef>(null);
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -1361,22 +1390,57 @@ const PluginsScreen: React.FC = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
-          <Text style={styles.backText}>Settings</Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            autoFocus
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <Ionicons name="arrow-back" size={24} color={focused ? '#000' : colors.primary} />
+                <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+            <Text style={styles.backText}>Settings</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.headerActions}>
           {/* Help Button */}
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => setShowHelpModal(true)}
-          >
-            <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              onPress={() => setShowHelpModal(true)}
+              style={styles.headerButton}
+              borderRadius={8}
+              focusScale={1.05}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <Ionicons name="help-circle-outline" size={20} color={focused ? '#000' : colors.primary} />
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setShowHelpModal(true)}
+            >
+              <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -1415,6 +1479,7 @@ const PluginsScreen: React.FC = () => {
           onToggle={() => toggleSection('repository')}
           colors={colors}
           styles={styles}
+          isTV={isTV}
         >
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
@@ -1423,12 +1488,29 @@ const PluginsScreen: React.FC = () => {
                 Allow the app to use installed plugins for finding streams
               </Text>
             </View>
-            <Switch
-              value={settings.enableLocalScrapers}
-              onValueChange={handleToggleLocalScrapers}
-              trackColor={{ false: colors.elevation3, true: colors.primary }}
-              thumbColor={settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-            />
+            {isTV ? (
+              <Focusable
+                onPress={() => handleToggleLocalScrapers(!settings.enableLocalScrapers)}
+                style={{ width: 51, height: 26, justifyContent: 'center' }}
+                borderRadius={13}
+                focusScale={1.1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (settings.enableLocalScrapers ? '#333' : '#666') : (settings.enableLocalScrapers ? colors.primary : colors.elevation3), position: 'relative' as const }}>
+                    <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (settings.enableLocalScrapers ? colors.white : '#f4f3f4'), ...(settings.enableLocalScrapers ? { right: 0 } : { left: 0 }) }} />
+                  </View>
+                )}
+              </Focusable>
+            ) : (
+              <Switch
+                value={settings.enableLocalScrapers}
+                onValueChange={handleToggleLocalScrapers}
+                trackColor={{ false: colors.elevation3, true: colors.primary }}
+                thumbColor={settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+              />
+            )}
           </View>
         </CollapsibleSection>
 
@@ -1439,6 +1521,7 @@ const PluginsScreen: React.FC = () => {
           onToggle={() => toggleSection('repository')}
           colors={colors}
           styles={styles}
+          isTV={isTV}
         >
           <Text style={styles.sectionDescription}>
             Manage multiple scraper repositories. Switch between repositories to access different sets of scrapers.
@@ -1485,36 +1568,89 @@ const PluginsScreen: React.FC = () => {
                   </View>
                   <View style={styles.repositoryActions}>
                     {repo.id !== currentRepositoryId && (
-                      <TouchableOpacity
-                        style={[styles.repositoryActionButton, styles.repositoryActionButtonPrimary]}
-                        onPress={() => handleSwitchRepository(repo.id)}
-                        disabled={switchingRepository === repo.id}
+                      isTV ? (
+                        <Focusable
+                          onPress={() => handleSwitchRepository(repo.id)}
+                          style={[styles.repositoryActionButton, styles.repositoryActionButtonPrimary, switchingRepository === repo.id && { opacity: 0.6 }]}
+                          borderRadius={6}
+                          focusScale={1.05}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => (
+                            switchingRepository === repo.id ? (
+                              <ActivityIndicator size="small" color={focused ? '#000' : colors.primary} />
+                            ) : (
+                              <Text style={[styles.repositoryActionButtonText, focused && { color: '#000' }]}>Switch</Text>
+                            )
+                          )}
+                        </Focusable>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.repositoryActionButton, styles.repositoryActionButtonPrimary]}
+                          onPress={() => handleSwitchRepository(repo.id)}
+                          disabled={switchingRepository === repo.id}
+                        >
+                          {switchingRepository === repo.id ? (
+                            <ActivityIndicator size="small" color={colors.primary} />
+                          ) : (
+                            <Text style={styles.repositoryActionButtonText}>Switch</Text>
+                          )}
+                        </TouchableOpacity>
+                      )
+                    )}
+                    {isTV ? (
+                      <Focusable
+                        onPress={() => handleRefreshRepository()}
+                        style={[styles.repositoryActionButton, styles.repositoryActionButtonSecondary, (isRefreshing || switchingRepository !== null) && { opacity: 0.6 }]}
+                        borderRadius={6}
+                        focusScale={1.05}
+                        animateBackground={true}
+                        showFocusBorder={true}
                       >
-                        {switchingRepository === repo.id ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
+                        {(focused) => (
+                          isRefreshing ? (
+                            <ActivityIndicator size="small" color={focused ? '#000' : colors.mediumGray} />
+                          ) : (
+                            <Text style={[styles.repositoryActionButtonText, focused && { color: '#000' }]}>Refresh</Text>
+                          )
+                        )}
+                      </Focusable>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.repositoryActionButton, styles.repositoryActionButtonSecondary]}
+                        onPress={() => handleRefreshRepository()}
+                        disabled={isRefreshing || switchingRepository !== null}
+                      >
+                        {isRefreshing ? (
+                          <ActivityIndicator size="small" color={colors.mediumGray} />
                         ) : (
-                          <Text style={styles.repositoryActionButtonText}>Switch</Text>
+                          <Text style={styles.repositoryActionButtonText}>Refresh</Text>
                         )}
                       </TouchableOpacity>
                     )}
-                    <TouchableOpacity
-                      style={[styles.repositoryActionButton, styles.repositoryActionButtonSecondary]}
-                      onPress={() => handleRefreshRepository()}
-                      disabled={isRefreshing || switchingRepository !== null}
-                    >
-                      {isRefreshing ? (
-                        <ActivityIndicator size="small" color={colors.mediumGray} />
-                      ) : (
-                        <Text style={styles.repositoryActionButtonText}>Refresh</Text>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.repositoryActionButton, styles.repositoryActionButtonDanger]}
-                      onPress={() => handleRemoveRepository(repo.id)}
-                      disabled={switchingRepository !== null}
-                    >
-                      <Text style={styles.repositoryActionButtonText}>Remove</Text>
-                    </TouchableOpacity>
+                    {isTV ? (
+                      <Focusable
+                        onPress={() => handleRemoveRepository(repo.id)}
+                        style={[styles.repositoryActionButton, styles.repositoryActionButtonDanger, switchingRepository !== null && { opacity: 0.6 }]}
+                        borderRadius={6}
+                        focusScale={1.05}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                      >
+                        {(focused) => (
+                          <Text style={[styles.repositoryActionButtonText, focused && { color: '#000' }]}>Remove</Text>
+                        )}
+                      </Focusable>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.repositoryActionButton, styles.repositoryActionButtonDanger]}
+                        onPress={() => handleRemoveRepository(repo.id)}
+                        disabled={switchingRepository !== null}
+                      >
+                        <Text style={styles.repositoryActionButtonText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               ))}
@@ -1523,13 +1659,28 @@ const PluginsScreen: React.FC = () => {
 
 
           {/* Add Repository Button */}
-          <TouchableOpacity
-            style={[styles.button, styles.primaryButton, { marginTop: 16 }]}
-            onPress={() => setShowAddRepositoryModal(true)}
-            disabled={!settings.enableLocalScrapers || switchingRepository !== null}
-          >
-            <Text style={styles.buttonText}>Add New Repository</Text>
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              onPress={() => setShowAddRepositoryModal(true)}
+              style={[styles.button, styles.primaryButton, { marginTop: 16 }, (!settings.enableLocalScrapers || switchingRepository !== null) && { opacity: 0.6 }]}
+              borderRadius={8}
+              focusScale={1.03}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <Text style={[styles.buttonText, focused && { color: '#000' }]}>Add New Repository</Text>
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={[styles.button, styles.primaryButton, { marginTop: 16 }]}
+              onPress={() => setShowAddRepositoryModal(true)}
+              disabled={!settings.enableLocalScrapers || switchingRepository !== null}
+            >
+              <Text style={styles.buttonText}>Add New Repository</Text>
+            </TouchableOpacity>
+          )}
         </CollapsibleSection>
 
         {/* Available Plugins */}
@@ -1539,6 +1690,7 @@ const PluginsScreen: React.FC = () => {
           onToggle={() => toggleSection('scrapers')}
           colors={colors}
           styles={styles}
+          isTV={isTV}
         >
           {installedScrapers.length > 0 && (
             <>
@@ -1562,41 +1714,96 @@ const PluginsScreen: React.FC = () => {
               {/* Filter Chips */}
               <View style={styles.filterContainer}>
                 {['all', 'movie', 'tv'].map((filter) => (
-                  <TouchableOpacity
-                    key={filter}
-                    style={[
-                      styles.filterChip,
-                      selectedFilter === filter && styles.filterChipSelected
-                    ]}
-                    onPress={() => setSelectedFilter(filter as any)}
-                  >
-                    <Text style={[
-                      styles.filterChipText,
-                      selectedFilter === filter && styles.filterChipTextSelected
-                    ]}>
-                      {filter === 'all' ? 'All' : filter === 'movie' ? 'Movies' : 'TV Shows'}
-                    </Text>
-                  </TouchableOpacity>
+                  isTV ? (
+                    <Focusable
+                      key={filter}
+                      onPress={() => setSelectedFilter(filter as any)}
+                      style={[
+                        styles.filterChip,
+                        selectedFilter === filter && styles.filterChipSelected
+                      ]}
+                      borderRadius={16}
+                      focusScale={1.05}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <Text style={[
+                          styles.filterChipText,
+                          selectedFilter === filter && styles.filterChipTextSelected,
+                          focused && { color: '#000' }
+                        ]}>
+                          {filter === 'all' ? 'All' : filter === 'movie' ? 'Movies' : 'TV Shows'}
+                        </Text>
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      key={filter}
+                      style={[
+                        styles.filterChip,
+                        selectedFilter === filter && styles.filterChipSelected
+                      ]}
+                      onPress={() => setSelectedFilter(filter as any)}
+                    >
+                      <Text style={[
+                        styles.filterChipText,
+                        selectedFilter === filter && styles.filterChipTextSelected
+                      ]}>
+                        {filter === 'all' ? 'All' : filter === 'movie' ? 'Movies' : 'TV Shows'}
+                      </Text>
+                    </TouchableOpacity>
+                  )
                 ))}
               </View>
 
               {/* Bulk Actions */}
               {filteredScrapers.length > 0 && (
                 <View style={styles.bulkActionsContainer}>
-                  <TouchableOpacity
-                    style={[styles.bulkActionButton, styles.bulkActionButtonEnabled]}
-                    onPress={() => handleBulkToggle(true)}
-                    disabled={isRefreshing}
-                  >
-                    <Text style={[styles.bulkActionButtonText, { color: '#34C759' }]}>Enable All</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.bulkActionButton, styles.bulkActionButtonDisabled]}
-                    onPress={() => handleBulkToggle(false)}
-                    disabled={isRefreshing}
-                  >
-                    <Text style={[styles.bulkActionButtonText, { color: colors.mediumGray }]}>Disable All</Text>
-                  </TouchableOpacity>
+                  {isTV ? (
+                    <Focusable
+                      onPress={() => handleBulkToggle(true)}
+                      style={[styles.bulkActionButton, styles.bulkActionButtonEnabled, isRefreshing && { opacity: 0.6 }]}
+                      borderRadius={8}
+                      focusScale={1.05}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <Text style={[styles.bulkActionButtonText, { color: focused ? '#000' : '#34C759' }]}>Enable All</Text>
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.bulkActionButton, styles.bulkActionButtonEnabled]}
+                      onPress={() => handleBulkToggle(true)}
+                      disabled={isRefreshing}
+                    >
+                      <Text style={[styles.bulkActionButtonText, { color: '#34C759' }]}>Enable All</Text>
+                    </TouchableOpacity>
+                  )}
+                  {isTV ? (
+                    <Focusable
+                      onPress={() => handleBulkToggle(false)}
+                      style={[styles.bulkActionButton, styles.bulkActionButtonDisabled, isRefreshing && { opacity: 0.6 }]}
+                      borderRadius={8}
+                      focusScale={1.05}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <Text style={[styles.bulkActionButtonText, { color: focused ? '#000' : colors.mediumGray }]}>Disable All</Text>
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.bulkActionButton, styles.bulkActionButtonDisabled]}
+                      onPress={() => handleBulkToggle(false)}
+                      disabled={isRefreshing}
+                    >
+                      <Text style={[styles.bulkActionButtonText, { color: colors.mediumGray }]}>Disable All</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
             </>
@@ -1620,12 +1827,27 @@ const PluginsScreen: React.FC = () => {
                 }
               </Text>
               {searchQuery && (
-                <TouchableOpacity
-                  style={[styles.button, styles.secondaryButton]}
-                  onPress={() => setSearchQuery('')}
-                >
-                  <Text style={styles.secondaryButtonText}>Clear Search</Text>
-                </TouchableOpacity>
+                isTV ? (
+                  <Focusable
+                    onPress={() => setSearchQuery('')}
+                    style={[styles.button, styles.secondaryButton]}
+                    borderRadius={8}
+                    focusScale={1.05}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                  >
+                    {(focused) => (
+                      <Text style={[styles.secondaryButtonText, focused && { color: '#000' }]}>Clear Search</Text>
+                    )}
+                  </Focusable>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.button, styles.secondaryButton]}
+                    onPress={() => setSearchQuery('')}
+                  >
+                    <Text style={styles.secondaryButtonText}>Clear Search</Text>
+                  </TouchableOpacity>
+                )
               )}
             </View>
           ) : (
@@ -1657,13 +1879,37 @@ const PluginsScreen: React.FC = () => {
                       </View>
                       <Text style={styles.scraperDescription}>{scraper.description}</Text>
                     </View>
-                    <Switch
-                      value={scraper.enabled && settings.enableLocalScrapers}
-                      onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
-                      trackColor={{ false: colors.elevation3, true: colors.primary }}
-                      thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-                      disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
-                    />
+                    {isTV ? (
+                      <Focusable
+                        onPress={() => {
+                          if (settings.enableLocalScrapers && scraper.manifestEnabled !== false && !(scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))) {
+                            handleToggleScraper(scraper.id, !scraper.enabled);
+                          }
+                        }}
+                        style={{ width: 51, height: 26, justifyContent: 'center', opacity: (!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))) ? 0.5 : 1 }}
+                        borderRadius={13}
+                        focusScale={1.1}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                      >
+                        {(focused) => {
+                          const isOn = scraper.enabled && settings.enableLocalScrapers;
+                          return (
+                            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
+                              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                            </View>
+                          );
+                        }}
+                      </Focusable>
+                    ) : (
+                      <Switch
+                        value={scraper.enabled && settings.enableLocalScrapers}
+                        onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
+                        trackColor={{ false: colors.elevation3, true: colors.primary }}
+                        thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+                        disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
+                      />
+                    )}
                   </View>
 
                   <View style={styles.scraperCardMeta}>
@@ -1761,6 +2007,7 @@ const PluginsScreen: React.FC = () => {
           onToggle={() => toggleSection('settings')}
           colors={colors}
           styles={styles}
+          isTV={isTV}
         >
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
@@ -1769,13 +2016,37 @@ const PluginsScreen: React.FC = () => {
                 Validate streaming URLs before returning them (may slow down results but improves reliability)
               </Text>
             </View>
-            <Switch
-              value={settings.enableScraperUrlValidation && settings.enableLocalScrapers}
-              onValueChange={handleToggleUrlValidation}
-              trackColor={{ false: colors.elevation3, true: colors.primary }}
-              thumbColor={settings.enableScraperUrlValidation && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-              disabled={!settings.enableLocalScrapers}
-            />
+            {isTV ? (
+              <Focusable
+                onPress={() => {
+                  if (settings.enableLocalScrapers) {
+                    handleToggleUrlValidation(!settings.enableScraperUrlValidation);
+                  }
+                }}
+                style={{ width: 51, height: 26, justifyContent: 'center', opacity: !settings.enableLocalScrapers ? 0.5 : 1 }}
+                borderRadius={13}
+                focusScale={1.1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => {
+                  const isOn = settings.enableScraperUrlValidation && settings.enableLocalScrapers;
+                  return (
+                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
+                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                    </View>
+                  );
+                }}
+              </Focusable>
+            ) : (
+              <Switch
+                value={settings.enableScraperUrlValidation && settings.enableLocalScrapers}
+                onValueChange={handleToggleUrlValidation}
+                trackColor={{ false: colors.elevation3, true: colors.primary }}
+                thumbColor={settings.enableScraperUrlValidation && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+                disabled={!settings.enableLocalScrapers}
+              />
+            )}
           </View>
 
           <View style={styles.settingRow}>
@@ -1785,19 +2056,45 @@ const PluginsScreen: React.FC = () => {
                 When enabled, all plugin streams are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
               </Text>
             </View>
-            <Switch
-              value={settings.streamDisplayMode === 'grouped'}
-              onValueChange={(value) => {
-                updateSetting('streamDisplayMode', value ? 'grouped' : 'separate');
-                // Auto-disable quality sorting when grouping is disabled
-                if (!value && settings.streamSortMode === 'quality-then-scraper') {
-                  updateSetting('streamSortMode', 'scraper-then-quality');
-                }
-              }}
-              trackColor={{ false: colors.elevation3, true: colors.primary }}
-              thumbColor={settings.streamDisplayMode === 'grouped' ? colors.white : '#f4f3f4'}
-              disabled={!settings.enableLocalScrapers}
-            />
+            {isTV ? (
+              <Focusable
+                onPress={() => {
+                  const newValue = settings.streamDisplayMode !== 'grouped';
+                  updateSetting('streamDisplayMode', newValue ? 'grouped' : 'separate');
+                  if (!newValue && settings.streamSortMode === 'quality-then-scraper') {
+                    updateSetting('streamSortMode', 'scraper-then-quality');
+                  }
+                }}
+                style={{ width: 51, height: 26, justifyContent: 'center' }}
+                borderRadius={13}
+                focusScale={1.1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => {
+                  const isOn = settings.streamDisplayMode === 'grouped';
+                  return (
+                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
+                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                    </View>
+                  );
+                }}
+              </Focusable>
+            ) : (
+              <Switch
+                value={settings.streamDisplayMode === 'grouped'}
+                onValueChange={(value) => {
+                  updateSetting('streamDisplayMode', value ? 'grouped' : 'separate');
+                  // Auto-disable quality sorting when grouping is disabled
+                  if (!value && settings.streamSortMode === 'quality-then-scraper') {
+                    updateSetting('streamSortMode', 'scraper-then-quality');
+                  }
+                }}
+                trackColor={{ false: colors.elevation3, true: colors.primary }}
+                thumbColor={settings.streamDisplayMode === 'grouped' ? colors.white : '#f4f3f4'}
+                disabled={!settings.enableLocalScrapers}
+              />
+            )}
           </View>
 
           <View style={styles.settingRow}>
@@ -1807,13 +2104,38 @@ const PluginsScreen: React.FC = () => {
                 When enabled, streams are sorted by quality first, then by scraper. When disabled, streams are sorted by scraper first, then by quality. Only available when grouping is enabled.
               </Text>
             </View>
-            <Switch
-              value={settings.streamSortMode === 'quality-then-scraper'}
-              onValueChange={(value) => updateSetting('streamSortMode', value ? 'quality-then-scraper' : 'scraper-then-quality')}
-              trackColor={{ false: colors.elevation3, true: colors.primary }}
-              thumbColor={settings.streamSortMode === 'quality-then-scraper' ? colors.white : '#f4f3f4'}
-              disabled={!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped'}
-            />
+            {isTV ? (
+              <Focusable
+                onPress={() => {
+                  if (settings.enableLocalScrapers && settings.streamDisplayMode === 'grouped') {
+                    const newValue = settings.streamSortMode !== 'quality-then-scraper';
+                    updateSetting('streamSortMode', newValue ? 'quality-then-scraper' : 'scraper-then-quality');
+                  }
+                }}
+                style={{ width: 51, height: 26, justifyContent: 'center', opacity: (!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped') ? 0.5 : 1 }}
+                borderRadius={13}
+                focusScale={1.1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => {
+                  const isOn = settings.streamSortMode === 'quality-then-scraper';
+                  return (
+                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
+                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                    </View>
+                  );
+                }}
+              </Focusable>
+            ) : (
+              <Switch
+                value={settings.streamSortMode === 'quality-then-scraper'}
+                onValueChange={(value) => updateSetting('streamSortMode', value ? 'quality-then-scraper' : 'scraper-then-quality')}
+                trackColor={{ false: colors.elevation3, true: colors.primary }}
+                thumbColor={settings.streamSortMode === 'quality-then-scraper' ? colors.white : '#f4f3f4'}
+                disabled={!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped'}
+              />
+            )}
           </View>
 
           <View style={styles.settingRow}>
@@ -1823,13 +2145,37 @@ const PluginsScreen: React.FC = () => {
                 Display scraper logos next to streaming links on the streams screen.
               </Text>
             </View>
-            <Switch
-              value={settings.showScraperLogos && settings.enableLocalScrapers}
-              onValueChange={(value) => updateSetting('showScraperLogos', value)}
-              trackColor={{ false: colors.elevation3, true: colors.primary }}
-              thumbColor={settings.showScraperLogos && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-              disabled={!settings.enableLocalScrapers}
-            />
+            {isTV ? (
+              <Focusable
+                onPress={() => {
+                  if (settings.enableLocalScrapers) {
+                    updateSetting('showScraperLogos', !settings.showScraperLogos);
+                  }
+                }}
+                style={{ width: 51, height: 26, justifyContent: 'center', opacity: !settings.enableLocalScrapers ? 0.5 : 1 }}
+                borderRadius={13}
+                focusScale={1.1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => {
+                  const isOn = settings.showScraperLogos && settings.enableLocalScrapers;
+                  return (
+                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
+                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                    </View>
+                  );
+                }}
+              </Focusable>
+            ) : (
+              <Switch
+                value={settings.showScraperLogos && settings.enableLocalScrapers}
+                onValueChange={(value) => updateSetting('showScraperLogos', value)}
+                trackColor={{ false: colors.elevation3, true: colors.primary }}
+                thumbColor={settings.showScraperLogos && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+                disabled={!settings.enableLocalScrapers}
+              />
+            )}
           </View>
         </CollapsibleSection>
 
@@ -1840,6 +2186,7 @@ const PluginsScreen: React.FC = () => {
           onToggle={() => toggleSection('quality')}
           colors={colors}
           styles={styles}
+          isTV={isTV}
         >
           <Text style={styles.sectionDescription}>
             Exclude specific video qualities from search results. Tap on a quality to exclude it from plugin results.
@@ -1848,7 +2195,32 @@ const PluginsScreen: React.FC = () => {
           <View style={styles.qualityChipsContainer}>
             {qualityOptions.map((quality) => {
               const isExcluded = (settings.excludedQualities || []).includes(quality);
-              return (
+              return isTV ? (
+                <Focusable
+                  key={quality}
+                  onPress={() => handleToggleQualityExclusion(quality)}
+                  style={[
+                    styles.qualityChip,
+                    isExcluded && styles.qualityChipSelected,
+                    !settings.enableLocalScrapers && styles.disabledButton
+                  ]}
+                  borderRadius={16}
+                  focusScale={1.05}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <Text style={[
+                      styles.qualityChipText,
+                      isExcluded && styles.qualityChipTextSelected,
+                      !settings.enableLocalScrapers && styles.disabledText,
+                      focused && { color: '#000' }
+                    ]}>
+                      {isExcluded ? '✕ ' : ''}{quality}
+                    </Text>
+                  )}
+                </Focusable>
+              ) : (
                 <TouchableOpacity
                   key={quality}
                   style={[
@@ -1885,6 +2257,7 @@ const PluginsScreen: React.FC = () => {
           onToggle={() => toggleSection('quality')}
           colors={colors}
           styles={styles}
+          isTV={isTV}
         >
           <Text style={styles.sectionDescription}>
             Exclude specific languages from search results. Tap on a language to exclude it from plugin results.
@@ -1897,7 +2270,32 @@ const PluginsScreen: React.FC = () => {
           <View style={styles.qualityChipsContainer}>
             {languageOptions.map((language) => {
               const isExcluded = (settings.excludedLanguages || []).includes(language);
-              return (
+              return isTV ? (
+                <Focusable
+                  key={language}
+                  onPress={() => handleToggleLanguageExclusion(language)}
+                  style={[
+                    styles.qualityChip,
+                    isExcluded && styles.qualityChipSelected,
+                    !settings.enableLocalScrapers && styles.disabledButton
+                  ]}
+                  borderRadius={16}
+                  focusScale={1.05}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <Text style={[
+                      styles.qualityChipText,
+                      isExcluded && styles.qualityChipTextSelected,
+                      !settings.enableLocalScrapers && styles.disabledText,
+                      focused && { color: '#000' }
+                    ]}>
+                      {isExcluded ? '✕ ' : ''}{language}
+                    </Text>
+                  )}
+                </Focusable>
+              ) : (
                 <TouchableOpacity
                   key={language}
                   style={[
@@ -1964,12 +2362,28 @@ const PluginsScreen: React.FC = () => {
             <Text style={styles.modalText}>
               4. <Text style={{ fontWeight: '600' }}>Enable Scrapers</Text> - Turn on the scrapers you want to use for streaming
             </Text>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setShowHelpModal(false)}
-            >
-              <Text style={styles.modalButtonText}>Got it!</Text>
-            </TouchableOpacity>
+            {isTV ? (
+              <Focusable
+                onPress={() => setShowHelpModal(false)}
+                style={styles.modalButton}
+                autoFocus
+                borderRadius={8}
+                focusScale={1.05}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <Text style={[styles.modalButtonText, focused && { color: '#000' }]}>Got it!</Text>
+                )}
+              </Focusable>
+            ) : (
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => setShowHelpModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Got it!</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -2011,27 +2425,65 @@ const PluginsScreen: React.FC = () => {
 
               {/* Action Buttons */}
               <View style={styles.compactActions}>
-                <TouchableOpacity
-                  style={[styles.compactButton, styles.cancelButton]}
-                  onPress={() => {
-                    setShowAddRepositoryModal(false);
-                    setNewRepositoryUrl('');
-                  }}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
+                {isTV ? (
+                  <Focusable
+                    onPress={() => {
+                      setShowAddRepositoryModal(false);
+                      setNewRepositoryUrl('');
+                    }}
+                    style={[styles.compactButton, styles.cancelButton]}
+                    borderRadius={8}
+                    focusScale={1.05}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                  >
+                    {(focused) => (
+                      <Text style={[styles.cancelButtonText, focused && { color: '#000' }]}>Cancel</Text>
+                    )}
+                  </Focusable>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.compactButton, styles.cancelButton]}
+                    onPress={() => {
+                      setShowAddRepositoryModal(false);
+                      setNewRepositoryUrl('');
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
 
-                <TouchableOpacity
-                  style={[styles.compactButton, styles.addButton, (!newRepositoryUrl.trim() || isLoading) && styles.disabledButton]}
-                  onPress={handleAddRepository}
-                  disabled={!newRepositoryUrl.trim() || isLoading}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <Text style={styles.addButtonText}>Add</Text>
-                  )}
-                </TouchableOpacity>
+                {isTV ? (
+                  <Focusable
+                    onPress={handleAddRepository}
+                    style={[styles.compactButton, styles.addButton, (!newRepositoryUrl.trim() || isLoading) && styles.disabledButton]}
+                    autoFocus
+                    borderRadius={8}
+                    focusScale={1.05}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                  >
+                    {(focused) => (
+                      isLoading ? (
+                        <ActivityIndicator size="small" color={focused ? '#000' : colors.white} />
+                      ) : (
+                        <Text style={[styles.addButtonText, focused && { color: '#000' }]}>Add</Text>
+                      )
+                    )}
+                  </Focusable>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.compactButton, styles.addButton, (!newRepositoryUrl.trim() || isLoading) && styles.disabledButton]}
+                    onPress={handleAddRepository}
+                    disabled={!newRepositoryUrl.trim() || isLoading}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.addButtonText}>Add</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             </ScrollView>
           </View>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import { useTheme, Theme, DEFAULT_THEMES } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
 import CustomAlert from '../components/CustomAlert';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 
 const { width } = Dimensions.get('window');
 
@@ -43,58 +45,49 @@ interface ThemeCardProps {
   onSelect: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  isTV?: boolean;
+  autoFocus?: boolean;
 }
 
-const ThemeCard: React.FC<ThemeCardProps> = ({ 
-  theme, 
-  isSelected, 
+const ThemeCard: React.FC<ThemeCardProps> = ({
+  theme,
+  isSelected,
   onSelect,
   onEdit,
-  onDelete
+  onDelete,
+  isTV = false,
+  autoFocus = false
 }) => {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.themeCard,
-        isSelected && styles.selectedThemeCard,
-        { 
-          borderColor: isSelected ? theme.colors.primary : 'transparent',
-          backgroundColor: Platform.OS === 'ios' 
-            ? `${theme.colors.darkBackground}60` 
-            : 'rgba(255, 255, 255, 0.07)'
-        }
-      ]}
-      onPress={onSelect}
-      activeOpacity={0.7}
-    >
+  const cardContent = (focused: boolean = false) => (
+    <>
       <View style={styles.themeCardHeader}>
-        <Text style={[styles.themeCardTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.themeCardTitle, { color: focused ? '#000' : theme.colors.text }]}>
           {theme.name}
         </Text>
         {isSelected && (
-          <MaterialIcons name="check-circle" size={18} color={theme.colors.primary} />
+          <MaterialIcons name="check-circle" size={18} color={focused ? '#000' : theme.colors.primary} />
         )}
       </View>
-      
+
       <View style={styles.colorPreviewContainer}>
         <View style={[styles.colorPreview, { backgroundColor: theme.colors.primary }, styles.colorPreviewShadow]} />
         <View style={[styles.colorPreview, { backgroundColor: theme.colors.secondary }, styles.colorPreviewShadow]} />
         <View style={[styles.colorPreview, { backgroundColor: theme.colors.darkBackground }, styles.colorPreviewShadow]} />
       </View>
-      
-      {theme.isEditable && (
+
+      {theme.isEditable && !isTV && (
         <View style={styles.themeCardActions}>
           {onEdit && (
-            <TouchableOpacity 
-              style={[styles.themeCardAction, styles.buttonShadow]} 
+            <TouchableOpacity
+              style={[styles.themeCardAction, styles.buttonShadow]}
               onPress={onEdit}
             >
               <MaterialIcons name="edit" size={16} color={theme.colors.primary} />
             </TouchableOpacity>
           )}
           {onDelete && (
-            <TouchableOpacity 
-              style={[styles.themeCardAction, styles.buttonShadow]} 
+            <TouchableOpacity
+              style={[styles.themeCardAction, styles.buttonShadow]}
               onPress={onDelete}
             >
               <MaterialIcons name="delete" size={16} color={theme.colors.error} />
@@ -102,6 +95,50 @@ const ThemeCard: React.FC<ThemeCardProps> = ({
           )}
         </View>
       )}
+    </>
+  );
+
+  if (isTV) {
+    return (
+      <Focusable
+        onPress={onSelect}
+        style={[
+          styles.themeCard,
+          isSelected && styles.selectedThemeCard,
+          {
+            borderColor: isSelected ? theme.colors.primary : 'transparent',
+            backgroundColor: Platform.OS === 'ios'
+              ? `${theme.colors.darkBackground}60`
+              : 'rgba(255, 255, 255, 0.07)'
+          }
+        ]}
+        autoFocus={autoFocus}
+        borderRadius={12}
+        focusScale={1.05}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => cardContent(focused)}
+      </Focusable>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.themeCard,
+        isSelected && styles.selectedThemeCard,
+        {
+          borderColor: isSelected ? theme.colors.primary : 'transparent',
+          backgroundColor: Platform.OS === 'ios'
+            ? `${theme.colors.darkBackground}60`
+            : 'rgba(255, 255, 255, 0.07)'
+        }
+      ]}
+      onPress={onSelect}
+      activeOpacity={0.7}
+    >
+      {cardContent(false)}
     </TouchableOpacity>
   );
 };
@@ -112,32 +149,67 @@ interface FilterTabProps {
   isActive: boolean;
   onPress: () => void;
   primaryColor: string;
+  isTV?: boolean;
+  autoFocus?: boolean;
 }
 
-const FilterTab: React.FC<FilterTabProps> = ({ 
-  category, 
-  isActive, 
+const FilterTab: React.FC<FilterTabProps> = ({
+  category,
+  isActive,
   onPress,
-  primaryColor 
-}) => (
-  <TouchableOpacity
-    style={[
-      styles.filterTab,
-      isActive && { backgroundColor: primaryColor },
-      styles.buttonShadow
-    ]}
-    onPress={onPress}
-  >
-    <Text 
+  primaryColor,
+  isTV = false,
+  autoFocus = false
+}) => {
+  if (isTV) {
+    return (
+      <Focusable
+        onPress={onPress}
+        style={[
+          styles.filterTab,
+          isActive && { backgroundColor: primaryColor },
+          styles.buttonShadow
+        ]}
+        autoFocus={autoFocus}
+        borderRadius={16}
+        focusScale={1.05}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <Text
+            style={[
+              styles.filterTabText,
+              { color: focused ? '#000' : (isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.8)') }
+            ]}
+          >
+            {category.name}
+          </Text>
+        )}
+      </Focusable>
+    );
+  }
+
+  return (
+    <TouchableOpacity
       style={[
-        styles.filterTabText, 
-        isActive && { color: '#FFFFFF' }
+        styles.filterTab,
+        isActive && { backgroundColor: primaryColor },
+        styles.buttonShadow
       ]}
+      onPress={onPress}
     >
-      {category.name}
-    </Text>
-  </TouchableOpacity>
-);
+      <Text
+        style={[
+          styles.filterTabText,
+          isActive && { color: '#FFFFFF' }
+        ]}
+      >
+        {category.name}
+      </Text>
+    </TouchableOpacity>
+  );
+};
 
 type ColorKey = 'primary' | 'secondary' | 'darkBackground';
 
@@ -330,12 +402,18 @@ const ThemeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { settings, updateSetting } = useSettings();
+  const isTV = useIsTV();
+
+  // TV focus refs
+  const backButtonRef = useRef<FocusableRef>(null);
+  const createButtonRef = useRef<FocusableRef>(null);
+  const dominantColorToggleRef = useRef<FocusableRef>(null);
 
   // Calculate proper header top padding (only needed on Android since iOS uses SafeAreaView)
   const headerTopPadding = Platform.OS === 'android'
     ? ANDROID_STATUSBAR_HEIGHT + 8
     : 8;
-  
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -529,31 +607,53 @@ const ThemeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[
-      styles.container, 
+      styles.container,
       { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={[styles.header, { paddingTop: headerTopPadding }]}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
-          <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
-            Settings
-          </Text>
-        </TouchableOpacity>
-        
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            autoFocus
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons name="arrow-back" size={24} color={focused ? '#000' : currentTheme.colors.text} />
+                <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.text }]}>
+                  Settings
+                </Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
+            <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
+              Settings
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}
         </View>
       </View>
-      
+
       <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
         App Themes
       </Text>
-      
+
       {/* Category filter */}
       <View style={styles.filterContainer}>
         <FlatList
@@ -561,29 +661,30 @@ const ThemeScreen: React.FC = () => {
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <FilterTab
               category={item}
               isActive={activeFilter === item.id}
               onPress={() => setActiveFilter(item.id)}
               primaryColor={currentTheme.colors.primary}
+              isTV={isTV}
             />
           )}
           contentContainerStyle={styles.filterList}
         />
       </View>
-      
-      <ScrollView 
-        style={styles.content} 
+
+      <ScrollView
+        style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.textMuted }]}>
           SELECT THEME
         </Text>
-        
+
         <View style={styles.themeGrid}>
-          {filteredThemes.map(theme => (
+          {filteredThemes.map((theme, index) => (
             <ThemeCard
               key={theme.id}
               theme={theme}
@@ -591,37 +692,93 @@ const ThemeScreen: React.FC = () => {
               onSelect={() => handleThemeSelect(theme.id)}
               onEdit={theme.isEditable ? () => handleEditTheme(theme) : undefined}
               onDelete={theme.isEditable ? () => handleDeleteTheme(theme) : undefined}
+              isTV={isTV}
             />
           ))}
         </View>
-        
-        <TouchableOpacity 
-          style={[
-            styles.createButton, 
-            { backgroundColor: currentTheme.colors.primary },
-            styles.buttonShadow
-          ]} 
-          onPress={handleCreateTheme}
-        >
-          <MaterialIcons name="add" size={20} color="#FFFFFF" />
-          <Text style={styles.createButtonText}>Create Custom Theme</Text>
-        </TouchableOpacity>
+
+        {isTV ? (
+          <Focusable
+            ref={createButtonRef}
+            onPress={handleCreateTheme}
+            style={[
+              styles.createButton,
+              { backgroundColor: currentTheme.colors.primary },
+              styles.buttonShadow
+            ]}
+            borderRadius={10}
+            focusScale={1.05}
+            animateBackground={false}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons name="add" size={20} color={focused ? '#000' : '#FFFFFF'} />
+                <Text style={[styles.createButtonText, focused && { color: '#000' }]}>Create Custom Theme</Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.createButton,
+              { backgroundColor: currentTheme.colors.primary },
+              styles.buttonShadow
+            ]}
+            onPress={handleCreateTheme}
+          >
+            <MaterialIcons name="add" size={20} color="#FFFFFF" />
+            <Text style={styles.createButtonText}>Create Custom Theme</Text>
+          </TouchableOpacity>
+        )}
 
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.textMuted, marginTop: 24 }]}>
           OPTIONS
         </Text>
 
-        <View style={styles.optionRow}>
-          <Text style={[styles.optionLabel, { color: currentTheme.colors.text }]}>
-            Use Dominant Color from Artwork
-          </Text>
-          <Switch
-            value={settings.useDominantBackgroundColor}
-            onValueChange={(value) => updateSetting('useDominantBackgroundColor', value)}
-            trackColor={{ false: '#767577', true: currentTheme.colors.primary }}
-            thumbColor={Platform.OS === 'android' ? currentTheme.colors.primary : '#f4f3f4'}
-          />
-        </View>
+        {isTV ? (
+          <Focusable
+            ref={dominantColorToggleRef}
+            onPress={() => updateSetting('useDominantBackgroundColor', !settings.useDominantBackgroundColor)}
+            style={styles.optionRow}
+            borderRadius={10}
+            focusScale={1}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <Text style={[styles.optionLabel, { color: focused ? '#000' : currentTheme.colors.text }]}>
+                  Use Dominant Color from Artwork
+                </Text>
+                <View style={styles.tvSwitchContainer}>
+                  <View style={[
+                    styles.tvSwitchTrack,
+                    { backgroundColor: focused ? (settings.useDominantBackgroundColor ? '#333' : '#666') : (settings.useDominantBackgroundColor ? currentTheme.colors.primary : '#767577') }
+                  ]}>
+                    <View style={[
+                      styles.tvSwitchThumb,
+                      settings.useDominantBackgroundColor ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                      { backgroundColor: focused ? '#000' : (settings.useDominantBackgroundColor ? '#fff' : '#f4f3f4') }
+                    ]} />
+                  </View>
+                </View>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <View style={styles.optionRow}>
+            <Text style={[styles.optionLabel, { color: currentTheme.colors.text }]}>
+              Use Dominant Color from Artwork
+            </Text>
+            <Switch
+              value={settings.useDominantBackgroundColor}
+              onValueChange={(value) => updateSetting('useDominantBackgroundColor', value)}
+              trackColor={{ false: '#767577', true: currentTheme.colors.primary }}
+              thumbColor={Platform.OS === 'android' ? currentTheme.colors.primary : '#f4f3f4'}
+            />
+          </View>
+        )}
       </ScrollView>
 
       <CustomAlert
@@ -1024,6 +1181,31 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  // TV Toggle styles - thin track with floating thumb
+  tvSwitchContainer: {
+    width: 51,
+    height: 26,
+    justifyContent: 'center',
+  },
+  tvSwitchTrack: {
+    width: 51,
+    height: 14,
+    borderRadius: 7,
+    position: 'relative' as const,
+  },
+  tvSwitchThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    position: 'absolute' as const,
+    top: -6,
+  },
+  tvSwitchThumbOn: {
+    right: 0,
+  },
+  tvSwitchThumbOff: {
+    left: 0,
   },
 });
 

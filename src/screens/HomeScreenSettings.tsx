@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
@@ -117,6 +119,10 @@ const HomeScreenSettings: React.FC = () => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const isTabletDevice = Platform.OS !== 'web' && (Dimensions.get('window').width >= 768);
 
+  // TV navigation
+  const isTV = useIsTV();
+  const backButtonRef = useRef<FocusableRef>(null);
+
   // Prevent iOS entrance flicker by restoring a non-translucent StatusBar
   useFocusEffect(
     React.useCallback(() => {
@@ -173,13 +179,30 @@ const HomeScreenSettings: React.FC = () => {
   }, [isTabletDevice, settings.heroStyle, updateSetting]);
 
   const CustomSwitch = ({ value, onValueChange }: { value: boolean, onValueChange: (value: boolean) => void }) => (
-    <Switch
-      value={value}
-      onValueChange={onValueChange}
-      trackColor={{ false: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', true: colors.primary }}
-      thumbColor={Platform.OS === 'android' ? (value ? colors.white : colors.white) : ''}
-      ios_backgroundColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}
-    />
+    isTV ? (
+      <Focusable
+        onPress={() => onValueChange(!value)}
+        style={{ width: 51, height: 26, justifyContent: 'center' }}
+        borderRadius={13}
+        focusScale={1.1}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (value ? '#333' : '#666') : (value ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')), position: 'relative' as const }}>
+            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(value ? { right: 0 } : { left: 0 }) }} />
+          </View>
+        )}
+      </Focusable>
+    ) : (
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', true: colors.primary }}
+        thumbColor={Platform.OS === 'android' ? (value ? colors.white : colors.white) : ''}
+        ios_backgroundColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}
+      />
+    )
   );
 
   // Radio button component for content source selection
@@ -219,7 +242,32 @@ const HomeScreenSettings: React.FC = () => {
     <View style={[styles.segmentContainer, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
       {options.map((opt, idx) => {
         const selected = value === opt.value;
-        return (
+        return isTV ? (
+          <Focusable
+            key={opt.value}
+            onPress={() => onChange(opt.value)}
+            style={[
+              styles.segment,
+              idx === 0 && styles.segmentFirst,
+              idx === options.length - 1 && styles.segmentLast,
+              selected && { backgroundColor: colors.primary },
+            ]}
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <Text style={{
+                color: focused ? '#000' : (selected ? colors.white : (isDarkMode ? colors.highEmphasis : colors.textDark)),
+                fontWeight: '700',
+                fontSize: 13,
+              }}>
+                {opt.label}
+              </Text>
+            )}
+          </Focusable>
+        ) : (
           <TouchableOpacity
             key={opt.value}
             onPress={() => onChange(opt.value)}
@@ -268,16 +316,42 @@ const HomeScreenSettings: React.FC = () => {
     ]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <MaterialIcons 
-            name="arrow-back" 
-            size={24} 
-            color={isDarkMode ? colors.highEmphasis : colors.textDark} 
-          />
-          <Text style={[styles.backText, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-            Settings
-          </Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={handleBack}
+            style={styles.backButton}
+            autoFocus
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons
+                  name="arrow-back"
+                  size={24}
+                  color={focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark)}
+                />
+                <Text style={[styles.backText, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>
+                  Settings
+                </Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <MaterialIcons
+              name="arrow-back"
+              size={24}
+              color={isDarkMode ? colors.highEmphasis : colors.textDark}
+            />
+            <Text style={[styles.backText, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
+              Settings
+            </Text>
+          </TouchableOpacity>
+        )}
         
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}

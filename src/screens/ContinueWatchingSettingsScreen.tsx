@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 import { useSettings } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -43,6 +45,10 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
   const styles = createStyles(colors);
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  // TV navigation
+  const isTV = useIsTV();
+  const backButtonRef = useRef<FocusableRef>(null);
 
   // Prevent iOS entrance flicker by restoring a non-translucent StatusBar
   useEffect(() => {
@@ -88,13 +94,30 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
   }, [updateSetting]);
 
   const CustomSwitch = ({ value, onValueChange }: { value: boolean; onValueChange: (value: boolean) => void }) => (
-    <Switch
-      value={value}
-      onValueChange={onValueChange}
-      trackColor={{ false: colors.elevation2, true: colors.primary }}
-      thumbColor={value ? colors.white : colors.mediumEmphasis}
-      ios_backgroundColor={colors.elevation2}
-    />
+    isTV ? (
+      <Focusable
+        onPress={() => onValueChange(!value)}
+        style={{ width: 51, height: 26, justifyContent: 'center' }}
+        borderRadius={13}
+        focusScale={1.1}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (value ? '#333' : '#666') : (value ? colors.primary : colors.elevation2), position: 'relative' as const }}>
+            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (value ? colors.white : colors.mediumEmphasis), ...(value ? { right: 0 } : { left: 0 }) }} />
+          </View>
+        )}
+      </Focusable>
+    ) : (
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.elevation2, true: colors.primary }}
+        thumbColor={value ? colors.white : colors.mediumEmphasis}
+        ios_backgroundColor={colors.elevation2}
+      />
+    )
   );
 
   const SettingItem = ({ 
@@ -131,7 +154,36 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
 
   const TTLPickerItem = ({ option }: { option: { label: string; value: number } }) => {
     const isSelected = settings.streamCacheTTL === option.value;
-    return (
+    return isTV ? (
+      <Focusable
+        onPress={() => handleUpdateSetting('streamCacheTTL', option.value)}
+        style={[
+          styles.ttlOption,
+          {
+            backgroundColor: isSelected ? colors.primary : colors.elevation1,
+            borderColor: isSelected ? colors.primary : colors.border,
+          }
+        ]}
+        borderRadius={8}
+        focusScale={1.05}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <>
+            <Text style={[
+              styles.ttlOptionText,
+              { color: focused ? '#000' : (isSelected ? colors.white : colors.highEmphasis) }
+            ]}>
+              {option.label}
+            </Text>
+            {isSelected && (
+              <MaterialIcons name="check" size={20} color={focused ? '#000' : colors.white} />
+            )}
+          </>
+        )}
+      </Focusable>
+    ) : (
       <TouchableOpacity
         style={[
           styles.ttlOption,
@@ -162,13 +214,33 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBack}
-        >
-          <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-          <Text style={styles.backText}>Settings</Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={handleBack}
+            style={styles.backButton}
+            autoFocus
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.white} />
+                <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBack}
+          >
+            <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+            <Text style={styles.backText}>Settings</Text>
+          </TouchableOpacity>
+        )}
       </View>
       
       <Text style={styles.headerTitle}>

@@ -707,11 +707,27 @@ const SettingsScreen: React.FC = () => {
               title="Episode Layout"
               description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
               icon="grid"
-              renderControl={() => (
-                <CustomSwitch
-                  value={settings?.episodeLayoutStyle === 'horizontal'}
-                  onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
-                />
+              onPress={isTVDevice ? () => updateSetting('episodeLayoutStyle', settings?.episodeLayoutStyle === 'horizontal' ? 'vertical' : 'horizontal') : undefined}
+              renderControl={(focused) => (
+                isTVDevice ? (
+                  <View style={styles.tvSwitchContainer}>
+                    <View style={[
+                      styles.tvSwitchTrack,
+                      { backgroundColor: focused ? ((settings?.episodeLayoutStyle === 'horizontal') ? '#333' : '#666') : ((settings?.episodeLayoutStyle === 'horizontal') ? currentTheme.colors.primary : currentTheme.colors.elevation2) }
+                    ]}>
+                      <View style={[
+                        styles.tvSwitchThumb,
+                        (settings?.episodeLayoutStyle === 'horizontal') ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                        { backgroundColor: focused ? '#000' : ((settings?.episodeLayoutStyle === 'horizontal') ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis) }
+                      ]} />
+                    </View>
+                  </View>
+                ) : (
+                  <CustomSwitch
+                    value={settings?.episodeLayoutStyle === 'horizontal'}
+                    onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
+                  />
+                )
               )}
               isLast={isTablet}
               isTablet={isTablet}

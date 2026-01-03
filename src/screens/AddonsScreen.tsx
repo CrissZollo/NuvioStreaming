@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,8 @@ if (Platform.OS === 'ios') {
 // Removed community blur and expo-constants for Android overlay
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 
 // Extend Manifest type to include logo only (remove disabled status)
 interface ExtendedManifest extends Manifest {
@@ -623,6 +625,14 @@ const AddonsScreen = () => {
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
 
+  // TV navigation
+  const isTV = useIsTV();
+  const backButtonRef = useRef<FocusableRef>(null);
+  const reorderButtonRef = useRef<FocusableRef>(null);
+  const refreshButtonRef = useRef<FocusableRef>(null);
+  const addButtonRef = useRef<FocusableRef>(null);
+  const textInputRef = useRef<TextInput>(null);
+
   // State for community addons
   const [communityAddons, setCommunityAddons] = useState<CommunityAddon[]>([]);
   const [communityLoading, setCommunityLoading] = useState(true);
@@ -972,7 +982,7 @@ const AddonsScreen = () => {
 
     return (
       <View style={styles.addonItem}>
-        {reorderMode && (
+        {reorderMode && !isTV && (
           <View style={styles.reorderButtons}>
             <TouchableOpacity
               style={[styles.reorderButton, isFirstItem && styles.disabledButton]}
@@ -1029,7 +1039,7 @@ const AddonsScreen = () => {
           <View style={styles.addonActions}>
             {!reorderMode ? (
               <>
-                {isConfigurable && (
+                {isConfigurable && !isTV && (
                   <TouchableOpacity
                     style={styles.configButton}
                     onPress={() => handleConfigureAddon(item, item.transport)}
@@ -1037,7 +1047,21 @@ const AddonsScreen = () => {
                     <MaterialIcons name="settings" size={20} color={colors.primary} />
                   </TouchableOpacity>
                 )}
-                {!stremioService.isPreInstalledAddon(item.id) && (
+                {isConfigurable && isTV && (
+                  <Focusable
+                    onPress={() => handleConfigureAddon(item, item.transport)}
+                    style={styles.configButton}
+                    borderRadius={6}
+                    focusScale={1.1}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                  >
+                    {(focused) => (
+                      <MaterialIcons name="settings" size={20} color={focused ? '#000' : colors.primary} />
+                    )}
+                  </Focusable>
+                )}
+                {!stremioService.isPreInstalledAddon(item.id) && !isTV && (
                   <TouchableOpacity
                     style={styles.deleteButton}
                     onPress={() => handleRemoveAddon(item)}
@@ -1045,11 +1069,67 @@ const AddonsScreen = () => {
                     <MaterialIcons name="delete" size={20} color={colors.error} />
                   </TouchableOpacity>
                 )}
+                {!stremioService.isPreInstalledAddon(item.id) && isTV && (
+                  <Focusable
+                    onPress={() => handleRemoveAddon(item)}
+                    style={styles.deleteButton}
+                    borderRadius={6}
+                    focusScale={1.1}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                  >
+                    {(focused) => (
+                      <MaterialIcons name="delete" size={20} color={focused ? '#000' : colors.error} />
+                    )}
+                  </Focusable>
+                )}
               </>
             ) : (
-              <View style={styles.priorityBadge}>
-                <Text style={styles.priorityText}>#{index + 1}</Text>
-              </View>
+              <>
+                {isTV ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Focusable
+                      onPress={() => moveAddonUp(item)}
+                      style={[styles.reorderButton, isFirstItem && styles.disabledButton, { marginRight: 4 }]}
+                      borderRadius={15}
+                      focusScale={1.1}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <MaterialIcons
+                          name="arrow-upward"
+                          size={20}
+                          color={focused ? '#000' : (isFirstItem ? colors.mediumGray : colors.white)}
+                        />
+                      )}
+                    </Focusable>
+                    <Focusable
+                      onPress={() => moveAddonDown(item)}
+                      style={[styles.reorderButton, isLastItem && styles.disabledButton]}
+                      borderRadius={15}
+                      focusScale={1.1}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <MaterialIcons
+                          name="arrow-downward"
+                          size={20}
+                          color={focused ? '#000' : (isLastItem ? colors.mediumGray : colors.white)}
+                        />
+                      )}
+                    </Focusable>
+                    <View style={[styles.priorityBadge, { marginLeft: 8 }]}>
+                      <Text style={styles.priorityText}>#{index + 1}</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.priorityBadge}>
+                    <Text style={styles.priorityText}>#{index + 1}</Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>
@@ -1134,39 +1214,99 @@ const AddonsScreen = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-          <Text style={styles.backText}>Settings</Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            autoFocus
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.white} />
+                <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+            <Text style={styles.backText}>Settings</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.headerActions}>
           {/* Reorder Mode Toggle Button */}
-          <TouchableOpacity
-            style={[styles.headerButton, reorderMode && styles.activeHeaderButton]}
-            onPress={toggleReorderMode}
-          >
-            <MaterialIcons
-              name="swap-vert"
-              size={24}
-              color={reorderMode ? colors.primary : colors.white}
-            />
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              ref={reorderButtonRef}
+              onPress={toggleReorderMode}
+              style={[styles.headerButton, reorderMode && styles.activeHeaderButton]}
+              borderRadius={6}
+              focusScale={1.05}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <MaterialIcons
+                  name="swap-vert"
+                  size={24}
+                  color={focused ? '#000' : (reorderMode ? colors.primary : colors.white)}
+                />
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={[styles.headerButton, reorderMode && styles.activeHeaderButton]}
+              onPress={toggleReorderMode}
+            >
+              <MaterialIcons
+                name="swap-vert"
+                size={24}
+                color={reorderMode ? colors.primary : colors.white}
+              />
+            </TouchableOpacity>
+          )}
 
           {/* Refresh Button */}
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={refreshAddons}
-            disabled={loading}
-          >
-            <MaterialIcons
-              name="refresh"
-              size={24}
-              color={loading ? colors.mediumGray : colors.white}
-            />
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              ref={refreshButtonRef}
+              onPress={refreshAddons}
+              style={styles.headerButton}
+              borderRadius={6}
+              focusScale={1.05}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <MaterialIcons
+                  name="refresh"
+                  size={24}
+                  color={focused ? '#000' : (loading ? colors.mediumGray : colors.white)}
+                />
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={refreshAddons}
+              disabled={loading}
+            >
+              <MaterialIcons
+                name="refresh"
+                size={24}
+                color={loading ? colors.mediumGray : colors.white}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -1212,24 +1352,66 @@ const AddonsScreen = () => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>ADD NEW ADDON</Text>
               <View style={styles.addAddonContainer}>
-                <TextInput
-                  style={styles.addonInput}
-                  placeholder="Addon URL"
-                  placeholderTextColor={colors.mediumGray}
-                  value={addonUrl}
-                  onChangeText={setAddonUrl}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  style={[styles.addButton, { opacity: installing || !addonUrl ? 0.6 : 1 }]}
-                  onPress={() => handleAddAddon()}
-                  disabled={installing || !addonUrl}
-                >
-                  <Text style={styles.addButtonText}>
-                    {installing ? 'Loading...' : 'Add Addon'}
-                  </Text>
-                </TouchableOpacity>
+                {isTV ? (
+                  <Focusable
+                    onPress={() => textInputRef.current?.focus()}
+                    style={[styles.addonInput, { marginBottom: 16 }]}
+                    borderRadius={8}
+                    focusScale={1.02}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                  >
+                    {(focused) => (
+                      <TextInput
+                        ref={textInputRef}
+                        style={[styles.addonInput, { marginBottom: 0, backgroundColor: 'transparent', color: focused ? '#000' : colors.white }]}
+                        placeholder="Addon URL"
+                        placeholderTextColor={focused ? '#666' : colors.mediumGray}
+                        value={addonUrl}
+                        onChangeText={setAddonUrl}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    )}
+                  </Focusable>
+                ) : (
+                  <TextInput
+                    style={styles.addonInput}
+                    placeholder="Addon URL"
+                    placeholderTextColor={colors.mediumGray}
+                    value={addonUrl}
+                    onChangeText={setAddonUrl}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                )}
+                {isTV ? (
+                  <Focusable
+                    ref={addButtonRef}
+                    onPress={() => handleAddAddon()}
+                    style={[styles.addButton, { opacity: installing || !addonUrl ? 0.6 : 1 }]}
+                    borderRadius={8}
+                    focusScale={1.05}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                  >
+                    {(focused) => (
+                      <Text style={[styles.addButtonText, focused && { color: '#000' }]}>
+                        {installing ? 'Loading...' : 'Add Addon'}
+                      </Text>
+                    )}
+                  </Focusable>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.addButton, { opacity: installing || !addonUrl ? 0.6 : 1 }]}
+                    onPress={() => handleAddAddon()}
+                    disabled={installing || !addonUrl}
+                  >
+                    <Text style={styles.addButtonText}>
+                      {installing ? 'Loading...' : 'Add Addon'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )}
@@ -1288,7 +1470,7 @@ const AddonsScreen = () => {
                       </View>
                     </View>
                     <View style={styles.addonActions}>
-                      {promoAddon.behaviorHints?.configurable && (
+                      {promoAddon.behaviorHints?.configurable && !isTV && (
                         <TouchableOpacity
                           style={styles.configButton}
                           onPress={() => handleConfigureAddon(promoAddon, PROMO_ADDON_URL)}
@@ -1296,17 +1478,50 @@ const AddonsScreen = () => {
                           <MaterialIcons name="settings" size={20} color={colors.primary} />
                         </TouchableOpacity>
                       )}
-                      <TouchableOpacity
-                        style={styles.installButton}
-                        onPress={() => handleAddAddon(PROMO_ADDON_URL)}
-                        disabled={installing}
-                      >
-                        {installing ? (
-                          <ActivityIndicator size="small" color={colors.white} />
-                        ) : (
-                          <MaterialIcons name="add" size={20} color={colors.white} />
-                        )}
-                      </TouchableOpacity>
+                      {promoAddon.behaviorHints?.configurable && isTV && (
+                        <Focusable
+                          onPress={() => handleConfigureAddon(promoAddon, PROMO_ADDON_URL)}
+                          style={styles.configButton}
+                          borderRadius={6}
+                          focusScale={1.1}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => (
+                            <MaterialIcons name="settings" size={20} color={focused ? '#000' : colors.primary} />
+                          )}
+                        </Focusable>
+                      )}
+                      {isTV ? (
+                        <Focusable
+                          onPress={() => handleAddAddon(PROMO_ADDON_URL)}
+                          style={styles.installButton}
+                          borderRadius={6}
+                          focusScale={1.1}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => (
+                            installing ? (
+                              <ActivityIndicator size="small" color={focused ? '#000' : colors.white} />
+                            ) : (
+                              <MaterialIcons name="add" size={20} color={focused ? '#000' : colors.white} />
+                            )
+                          )}
+                        </Focusable>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.installButton}
+                          onPress={() => handleAddAddon(PROMO_ADDON_URL)}
+                          disabled={installing}
+                        >
+                          {installing ? (
+                            <ActivityIndicator size="small" color={colors.white} />
+                          ) : (
+                            <MaterialIcons name="add" size={20} color={colors.white} />
+                          )}
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                   <Text style={styles.addonDescription}>
@@ -1370,7 +1585,7 @@ const AddonsScreen = () => {
                           </View>
                         </View>
                         <View style={styles.addonActions}>
-                          {item.manifest.behaviorHints?.configurable && (
+                          {item.manifest.behaviorHints?.configurable && !isTV && (
                             <TouchableOpacity
                               style={styles.configButton}
                               onPress={() => handleConfigureAddon(item.manifest, item.transportUrl)}
@@ -1378,17 +1593,50 @@ const AddonsScreen = () => {
                               <MaterialIcons name="settings" size={20} color={colors.primary} />
                             </TouchableOpacity>
                           )}
-                          <TouchableOpacity
-                            style={[styles.installButton, installing && { opacity: 0.6 }]}
-                            onPress={() => handleAddAddon(item.transportUrl)}
-                            disabled={installing}
-                          >
-                            {installing ? (
-                              <ActivityIndicator size="small" color={colors.white} />
-                            ) : (
-                              <MaterialIcons name="add" size={20} color={colors.white} />
-                            )}
-                          </TouchableOpacity>
+                          {item.manifest.behaviorHints?.configurable && isTV && (
+                            <Focusable
+                              onPress={() => handleConfigureAddon(item.manifest, item.transportUrl)}
+                              style={styles.configButton}
+                              borderRadius={6}
+                              focusScale={1.1}
+                              animateBackground={true}
+                              showFocusBorder={true}
+                            >
+                              {(focused) => (
+                                <MaterialIcons name="settings" size={20} color={focused ? '#000' : colors.primary} />
+                              )}
+                            </Focusable>
+                          )}
+                          {isTV ? (
+                            <Focusable
+                              onPress={() => handleAddAddon(item.transportUrl)}
+                              style={[styles.installButton, installing && { opacity: 0.6 }]}
+                              borderRadius={6}
+                              focusScale={1.1}
+                              animateBackground={true}
+                              showFocusBorder={true}
+                            >
+                              {(focused) => (
+                                installing ? (
+                                  <ActivityIndicator size="small" color={focused ? '#000' : colors.white} />
+                                ) : (
+                                  <MaterialIcons name="add" size={20} color={focused ? '#000' : colors.white} />
+                                )
+                              )}
+                            </Focusable>
+                          ) : (
+                            <TouchableOpacity
+                              style={[styles.installButton, installing && { opacity: 0.6 }]}
+                              onPress={() => handleAddAddon(item.transportUrl)}
+                              disabled={installing}
+                            >
+                              {installing ? (
+                                <ActivityIndicator size="small" color={colors.white} />
+                              ) : (
+                                <MaterialIcons name="add" size={20} color={colors.white} />
+                              )}
+                            </TouchableOpacity>
+                          )}
                         </View>
                       </View>
 
@@ -1435,14 +1683,32 @@ const AddonsScreen = () => {
               <>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Install Addon</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setShowConfirmModal(false);
-                      setAddonDetails(null);
-                    }}
-                  >
-                    <MaterialIcons name="close" size={24} color={colors.white} />
-                  </TouchableOpacity>
+                  {isTV ? (
+                    <Focusable
+                      onPress={() => {
+                        setShowConfirmModal(false);
+                        setAddonDetails(null);
+                      }}
+                      style={{ padding: 4 }}
+                      borderRadius={12}
+                      focusScale={1.1}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <MaterialIcons name="close" size={24} color={focused ? '#000' : colors.white} />
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowConfirmModal(false);
+                        setAddonDetails(null);
+                      }}
+                    >
+                      <MaterialIcons name="close" size={24} color={colors.white} />
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 <ScrollView
@@ -1504,26 +1770,64 @@ const AddonsScreen = () => {
                 </ScrollView>
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelButton]}
-                    onPress={() => {
-                      setShowConfirmModal(false);
-                      setAddonDetails(null);
-                    }}
-                  >
-                    <Text style={styles.modalButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.installButton]}
-                    onPress={confirmInstallAddon}
-                    disabled={installing}
-                  >
-                    {installing ? (
-                      <ActivityIndicator size="small" color={colors.white} />
-                    ) : (
-                      <Text style={styles.modalButtonText}>Install</Text>
-                    )}
-                  </TouchableOpacity>
+                  {isTV ? (
+                    <Focusable
+                      onPress={() => {
+                        setShowConfirmModal(false);
+                        setAddonDetails(null);
+                      }}
+                      style={[styles.modalButton, styles.cancelButton]}
+                      borderRadius={8}
+                      focusScale={1.05}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <Text style={[styles.modalButtonText, focused && { color: '#000' }]}>Cancel</Text>
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.cancelButton]}
+                      onPress={() => {
+                        setShowConfirmModal(false);
+                        setAddonDetails(null);
+                      }}
+                    >
+                      <Text style={styles.modalButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  )}
+                  {isTV ? (
+                    <Focusable
+                      onPress={confirmInstallAddon}
+                      style={[styles.modalButton, styles.installButton, installing && { opacity: 0.6 }]}
+                      autoFocus
+                      borderRadius={8}
+                      focusScale={1.05}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        installing ? (
+                          <ActivityIndicator size="small" color={focused ? '#000' : colors.white} />
+                        ) : (
+                          <Text style={[styles.modalButtonText, focused && { color: '#000' }]}>Install</Text>
+                        )
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.installButton]}
+                      onPress={confirmInstallAddon}
+                      disabled={installing}
+                    >
+                      {installing ? (
+                        <ActivityIndicator size="small" color={colors.white} />
+                      ) : (
+                        <Text style={styles.modalButtonText}>Install</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
               </>
             )}

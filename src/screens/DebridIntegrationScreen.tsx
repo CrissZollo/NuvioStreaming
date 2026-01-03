@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -21,6 +21,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 import { Feather, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { stremioService } from '../services/stremioService';
 import { logger } from '../utils/logger';
@@ -692,6 +694,11 @@ const DebridIntegrationScreen = () => {
     const colors = currentTheme.colors;
     const styles = createStyles(colors);
 
+    // TV navigation
+    const isTV = useIsTV();
+    const backButtonRef = useRef<FocusableRef>(null);
+    const torrentioApiKeyRef = useRef<TextInput>(null);
+
     // Tab state
     const [activeTab, setActiveTab] = useState<'torbox' | 'torrentio'>('torbox');
 
@@ -1122,25 +1129,59 @@ const DebridIntegrationScreen = () => {
 
                         <View style={styles.statusRow}>
                             <Text style={styles.statusLabel}>Enable Addon</Text>
-                            <Switch
-                                value={config.isEnabled}
-                                onValueChange={handleToggleEnabled}
-                                trackColor={{ false: colors.elevation2, true: colors.primary }}
-                                thumbColor={config.isEnabled ? colors.white : colors.mediumEmphasis}
-                                ios_backgroundColor={colors.elevation2}
-                            />
+                            {isTV ? (
+                                <Focusable
+                                    onPress={() => handleToggleEnabled(!config.isEnabled)}
+                                    style={{ width: 51, height: 26, justifyContent: 'center' }}
+                                    borderRadius={13}
+                                    focusScale={1.1}
+                                    animateBackground={true}
+                                    showFocusBorder={true}
+                                >
+                                    {(focused) => (
+                                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (config.isEnabled ? '#333' : '#666') : (config.isEnabled ? colors.primary : colors.elevation2), position: 'relative' as const }}>
+                                            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (config.isEnabled ? colors.white : colors.mediumEmphasis), ...(config.isEnabled ? { right: 0 } : { left: 0 }) }} />
+                                        </View>
+                                    )}
+                                </Focusable>
+                            ) : (
+                                <Switch
+                                    value={config.isEnabled}
+                                    onValueChange={handleToggleEnabled}
+                                    trackColor={{ false: colors.elevation2, true: colors.primary }}
+                                    thumbColor={config.isEnabled ? colors.white : colors.mediumEmphasis}
+                                    ios_backgroundColor={colors.elevation2}
+                                />
+                            )}
                         </View>
                     </View>
 
-                    <TouchableOpacity
-                        style={[styles.actionButton, styles.dangerButton, loading && styles.disabledButton]}
-                        onPress={handleDisconnect}
-                        disabled={loading}
-                    >
-                        <Text style={styles.buttonText}>
-                            {loading ? 'Disconnecting...' : 'Disconnect & Remove'}
-                        </Text>
-                    </TouchableOpacity>
+                    {isTV ? (
+                        <Focusable
+                            onPress={handleDisconnect}
+                            style={[styles.actionButton, styles.dangerButton, loading && styles.disabledButton]}
+                            borderRadius={10}
+                            focusScale={1.03}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                        >
+                            {(focused) => (
+                                <Text style={[styles.buttonText, focused && { color: '#000' }]}>
+                                    {loading ? 'Disconnecting...' : 'Disconnect & Remove'}
+                                </Text>
+                            )}
+                        </Focusable>
+                    ) : (
+                        <TouchableOpacity
+                            style={[styles.actionButton, styles.dangerButton, loading && styles.disabledButton]}
+                            onPress={handleDisconnect}
+                            disabled={loading}
+                        >
+                            <Text style={styles.buttonText}>
+                                {loading ? 'Disconnecting...' : 'Disconnect & Remove'}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
 
                     {userData && (
                         <View style={styles.userDataCard}>
@@ -1213,12 +1254,27 @@ const DebridIntegrationScreen = () => {
                         <Text style={styles.sectionText}>
                             Customize your streaming experience. Sort by quality, filter file sizes, and manage other integration settings.
                         </Text>
-                        <TouchableOpacity
-                            style={styles.subscribeButton}
-                            onPress={() => Linking.openURL('https://torbox.app/settings?section=integration-settings')}
-                        >
-                            <Text style={styles.subscribeButtonText}>Open Settings</Text>
-                        </TouchableOpacity>
+                        {isTV ? (
+                            <Focusable
+                                onPress={() => Linking.openURL('https://torbox.app/settings?section=integration-settings')}
+                                style={styles.subscribeButton}
+                                borderRadius={8}
+                                focusScale={1.05}
+                                animateBackground={true}
+                                showFocusBorder={true}
+                            >
+                                {(focused) => (
+                                    <Text style={[styles.subscribeButtonText, focused && { color: '#000' }]}>Open Settings</Text>
+                                )}
+                            </Focusable>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.subscribeButton}
+                                onPress={() => Linking.openURL('https://torbox.app/settings?section=integration-settings')}
+                            >
+                                <Text style={styles.subscribeButtonText}>Open Settings</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </>
             ) : (
@@ -1227,42 +1283,113 @@ const DebridIntegrationScreen = () => {
                         Unlock 4K high-quality streams and lightning-fast speeds by integrating Torbox. Enter your API Key below to instantly upgrade your streaming experience.
                     </Text>
 
-                    <TouchableOpacity onPress={() => Linking.openURL('https://guides.viren070.me/stremio/technical-details#debrid-services')} style={styles.guideLink}>
-                        <Text style={styles.guideLinkText}>What is a Debrid Service?</Text>
-                    </TouchableOpacity>
+                    {isTV ? (
+                        <Focusable
+                            onPress={() => Linking.openURL('https://guides.viren070.me/stremio/technical-details#debrid-services')}
+                            style={styles.guideLink}
+                            borderRadius={4}
+                            focusScale={1.02}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                        >
+                            {(focused) => (
+                                <Text style={[styles.guideLinkText, focused && { color: '#000' }]}>What is a Debrid Service?</Text>
+                            )}
+                        </Focusable>
+                    ) : (
+                        <TouchableOpacity onPress={() => Linking.openURL('https://guides.viren070.me/stremio/technical-details#debrid-services')} style={styles.guideLink}>
+                            <Text style={styles.guideLinkText}>What is a Debrid Service?</Text>
+                        </TouchableOpacity>
+                    )}
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Torbox API Key</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your API Key"
-                            placeholderTextColor={colors.mediumGray}
-                            value={apiKey}
-                            onChangeText={setApiKey}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            secureTextEntry
-                        />
+                        {isTV ? (
+                            <Focusable
+                                onPress={() => {}}
+                                style={styles.input}
+                                borderRadius={10}
+                                focusScale={1.02}
+                                animateBackground={true}
+                                showFocusBorder={true}
+                            >
+                                {(focused) => (
+                                    <TextInput
+                                        style={[styles.input, { marginBottom: 0, backgroundColor: 'transparent', color: focused ? '#000' : colors.white }]}
+                                        placeholder="Enter your API Key"
+                                        placeholderTextColor={focused ? '#666' : colors.mediumGray}
+                                        value={apiKey}
+                                        onChangeText={setApiKey}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        secureTextEntry
+                                    />
+                                )}
+                            </Focusable>
+                        ) : (
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter your API Key"
+                                placeholderTextColor={colors.mediumGray}
+                                value={apiKey}
+                                onChangeText={setApiKey}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                secureTextEntry
+                            />
+                        )}
                     </View>
 
-                    <TouchableOpacity
-                        style={[styles.connectButton, loading && styles.disabledButton]}
-                        onPress={handleConnect}
-                        disabled={loading}
-                    >
-                        <Text style={styles.connectButtonText}>
-                            {loading ? 'Connecting...' : 'Connect & Install'}
-                        </Text>
-                    </TouchableOpacity>
+                    {isTV ? (
+                        <Focusable
+                            onPress={handleConnect}
+                            style={[styles.connectButton, loading && styles.disabledButton]}
+                            borderRadius={10}
+                            focusScale={1.03}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                        >
+                            {(focused) => (
+                                <Text style={[styles.connectButtonText, focused && { color: '#000' }]}>
+                                    {loading ? 'Connecting...' : 'Connect & Install'}
+                                </Text>
+                            )}
+                        </Focusable>
+                    ) : (
+                        <TouchableOpacity
+                            style={[styles.connectButton, loading && styles.disabledButton]}
+                            onPress={handleConnect}
+                            disabled={loading}
+                        >
+                            <Text style={styles.connectButtonText}>
+                                {loading ? 'Connecting...' : 'Connect & Install'}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Unlock Premium Speeds</Text>
                         <Text style={styles.sectionText}>
                             Get a Torbox subscription to access cached high-quality streams with zero buffering.
                         </Text>
-                        <TouchableOpacity style={styles.subscribeButton} onPress={openSubscription}>
-                            <Text style={styles.subscribeButtonText}>Get Subscription</Text>
-                        </TouchableOpacity>
+                        {isTV ? (
+                            <Focusable
+                                onPress={openSubscription}
+                                style={styles.subscribeButton}
+                                borderRadius={8}
+                                focusScale={1.05}
+                                animateBackground={true}
+                                showFocusBorder={true}
+                            >
+                                {(focused) => (
+                                    <Text style={[styles.subscribeButtonText, focused && { color: '#000' }]}>Get Subscription</Text>
+                                )}
+                            </Focusable>
+                        ) : (
+                            <TouchableOpacity style={styles.subscribeButton} onPress={openSubscription}>
+                                <Text style={styles.subscribeButtonText}>Get Subscription</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </>
             )}
@@ -1306,12 +1433,27 @@ const DebridIntegrationScreen = () => {
                     <Text style={styles.promoText}>
                         Get TorBox for lightning-fast 4K streaming with zero buffering. Premium cached torrents and instant downloads.
                     </Text>
-                    <TouchableOpacity
-                        style={styles.promoButton}
-                        onPress={() => Linking.openURL('https://torbox.app/subscription?referral=493192f2-6403-440f-b414-768f72222ec7')}
-                    >
-                        <Text style={styles.promoButtonText}>Get TorBox Subscription</Text>
-                    </TouchableOpacity>
+                    {isTV ? (
+                        <Focusable
+                            onPress={() => Linking.openURL('https://torbox.app/subscription?referral=493192f2-6403-440f-b414-768f72222ec7')}
+                            style={styles.promoButton}
+                            borderRadius={8}
+                            focusScale={1.03}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                        >
+                            {(focused) => (
+                                <Text style={[styles.promoButtonText, focused && { color: '#000' }]}>Get TorBox Subscription</Text>
+                            )}
+                        </Focusable>
+                    ) : (
+                        <TouchableOpacity
+                            style={styles.promoButton}
+                            onPress={() => Linking.openURL('https://torbox.app/subscription?referral=493192f2-6403-440f-b414-768f72222ec7')}
+                        >
+                            <Text style={styles.promoButtonText}>Get TorBox Subscription</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             )}
 
@@ -1320,21 +1462,46 @@ const DebridIntegrationScreen = () => {
                 <Text style={styles.configSectionTitle}>Debrid Service *</Text>
                 <View style={styles.pickerContainer}>
                     {TORRENTIO_DEBRID_SERVICES.map((service: any) => (
-                        <TouchableOpacity
-                            key={service.id}
-                            style={[
-                                styles.pickerItem,
-                                torrentioConfig.debridService === service.id && styles.pickerItemSelected
-                            ]}
-                            onPress={() => setTorrentioConfig(prev => ({ ...prev, debridService: service.id }))}
-                        >
-                            <Text style={[
-                                styles.pickerItemText,
-                                torrentioConfig.debridService === service.id && styles.pickerItemTextSelected
-                            ]}>
-                                {service.name}
-                            </Text>
-                        </TouchableOpacity>
+                        isTV ? (
+                            <Focusable
+                                key={service.id}
+                                onPress={() => setTorrentioConfig(prev => ({ ...prev, debridService: service.id }))}
+                                style={[
+                                    styles.pickerItem,
+                                    torrentioConfig.debridService === service.id && styles.pickerItemSelected
+                                ]}
+                                borderRadius={8}
+                                focusScale={1.03}
+                                animateBackground={true}
+                                showFocusBorder={true}
+                            >
+                                {(focused) => (
+                                    <Text style={[
+                                        styles.pickerItemText,
+                                        torrentioConfig.debridService === service.id && styles.pickerItemTextSelected,
+                                        focused && { color: '#000' }
+                                    ]}>
+                                        {service.name}
+                                    </Text>
+                                )}
+                            </Focusable>
+                        ) : (
+                            <TouchableOpacity
+                                key={service.id}
+                                style={[
+                                    styles.pickerItem,
+                                    torrentioConfig.debridService === service.id && styles.pickerItemSelected
+                                ]}
+                                onPress={() => setTorrentioConfig(prev => ({ ...prev, debridService: service.id }))}
+                            >
+                                <Text style={[
+                                    styles.pickerItemText,
+                                    torrentioConfig.debridService === service.id && styles.pickerItemTextSelected
+                                ]}>
+                                    {service.name}
+                                </Text>
+                            </TouchableOpacity>
+                        )
                     ))}
                 </View>
             </View>
@@ -1342,173 +1509,465 @@ const DebridIntegrationScreen = () => {
             {/* Debrid API Key */}
             <View style={styles.configSection}>
                 <Text style={styles.configSectionTitle}>API Key *</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder={`Enter your ${TORRENTIO_DEBRID_SERVICES.find((d: any) => d.id === torrentioConfig.debridService)?.name || 'Debrid'} API Key`}
-                    placeholderTextColor={colors.mediumGray}
-                    value={torrentioConfig.debridApiKey}
-                    onChangeText={(text) => setTorrentioConfig(prev => ({ ...prev, debridApiKey: text }))}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    secureTextEntry
-                />
+                {isTV ? (
+                    <Focusable
+                        onPress={() => torrentioApiKeyRef.current?.focus()}
+                        style={styles.input}
+                        borderRadius={10}
+                        focusScale={1.02}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                    >
+                        {(focused) => (
+                            <TextInput
+                                ref={torrentioApiKeyRef}
+                                style={[{ flex: 1, color: focused ? '#000' : colors.white }]}
+                                placeholder={`Enter your ${TORRENTIO_DEBRID_SERVICES.find((d: any) => d.id === torrentioConfig.debridService)?.name || 'Debrid'} API Key`}
+                                placeholderTextColor={focused ? '#666' : colors.mediumGray}
+                                value={torrentioConfig.debridApiKey}
+                                onChangeText={(text) => setTorrentioConfig(prev => ({ ...prev, debridApiKey: text }))}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                secureTextEntry
+                            />
+                        )}
+                    </Focusable>
+                ) : (
+                    <TextInput
+                        style={styles.input}
+                        placeholder={`Enter your ${TORRENTIO_DEBRID_SERVICES.find((d: any) => d.id === torrentioConfig.debridService)?.name || 'Debrid'} API Key`}
+                        placeholderTextColor={colors.mediumGray}
+                        value={torrentioConfig.debridApiKey}
+                        onChangeText={(text) => setTorrentioConfig(prev => ({ ...prev, debridApiKey: text }))}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        secureTextEntry
+                    />
+                )}
             </View>
 
             {/* Sorting - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.sorting && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('sorting')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>Sorting</Text>
-                    <Text style={styles.accordionSubtext}>
-                        {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || 'By quality'}
-                    </Text>
-                </View>
-                <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
+            {isTV ? (
+                <Focusable
+                    onPress={() => toggleSection('sorting')}
+                    style={[styles.accordionHeader, expandedSections.sorting && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    borderRadius={10}
+                    focusScale={1.02}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                >
+                    {(focused) => (
+                        <>
+                            <View>
+                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Sorting</Text>
+                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>
+                                    {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || 'By quality'}
+                                </Text>
+                            </View>
+                            <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                        </>
+                    )}
+                </Focusable>
+            ) : (
+                <TouchableOpacity
+                    style={[styles.accordionHeader, expandedSections.sorting && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    onPress={() => toggleSection('sorting')}
+                >
+                    <View>
+                        <Text style={styles.accordionHeaderText}>Sorting</Text>
+                        <Text style={styles.accordionSubtext}>
+                            {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || 'By quality'}
+                        </Text>
+                    </View>
+                    <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+                </TouchableOpacity>
+            )}
             {expandedSections.sorting && (
                 <View style={styles.accordionContent}>
                     <View style={styles.pickerContainer}>
                         {TORRENTIO_SORT_OPTIONS.map(option => (
-                            <TouchableOpacity
-                                key={option.id}
-                                style={[styles.pickerItem, torrentioConfig.sort === option.id && styles.pickerItemSelected]}
-                                onPress={() => setTorrentioConfig(prev => ({ ...prev, sort: option.id }))}
-                            >
-                                <Text style={[styles.pickerItemText, torrentioConfig.sort === option.id && styles.pickerItemTextSelected]}>
-                                    {option.name}
-                                </Text>
-                            </TouchableOpacity>
+                            isTV ? (
+                                <Focusable
+                                    key={option.id}
+                                    onPress={() => setTorrentioConfig(prev => ({ ...prev, sort: option.id }))}
+                                    style={[styles.pickerItem, torrentioConfig.sort === option.id && styles.pickerItemSelected]}
+                                    borderRadius={8}
+                                    focusScale={1.03}
+                                    animateBackground={true}
+                                    showFocusBorder={true}
+                                >
+                                    {(focused) => (
+                                        <Text style={[styles.pickerItemText, torrentioConfig.sort === option.id && styles.pickerItemTextSelected, focused && { color: '#000' }]}>
+                                            {option.name}
+                                        </Text>
+                                    )}
+                                </Focusable>
+                            ) : (
+                                <TouchableOpacity
+                                    key={option.id}
+                                    style={[styles.pickerItem, torrentioConfig.sort === option.id && styles.pickerItemSelected]}
+                                    onPress={() => setTorrentioConfig(prev => ({ ...prev, sort: option.id }))}
+                                >
+                                    <Text style={[styles.pickerItemText, torrentioConfig.sort === option.id && styles.pickerItemTextSelected]}>
+                                        {option.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            )
                         ))}
                     </View>
                 </View>
             )}
 
             {/* Quality Filter - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.qualityFilter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('qualityFilter')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>Exclude Qualities</Text>
-                    <Text style={styles.accordionSubtext}>
-                        {torrentioConfig.qualityFilter.length > 0 ? `${torrentioConfig.qualityFilter.length} excluded` : 'None excluded'}
-                    </Text>
-                </View>
-                <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
+            {isTV ? (
+                <Focusable
+                    onPress={() => toggleSection('qualityFilter')}
+                    style={[styles.accordionHeader, expandedSections.qualityFilter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    borderRadius={10}
+                    focusScale={1.02}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                >
+                    {(focused) => (
+                        <>
+                            <View>
+                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Exclude Qualities</Text>
+                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>
+                                    {torrentioConfig.qualityFilter.length > 0 ? `${torrentioConfig.qualityFilter.length} excluded` : 'None excluded'}
+                                </Text>
+                            </View>
+                            <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                        </>
+                    )}
+                </Focusable>
+            ) : (
+                <TouchableOpacity
+                    style={[styles.accordionHeader, expandedSections.qualityFilter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    onPress={() => toggleSection('qualityFilter')}
+                >
+                    <View>
+                        <Text style={styles.accordionHeaderText}>Exclude Qualities</Text>
+                        <Text style={styles.accordionSubtext}>
+                            {torrentioConfig.qualityFilter.length > 0 ? `${torrentioConfig.qualityFilter.length} excluded` : 'None excluded'}
+                        </Text>
+                    </View>
+                    <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+                </TouchableOpacity>
+            )}
             {expandedSections.qualityFilter && (
                 <View style={styles.accordionContent}>
                     <View style={styles.chipContainer}>
                         {TORRENTIO_QUALITY_FILTERS.map(quality => (
-                            <TouchableOpacity
-                                key={quality.id}
-                                style={[styles.chip, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipSelected]}
-                                onPress={() => toggleQualityFilter(quality.id)}
-                            >
-                                <Text style={[styles.chipText, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipTextSelected]}>
-                                    {quality.name}
-                                </Text>
-                            </TouchableOpacity>
+                            isTV ? (
+                                <Focusable
+                                    key={quality.id}
+                                    onPress={() => toggleQualityFilter(quality.id)}
+                                    style={[styles.chip, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipSelected]}
+                                    borderRadius={16}
+                                    focusScale={1.05}
+                                    animateBackground={true}
+                                    showFocusBorder={true}
+                                >
+                                    {(focused) => (
+                                        <Text style={[styles.chipText, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipTextSelected, focused && { color: '#000' }]}>
+                                            {quality.name}
+                                        </Text>
+                                    )}
+                                </Focusable>
+                            ) : (
+                                <TouchableOpacity
+                                    key={quality.id}
+                                    style={[styles.chip, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipSelected]}
+                                    onPress={() => toggleQualityFilter(quality.id)}
+                                >
+                                    <Text style={[styles.chipText, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipTextSelected]}>
+                                        {quality.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            )
                         ))}
                     </View>
                 </View>
             )}
 
             {/* Priority Languages - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.languages && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('languages')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>Priority Languages</Text>
-                    <Text style={styles.accordionSubtext}>
-                        {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} selected` : 'No preference'}
-                    </Text>
-                </View>
-                <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
+            {isTV ? (
+                <Focusable
+                    onPress={() => toggleSection('languages')}
+                    style={[styles.accordionHeader, expandedSections.languages && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    borderRadius={10}
+                    focusScale={1.02}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                >
+                    {(focused) => (
+                        <>
+                            <View>
+                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Priority Languages</Text>
+                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>
+                                    {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} selected` : 'No preference'}
+                                </Text>
+                            </View>
+                            <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                        </>
+                    )}
+                </Focusable>
+            ) : (
+                <TouchableOpacity
+                    style={[styles.accordionHeader, expandedSections.languages && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    onPress={() => toggleSection('languages')}
+                >
+                    <View>
+                        <Text style={styles.accordionHeaderText}>Priority Languages</Text>
+                        <Text style={styles.accordionSubtext}>
+                            {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} selected` : 'No preference'}
+                        </Text>
+                    </View>
+                    <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+                </TouchableOpacity>
+            )}
             {expandedSections.languages && (
                 <View style={styles.accordionContent}>
                     <View style={styles.chipContainer}>
                         {TORRENTIO_LANGUAGES.map(lang => (
-                            <TouchableOpacity
-                                key={lang.id}
-                                style={[styles.chip, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipSelected]}
-                                onPress={() => toggleLanguage(lang.id)}
-                            >
-                                <Text style={[styles.chipText, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipTextSelected]}>
-                                    {lang.name}
-                                </Text>
-                            </TouchableOpacity>
+                            isTV ? (
+                                <Focusable
+                                    key={lang.id}
+                                    onPress={() => toggleLanguage(lang.id)}
+                                    style={[styles.chip, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipSelected]}
+                                    borderRadius={16}
+                                    focusScale={1.05}
+                                    animateBackground={true}
+                                    showFocusBorder={true}
+                                >
+                                    {(focused) => (
+                                        <Text style={[styles.chipText, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipTextSelected, focused && { color: '#000' }]}>
+                                            {lang.name}
+                                        </Text>
+                                    )}
+                                </Focusable>
+                            ) : (
+                                <TouchableOpacity
+                                    key={lang.id}
+                                    style={[styles.chip, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipSelected]}
+                                    onPress={() => toggleLanguage(lang.id)}
+                                >
+                                    <Text style={[styles.chipText, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipTextSelected]}>
+                                        {lang.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            )
                         ))}
                     </View>
                 </View>
             )}
 
             {/* Max Results - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.maxResults && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('maxResults')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>Max Results</Text>
-                    <Text style={styles.accordionSubtext}>
-                        {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || 'All results'}
-                    </Text>
-                </View>
-                <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
+            {isTV ? (
+                <Focusable
+                    onPress={() => toggleSection('maxResults')}
+                    style={[styles.accordionHeader, expandedSections.maxResults && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    borderRadius={10}
+                    focusScale={1.02}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                >
+                    {(focused) => (
+                        <>
+                            <View>
+                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Max Results</Text>
+                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>
+                                    {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || 'All results'}
+                                </Text>
+                            </View>
+                            <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                        </>
+                    )}
+                </Focusable>
+            ) : (
+                <TouchableOpacity
+                    style={[styles.accordionHeader, expandedSections.maxResults && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    onPress={() => toggleSection('maxResults')}
+                >
+                    <View>
+                        <Text style={styles.accordionHeaderText}>Max Results</Text>
+                        <Text style={styles.accordionSubtext}>
+                            {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || 'All results'}
+                        </Text>
+                    </View>
+                    <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+                </TouchableOpacity>
+            )}
             {expandedSections.maxResults && (
                 <View style={styles.accordionContent}>
                     <View style={styles.pickerContainer}>
                         {TORRENTIO_MAX_RESULTS.map(option => (
-                            <TouchableOpacity
-                                key={option.id || 'all'}
-                                style={[styles.pickerItem, torrentioConfig.maxResults === option.id && styles.pickerItemSelected]}
-                                onPress={() => setTorrentioConfig(prev => ({ ...prev, maxResults: option.id }))}
-                            >
-                                <Text style={[styles.pickerItemText, torrentioConfig.maxResults === option.id && styles.pickerItemTextSelected]}>
-                                    {option.name}
-                                </Text>
-                            </TouchableOpacity>
+                            isTV ? (
+                                <Focusable
+                                    key={option.id || 'all'}
+                                    onPress={() => setTorrentioConfig(prev => ({ ...prev, maxResults: option.id }))}
+                                    style={[styles.pickerItem, torrentioConfig.maxResults === option.id && styles.pickerItemSelected]}
+                                    borderRadius={8}
+                                    focusScale={1.03}
+                                    animateBackground={true}
+                                    showFocusBorder={true}
+                                >
+                                    {(focused) => (
+                                        <Text style={[styles.pickerItemText, torrentioConfig.maxResults === option.id && styles.pickerItemTextSelected, focused && { color: '#000' }]}>
+                                            {option.name}
+                                        </Text>
+                                    )}
+                                </Focusable>
+                            ) : (
+                                <TouchableOpacity
+                                    key={option.id || 'all'}
+                                    style={[styles.pickerItem, torrentioConfig.maxResults === option.id && styles.pickerItemSelected]}
+                                    onPress={() => setTorrentioConfig(prev => ({ ...prev, maxResults: option.id }))}
+                                >
+                                    <Text style={[styles.pickerItemText, torrentioConfig.maxResults === option.id && styles.pickerItemTextSelected]}>
+                                        {option.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            )
                         ))}
                     </View>
                 </View>
             )}
 
             {/* Additional Options - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.options && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('options')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>Additional Options</Text>
-                    <Text style={styles.accordionSubtext}>Catalog & download settings</Text>
-                </View>
-                <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
+            {isTV ? (
+                <Focusable
+                    onPress={() => toggleSection('options')}
+                    style={[styles.accordionHeader, expandedSections.options && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    borderRadius={10}
+                    focusScale={1.02}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                >
+                    {(focused) => (
+                        <>
+                            <View>
+                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Additional Options</Text>
+                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>Catalog & download settings</Text>
+                            </View>
+                            <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                        </>
+                    )}
+                </Focusable>
+            ) : (
+                <TouchableOpacity
+                    style={[styles.accordionHeader, expandedSections.options && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                    onPress={() => toggleSection('options')}
+                >
+                    <View>
+                        <Text style={styles.accordionHeaderText}>Additional Options</Text>
+                        <Text style={styles.accordionSubtext}>Catalog & download settings</Text>
+                    </View>
+                    <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+                </TouchableOpacity>
+            )}
             {expandedSections.options && (
                 <View style={styles.accordionContent}>
-                    <View style={styles.switchRow}>
-                        <Text style={styles.switchLabel}>Don't show download links</Text>
-                        <Switch
-                            value={torrentioConfig.noDownloadLinks}
-                            onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noDownloadLinks: val }))}
-                            trackColor={{ false: colors.elevation3, true: colors.primary }}
-                            thumbColor={colors.white}
-                        />
-                    </View>
-                    <View style={styles.switchRow}>
-                        <Text style={styles.switchLabel}>Don't show debrid catalog</Text>
-                        <Switch
-                            value={torrentioConfig.noCatalog}
-                            onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noCatalog: val }))}
-                            trackColor={{ false: colors.elevation3, true: colors.primary }}
-                            thumbColor={colors.white}
-                        />
-                    </View>
+                    {isTV ? (
+                        <Focusable
+                            onPress={() => setTorrentioConfig(prev => ({ ...prev, noDownloadLinks: !prev.noDownloadLinks }))}
+                            style={styles.switchRow}
+                            borderRadius={8}
+                            focusScale={1.02}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                        >
+                            {(focused) => (
+                                <>
+                                    <Text style={[styles.switchLabel, focused && { color: '#000' }]}>Don't show download links</Text>
+                                    <View style={[{
+                                        width: 44,
+                                        height: 14,
+                                        borderRadius: 7,
+                                        backgroundColor: torrentioConfig.noDownloadLinks
+                                            ? (focused ? '#333' : colors.primary)
+                                            : (focused ? '#666' : colors.elevation3),
+                                        justifyContent: 'center',
+                                    }]}>
+                                        <View style={{
+                                            width: 26,
+                                            height: 26,
+                                            borderRadius: 13,
+                                            backgroundColor: focused ? '#000' : colors.white,
+                                            position: 'absolute',
+                                            top: -6,
+                                            left: torrentioConfig.noDownloadLinks ? 20 : -2,
+                                            shadowColor: '#000',
+                                            shadowOffset: { width: 0, height: 2 },
+                                            shadowOpacity: 0.2,
+                                            shadowRadius: 2,
+                                            elevation: 2,
+                                        }} />
+                                    </View>
+                                </>
+                            )}
+                        </Focusable>
+                    ) : (
+                        <View style={styles.switchRow}>
+                            <Text style={styles.switchLabel}>Don't show download links</Text>
+                            <Switch
+                                value={torrentioConfig.noDownloadLinks}
+                                onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noDownloadLinks: val }))}
+                                trackColor={{ false: colors.elevation3, true: colors.primary }}
+                                thumbColor={colors.white}
+                            />
+                        </View>
+                    )}
+                    {isTV ? (
+                        <Focusable
+                            onPress={() => setTorrentioConfig(prev => ({ ...prev, noCatalog: !prev.noCatalog }))}
+                            style={styles.switchRow}
+                            borderRadius={8}
+                            focusScale={1.02}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                        >
+                            {(focused) => (
+                                <>
+                                    <Text style={[styles.switchLabel, focused && { color: '#000' }]}>Don't show debrid catalog</Text>
+                                    <View style={[{
+                                        width: 44,
+                                        height: 14,
+                                        borderRadius: 7,
+                                        backgroundColor: torrentioConfig.noCatalog
+                                            ? (focused ? '#333' : colors.primary)
+                                            : (focused ? '#666' : colors.elevation3),
+                                        justifyContent: 'center',
+                                    }]}>
+                                        <View style={{
+                                            width: 26,
+                                            height: 26,
+                                            borderRadius: 13,
+                                            backgroundColor: focused ? '#000' : colors.white,
+                                            position: 'absolute',
+                                            top: -6,
+                                            left: torrentioConfig.noCatalog ? 20 : -2,
+                                            shadowColor: '#000',
+                                            shadowOffset: { width: 0, height: 2 },
+                                            shadowOpacity: 0.2,
+                                            shadowRadius: 2,
+                                            elevation: 2,
+                                        }} />
+                                    </View>
+                                </>
+                            )}
+                        </Focusable>
+                    ) : (
+                        <View style={styles.switchRow}>
+                            <Text style={styles.switchLabel}>Don't show debrid catalog</Text>
+                            <Switch
+                                value={torrentioConfig.noCatalog}
+                                onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noCatalog: val }))}
+                                trackColor={{ false: colors.elevation3, true: colors.primary }}
+                                thumbColor={colors.white}
+                            />
+                        </View>
+                    )}
                 </View>
             )}
 
@@ -1526,33 +1985,82 @@ const DebridIntegrationScreen = () => {
             <View style={{ marginTop: 8 }}>
                 {torrentioConfig.isInstalled ? (
                     <>
+                        {isTV ? (
+                            <Focusable
+                                onPress={handleInstallTorrentio}
+                                style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
+                                borderRadius={10}
+                                focusScale={1.03}
+                                animateBackground={true}
+                                showFocusBorder={true}
+                            >
+                                {(focused) => (
+                                    <Text style={[styles.connectButtonText, focused && { color: '#000' }]}>
+                                        {torrentioLoading ? 'Updating...' : 'Update Configuration'}
+                                    </Text>
+                                )}
+                            </Focusable>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
+                                onPress={handleInstallTorrentio}
+                                disabled={torrentioLoading}
+                            >
+                                <Text style={styles.connectButtonText}>
+                                    {torrentioLoading ? 'Updating...' : 'Update Configuration'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        {isTV ? (
+                            <Focusable
+                                onPress={handleRemoveTorrentio}
+                                style={[styles.actionButton, styles.dangerButton, torrentioLoading && styles.disabledButton]}
+                                borderRadius={10}
+                                focusScale={1.03}
+                                animateBackground={true}
+                                showFocusBorder={true}
+                            >
+                                {(focused) => (
+                                    <Text style={[styles.buttonText, focused && { color: '#000' }]}>Remove Torrentio</Text>
+                                )}
+                            </Focusable>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.dangerButton, torrentioLoading && styles.disabledButton]}
+                                onPress={handleRemoveTorrentio}
+                                disabled={torrentioLoading}
+                            >
+                                <Text style={styles.buttonText}>Remove Torrentio</Text>
+                            </TouchableOpacity>
+                        )}
+                    </>
+                ) : (
+                    isTV ? (
+                        <Focusable
+                            onPress={handleInstallTorrentio}
+                            style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
+                            borderRadius={10}
+                            focusScale={1.03}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                        >
+                            {(focused) => (
+                                <Text style={[styles.connectButtonText, focused && { color: '#000' }]}>
+                                    {torrentioLoading ? 'Installing...' : 'Install Torrentio'}
+                                </Text>
+                            )}
+                        </Focusable>
+                    ) : (
                         <TouchableOpacity
                             style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
                             onPress={handleInstallTorrentio}
                             disabled={torrentioLoading}
                         >
                             <Text style={styles.connectButtonText}>
-                                {torrentioLoading ? 'Updating...' : 'Update Configuration'}
+                                {torrentioLoading ? 'Installing...' : 'Install Torrentio'}
                             </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.dangerButton, torrentioLoading && styles.disabledButton]}
-                            onPress={handleRemoveTorrentio}
-                            disabled={torrentioLoading}
-                        >
-                            <Text style={styles.buttonText}>Remove Torrentio</Text>
-                        </TouchableOpacity>
-                    </>
-                ) : (
-                    <TouchableOpacity
-                        style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
-                        onPress={handleInstallTorrentio}
-                        disabled={torrentioLoading}
-                    >
-                        <Text style={styles.connectButtonText}>
-                            {torrentioLoading ? 'Installing...' : 'Install Torrentio'}
-                        </Text>
-                    </TouchableOpacity>
+                    )
                 )}
             </View>
 
@@ -1578,33 +2086,84 @@ const DebridIntegrationScreen = () => {
             <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
 
             <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backButton}
-                >
-                    <Feather name="arrow-left" size={24} color={colors.white} />
-                </TouchableOpacity>
+                {isTV ? (
+                    <Focusable
+                        ref={backButtonRef}
+                        onPress={() => navigation.goBack()}
+                        style={styles.backButton}
+                        autoFocus
+                        borderRadius={8}
+                        focusScale={1.05}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                    >
+                        {(focused) => (
+                            <Feather name="arrow-left" size={24} color={focused ? '#000' : colors.white} />
+                        )}
+                    </Focusable>
+                ) : (
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={styles.backButton}
+                    >
+                        <Feather name="arrow-left" size={24} color={colors.white} />
+                    </TouchableOpacity>
+                )}
                 <Text style={styles.headerTitle}>Debrid Integration</Text>
             </View>
 
             {/* Tab Selector */}
             <View style={styles.tabContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'torbox' && styles.activeTab]}
-                    onPress={() => setActiveTab('torbox')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'torbox' && styles.activeTabText]}>
-                        TorBox
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'torrentio' && styles.activeTab]}
-                    onPress={() => setActiveTab('torrentio')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'torrentio' && styles.activeTabText]}>
-                        Torrentio
-                    </Text>
-                </TouchableOpacity>
+                {isTV ? (
+                    <Focusable
+                        onPress={() => setActiveTab('torbox')}
+                        style={[styles.tab, activeTab === 'torbox' && styles.activeTab]}
+                        borderRadius={10}
+                        focusScale={1.02}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                    >
+                        {(focused) => (
+                            <Text style={[styles.tabText, activeTab === 'torbox' && styles.activeTabText, focused && { color: '#000' }]}>
+                                TorBox
+                            </Text>
+                        )}
+                    </Focusable>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'torbox' && styles.activeTab]}
+                        onPress={() => setActiveTab('torbox')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'torbox' && styles.activeTabText]}>
+                            TorBox
+                        </Text>
+                    </TouchableOpacity>
+                )}
+                {isTV ? (
+                    <Focusable
+                        onPress={() => setActiveTab('torrentio')}
+                        style={[styles.tab, activeTab === 'torrentio' && styles.activeTab]}
+                        borderRadius={10}
+                        focusScale={1.02}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                    >
+                        {(focused) => (
+                            <Text style={[styles.tabText, activeTab === 'torrentio' && styles.activeTabText, focused && { color: '#000' }]}>
+                                Torrentio
+                            </Text>
+                        )}
+                    </Focusable>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.tab, activeTab === 'torrentio' && styles.activeTab]}
+                        onPress={() => setActiveTab('torrentio')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'torrentio' && styles.activeTabText]}>
+                            Torrentio
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             <KeyboardAvoidingView

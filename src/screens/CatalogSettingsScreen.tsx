@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import {
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 import { stremioService } from '../services/stremioService';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useCatalogContext } from '../contexts/CatalogContext';
@@ -276,6 +278,10 @@ const CatalogSettingsScreen = () => {
   const styles = createStyles(colors);
   const isDarkMode = true; // Force dark mode
 
+  // TV navigation
+  const isTV = useIsTV();
+  const backButtonRef = useRef<FocusableRef>(null);
+
   // Modal State
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [catalogToRename, setCatalogToRename] = useState<CatalogSetting | null>(null);
@@ -509,13 +515,33 @@ const CatalogSettingsScreen = () => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
-            <Text style={styles.backText}>Settings</Text>
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              ref={backButtonRef}
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+              autoFocus
+              borderRadius={8}
+              focusScale={1.05}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <>
+                  <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.primary} />
+                  <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+                </>
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
+              <Text style={styles.backText}>Settings</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <Text style={styles.headerTitle}>Catalogs</Text>
         <View style={styles.loadingContainer}>
@@ -529,13 +555,33 @@ const CatalogSettingsScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
-          <Text style={styles.backText}>Settings</Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            autoFocus
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.primary} />
+                <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
+            <Text style={styles.backText}>Settings</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <Text style={styles.headerTitle}>Catalogs</Text>
 
@@ -599,18 +645,40 @@ const CatalogSettingsScreen = () => {
                   <Text style={styles.catalogName}>Show Poster Titles</Text>
                   <Text style={styles.catalogType}>Display title text below each poster</Text>
                 </View>
-                <Switch
-                  value={showTitles}
-                  onValueChange={async (value) => {
-                    try {
-                      await mmkvStorage.setItem('catalog_show_titles', value ? 'true' : 'false');
-                      setShowTitles(value);
-                    } catch { }
-                  }}
-                  trackColor={{ false: '#505050', true: colors.primary }}
-                  thumbColor={Platform.OS === 'android' ? colors.white : undefined}
-                  ios_backgroundColor="#505050"
-                />
+                {isTV ? (
+                  <Focusable
+                    onPress={async () => {
+                      try {
+                        await mmkvStorage.setItem('catalog_show_titles', !showTitles ? 'true' : 'false');
+                        setShowTitles(!showTitles);
+                      } catch { }
+                    }}
+                    style={{ width: 51, height: 26, justifyContent: 'center' }}
+                    borderRadius={13}
+                    focusScale={1.1}
+                    animateBackground={true}
+                    showFocusBorder={true}
+                  >
+                    {(focused) => (
+                      <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (showTitles ? '#333' : '#666') : (showTitles ? colors.primary : '#505050'), position: 'relative' as const }}>
+                        <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(showTitles ? { right: 0 } : { left: 0 }) }} />
+                      </View>
+                    )}
+                  </Focusable>
+                ) : (
+                  <Switch
+                    value={showTitles}
+                    onValueChange={async (value) => {
+                      try {
+                        await mmkvStorage.setItem('catalog_show_titles', value ? 'true' : 'false');
+                        setShowTitles(value);
+                      } catch { }
+                    }}
+                    trackColor={{ false: '#505050', true: colors.primary }}
+                    thumbColor={Platform.OS === 'android' ? colors.white : undefined}
+                    ios_backgroundColor="#505050"
+                  />
+                )}
               </View>
             </View>
           </View>
@@ -623,55 +691,114 @@ const CatalogSettingsScreen = () => {
             </Text>
 
             <View style={styles.card}>
-              <TouchableOpacity
-                style={styles.groupHeader}
-                onPress={() => toggleExpansion(addonId)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.groupTitle}>Catalogs</Text>
-                <View style={styles.groupHeaderRight}>
-                  <Text style={styles.enabledCount}>
-                    {group.enabledCount} of {group.catalogs.length} enabled
-                  </Text>
-                  <MaterialIcons
-                    name={group.expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"}
-                    size={24}
-                    color={colors.mediumGray}
-                  />
-                </View>
-              </TouchableOpacity>
+              {isTV ? (
+                <Focusable
+                  onPress={() => toggleExpansion(addonId)}
+                  style={styles.groupHeader}
+                  borderRadius={8}
+                  focusScale={1.02}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <>
+                      <Text style={[styles.groupTitle, focused && { color: '#000' }]}>Catalogs</Text>
+                      <View style={styles.groupHeaderRight}>
+                        <Text style={[styles.enabledCount, focused && { color: '#000' }]}>
+                          {group.enabledCount} of {group.catalogs.length} enabled
+                        </Text>
+                        <MaterialIcons
+                          name={group.expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"}
+                          size={24}
+                          color={focused ? '#000' : colors.mediumGray}
+                        />
+                      </View>
+                    </>
+                  )}
+                </Focusable>
+              ) : (
+                <TouchableOpacity
+                  style={styles.groupHeader}
+                  onPress={() => toggleExpansion(addonId)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.groupTitle}>Catalogs</Text>
+                  <View style={styles.groupHeaderRight}>
+                    <Text style={styles.enabledCount}>
+                      {group.enabledCount} of {group.catalogs.length} enabled
+                    </Text>
+                    <MaterialIcons
+                      name={group.expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"}
+                      size={24}
+                      color={colors.mediumGray}
+                    />
+                  </View>
+                </TouchableOpacity>
+              )}
 
               {group.expanded && (
                 <>
-                  <View style={styles.hintRow}>
-                    <MaterialIcons name="edit" size={14} color={colors.mediumGray} />
-                    <Text style={styles.hintText}>Long-press a catalog to rename</Text>
-                  </View>
+                  {!isTV && (
+                    <View style={styles.hintRow}>
+                      <MaterialIcons name="edit" size={14} color={colors.mediumGray} />
+                      <Text style={styles.hintText}>Long-press a catalog to rename</Text>
+                    </View>
+                  )}
                   {group.catalogs.map((setting, index) => (
-                    <Pressable
-                      key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}
-                      onLongPress={() => handleLongPress(setting)} // Added long press handler
-                      style={({ pressed }) => [
-                        styles.catalogItem,
-                        pressed && styles.catalogItemPressed, // Optional pressed style
-                      ]}
-                    >
-                      <View style={styles.catalogInfo}>
-                        <Text style={styles.catalogName}>
-                          {setting.customName || setting.name} {/* Display custom or default name */}
-                        </Text>
-                        <Text style={styles.catalogType}>
-                          {setting.type.charAt(0).toUpperCase() + setting.type.slice(1)}
-                        </Text>
+                    isTV ? (
+                      <View
+                        key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}
+                        style={styles.catalogItem}
+                      >
+                        <View style={styles.catalogInfo}>
+                          <Text style={styles.catalogName}>
+                            {setting.customName || setting.name}
+                          </Text>
+                          <Text style={styles.catalogType}>
+                            {setting.type.charAt(0).toUpperCase() + setting.type.slice(1)}
+                          </Text>
+                        </View>
+                        <Focusable
+                          onPress={() => toggleCatalog(addonId, index)}
+                          style={{ width: 51, height: 26, justifyContent: 'center' }}
+                          borderRadius={13}
+                          focusScale={1.1}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => (
+                            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (setting.enabled ? '#333' : '#666') : (setting.enabled ? colors.primary : '#505050'), position: 'relative' as const }}>
+                              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(setting.enabled ? { right: 0 } : { left: 0 }) }} />
+                            </View>
+                          )}
+                        </Focusable>
                       </View>
-                      <Switch
-                        value={setting.enabled}
-                        onValueChange={() => toggleCatalog(addonId, index)}
-                        trackColor={{ false: '#505050', true: colors.primary }}
-                        thumbColor={Platform.OS === 'android' ? colors.white : undefined}
-                        ios_backgroundColor="#505050"
-                      />
-                    </Pressable>
+                    ) : (
+                      <Pressable
+                        key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}
+                        onLongPress={() => handleLongPress(setting)}
+                        style={({ pressed }) => [
+                          styles.catalogItem,
+                          pressed && styles.catalogItemPressed,
+                        ]}
+                      >
+                        <View style={styles.catalogInfo}>
+                          <Text style={styles.catalogName}>
+                            {setting.customName || setting.name}
+                          </Text>
+                          <Text style={styles.catalogType}>
+                            {setting.type.charAt(0).toUpperCase() + setting.type.slice(1)}
+                          </Text>
+                        </View>
+                        <Switch
+                          value={setting.enabled}
+                          onValueChange={() => toggleCatalog(addonId, index)}
+                          trackColor={{ false: '#505050', true: colors.primary }}
+                          thumbColor={Platform.OS === 'android' ? colors.white : undefined}
+                          ios_backgroundColor="#505050"
+                        />
+                      </Pressable>
+                    )
                   ))}
                 </>
               )}
