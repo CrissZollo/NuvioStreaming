@@ -61,9 +61,9 @@ object NavRoutes {
 
     // Content screens
     const val METADATA = "metadata/{type}/{id}"
-    const val STREAMS = "streams/{type}/{id}"
+    const val STREAMS = "streams/{type}/{id}?episodeId={episodeId}"
     const val CATALOG = "catalog/{addonId}/{type}/{catalogId}"
-    const val PLAYER = "player/{type}/{id}"
+    const val PLAYER = "player/{type}/{id}?episodeId={episodeId}"
     const val FILMOGRAPHY = "filmography/{personId}/{personName}"
 
     // Settings sub-screens
@@ -93,10 +93,12 @@ object NavRoutes {
 
     // Helper functions for building routes with arguments
     fun metadata(type: String, id: String): String = "metadata/$type/$id"
-    fun streams(type: String, id: String): String = "streams/$type/$id"
+    fun streams(type: String, id: String, episodeId: String? = null): String =
+        if (episodeId != null) "streams/$type/$id?episodeId=$episodeId" else "streams/$type/$id"
     fun catalog(addonId: String, type: String, catalogId: String): String =
         "catalog/$addonId/$type/$catalogId"
-    fun player(type: String, id: String): String = "player/$type/$id"
+    fun player(type: String, id: String, episodeId: String? = null): String =
+        if (episodeId != null) "player/$type/$id?episodeId=$episodeId" else "player/$type/$id"
     fun filmography(personId: Int, personName: String): String =
         "filmography/$personId/${java.net.URLEncoder.encode(personName, "UTF-8")}"
 }

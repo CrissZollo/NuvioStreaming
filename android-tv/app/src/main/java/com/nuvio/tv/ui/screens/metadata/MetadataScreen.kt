@@ -776,68 +776,67 @@ private fun EpisodesSection(
     }
 }
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun EpisodeCard(
     episode: Episode,
     isNextEpisode: Boolean,
     onClick: () -> Unit
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.width(240.dp)
     ) {
-        Box(
+        Card(
+            onClick = onClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(NuvioShapes.card)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .onFocusChanged { focusState ->
+                    isFocused = focusState.isFocused
+                },
+            border = CardDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(3.dp, Color.White),
+                    shape = NuvioShapes.card
+                )
+            ),
+            shape = CardDefaults.shape(shape = NuvioShapes.card),
+            colors = CardDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
         ) {
-            // Thumbnail
-            episode.thumbnail?.let { thumb ->
-                AsyncImage(
-                    model = thumb,
-                    contentDescription = episode.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            // Episode Number Badge
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .clip(NuvioShapes.badge)
-                    .background(
-                        if (isNextEpisode) MaterialTheme.colorScheme.primary
-                        else Color.Black.copy(alpha = 0.7f)
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = episode.episodeCode,
-                    style = NuvioTypography.badge,
-                    color = Color.White
-                )
-            }
-
-            // Play button overlay
-            if (isNextEpisode) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Play",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(32.dp)
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Thumbnail
+                episode.thumbnail?.let { thumb ->
+                    AsyncImage(
+                        model = thumb,
+                        contentDescription = episode.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
+
+                // Episode Number Badge
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(NuvioShapes.badge)
+                        .background(
+                            if (isNextEpisode || isFocused) MaterialTheme.colorScheme.primary
+                            else Color.Black.copy(alpha = 0.7f)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = episode.episodeCode,
+                        style = NuvioTypography.badge,
+                        color = Color.White
+                    )
+                }
+
             }
         }
 
@@ -846,7 +845,8 @@ private fun EpisodeCard(
         Text(
             text = episode.title,
             style = NuvioTypography.labelMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = if (isFocused) Color.White else MaterialTheme.colorScheme.onBackground,
+            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -855,7 +855,7 @@ private fun EpisodeCard(
             Text(
                 text = runtime,
                 style = NuvioTypography.labelSmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                color = if (isFocused) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
             )
         }
     }

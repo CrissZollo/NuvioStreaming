@@ -189,7 +189,11 @@ fun NuvioNavigation(
                     contentType = type,
                     contentId = id,
                     onPlayClick = { content, episodeId ->
-                        navController.navigate(NavRoutes.streams(content.type, content.id))
+                        navController.navigate(NavRoutes.streams(content.type, content.id, episodeId))
+                    },
+                    onEpisodeClick = { content, episode ->
+                        // Navigate to streams with the stremio episode ID (imdbId:season:episode format)
+                        navController.navigate(NavRoutes.streams(content.type, content.id, episode.stremioId))
                     },
                     onFilmographyClick = { personId, personName ->
                         navController.navigate(NavRoutes.filmography(personId, personName))
@@ -204,19 +208,26 @@ fun NuvioNavigation(
                 route = NavRoutes.STREAMS,
                 arguments = listOf(
                     navArgument(NavArgs.TYPE) { type = NavType.StringType },
-                    navArgument(NavArgs.ID) { type = NavType.StringType }
+                    navArgument(NavArgs.ID) { type = NavType.StringType },
+                    navArgument(NavArgs.EPISODE_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
                 )
             ) { backStackEntry ->
                 val type = backStackEntry.arguments?.getString(NavArgs.TYPE) ?: "movie"
                 val id = backStackEntry.arguments?.getString(NavArgs.ID) ?: ""
+                val episodeId = backStackEntry.arguments?.getString(NavArgs.EPISODE_ID)
 
                 StreamsScreen(
                     contentType = type,
                     contentId = id,
+                    episodeId = episodeId,
                     onStreamSelected = { stream ->
                         // The viewModel.selectStream() is called from StreamsScreen
                         // Navigate to player with content info
-                        navController.navigate(NavRoutes.player(type, id))
+                        navController.navigate(NavRoutes.player(type, id, episodeId))
                     },
                     onBackClick = {
                         navController.popBackStack()
@@ -251,17 +262,24 @@ fun NuvioNavigation(
                 route = NavRoutes.PLAYER,
                 arguments = listOf(
                     navArgument(NavArgs.TYPE) { type = NavType.StringType },
-                    navArgument(NavArgs.ID) { type = NavType.StringType }
+                    navArgument(NavArgs.ID) { type = NavType.StringType },
+                    navArgument(NavArgs.EPISODE_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
                 )
             ) { backStackEntry ->
                 val type = backStackEntry.arguments?.getString(NavArgs.TYPE) ?: "movie"
                 val id = backStackEntry.arguments?.getString(NavArgs.ID) ?: ""
+                val episodeId = backStackEntry.arguments?.getString(NavArgs.EPISODE_ID)
 
                 // Get the stream from the PlaybackStateHolder
                 // The stream should be set before navigating here from StreamsScreen
                 NuvioPlayerScreen(
                     contentType = type,
                     contentId = id,
+                    episodeId = episodeId,
                     onBackClick = {
                         navController.popBackStack()
                     }
