@@ -117,6 +117,8 @@ interface SettingItemProps {
   badge?: string | number;
   isTablet?: boolean;
   isTV?: boolean;
+  disabled?: boolean;
+  disabledMessage?: string;
 }
 
 const SettingItem: React.FC<SettingItemProps> = ({
@@ -129,16 +131,23 @@ const SettingItem: React.FC<SettingItemProps> = ({
   onPress,
   badge,
   isTablet = false,
-  isTV = false
+  isTV = false,
+  disabled = false,
+  disabledMessage,
 }) => {
   const { currentTheme } = useTheme();
+
+  // Use disabled message as description if disabled and message provided
+  const displayDescription = disabled && disabledMessage ? disabledMessage : description;
 
   const content = (focused: boolean = false) => (
     <>
       <View style={[
         styles.settingIconContainer,
         {
-          backgroundColor: focused ? 'rgba(0, 0, 0, 0.2)' : currentTheme.colors.primary + '12',
+          backgroundColor: disabled
+            ? 'rgba(128, 128, 128, 0.1)'
+            : focused ? 'rgba(0, 0, 0, 0.2)' : currentTheme.colors.primary + '12',
         },
         isTablet && styles.tabletSettingIconContainer
       ]}>
@@ -148,7 +157,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
           <Feather
             name={icon! as any}
             size={isTablet ? 22 : 18}
-            color={focused ? '#0A0A0A' : currentTheme.colors.primary}
+            color={disabled ? '#666666' : (focused ? '#0A0A0A' : currentTheme.colors.primary)}
           />
         )}
       </View>
@@ -156,18 +165,18 @@ const SettingItem: React.FC<SettingItemProps> = ({
         <View style={styles.settingTextContainer}>
           <Text style={[
             styles.settingTitle,
-            { color: focused ? '#0A0A0A' : currentTheme.colors.highEmphasis },
+            { color: disabled ? '#666666' : (focused ? '#0A0A0A' : currentTheme.colors.highEmphasis) },
             isTablet && styles.tabletSettingTitle
           ]}>
             {title}
           </Text>
-          {description && (
+          {displayDescription && (
             <Text style={[
               styles.settingDescription,
-              { color: focused ? '#0A0A0A' : currentTheme.colors.mediumEmphasis },
+              { color: disabled ? '#555555' : (focused ? '#0A0A0A' : currentTheme.colors.mediumEmphasis) },
               isTablet && styles.tabletSettingDescription
             ]} numberOfLines={1}>
-              {description}
+              {displayDescription}
             </Text>
           )}
         </View>
@@ -177,7 +186,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
           </View>
         )}
       </View>
-      {renderControl && (
+      {renderControl && !disabled && (
         <View style={styles.settingControl}>
           {renderControl()}
         </View>
@@ -185,8 +194,22 @@ const SettingItem: React.FC<SettingItemProps> = ({
     </>
   );
 
-  // TV version with Focusable
+  // TV version with Focusable (or plain View if disabled)
   if (isTV) {
+    if (disabled) {
+      return (
+        <View
+          style={[
+            styles.settingItem,
+            !isLast ? styles.settingItemBorder : undefined,
+            { borderBottomColor: currentTheme.colors.elevation2, opacity: 0.5 },
+            isTablet ? styles.tabletSettingItem : undefined
+          ]}
+        >
+          {content(false)}
+        </View>
+      );
+    }
     return (
       <Focusable
         onPress={onPress}
@@ -782,31 +805,35 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
               isTV={isTVDevice}
             />
-            <SettingItem
-              title="Enable Downloads (Beta)"
-              description="Show Downloads tab and enable saving streams"
-              icon="download"
-              renderControl={() => (
-                <Switch
-                  value={settings?.enableDownloads ?? false}
-                  onValueChange={(value) => updateSetting('enableDownloads', value)}
-                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
-                  thumbColor={settings?.enableDownloads ? '#fff' : '#f4f3f4'}
-                />
-              )}
-              isTablet={isTablet}
-              isTV={isTVDevice}
-            />
-            <SettingItem
-              title="Notifications"
-              description="Episode reminders"
-              icon="bell"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('NotificationSettings')}
-              isLast={true}
-              isTablet={isTablet}
-              isTV={isTVDevice}
-            />
+            {!isTVDevice && (
+              <SettingItem
+                title="Enable Downloads (Beta)"
+                description="Show Downloads tab and enable saving streams"
+                icon="download"
+                renderControl={() => (
+                  <Switch
+                    value={settings?.enableDownloads ?? false}
+                    onValueChange={(value) => updateSetting('enableDownloads', value)}
+                    trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                    thumbColor={settings?.enableDownloads ? '#fff' : '#f4f3f4'}
+                  />
+                )}
+                isTablet={isTablet}
+                isTV={isTVDevice}
+              />
+            )}
+            {!isTVDevice && (
+              <SettingItem
+                title="Notifications"
+                description="Episode reminders"
+                icon="bell"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('NotificationSettings')}
+                isLast={true}
+                isTablet={isTablet}
+                isTV={isTVDevice}
+              />
+            )}
           </SettingsCard>
         );
 
@@ -998,6 +1025,8 @@ const SettingsScreen: React.FC = () => {
               isLast={true}
               isTablet={isTablet}
               isTV={isTVDevice}
+              disabled={isTVDevice}
+              disabledMessage="Coming soon to TV"
             />
           </SettingsCard>
         );
