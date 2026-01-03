@@ -622,7 +622,7 @@ private fun CastSection(
 
         TvLazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(end = 48.dp)
+            contentPadding = PaddingValues(start = 24.dp, end = 48.dp)
         ) {
             items(items = cast.take(10), key = { it.id }) { member ->
                 CastCard(
@@ -653,6 +653,7 @@ private fun CastCard(
                 .onFocusChanged { focusState ->
                     isFocused = focusState.isFocused
                 },
+            scale = CardDefaults.scale(focusedScale = 1f),
             border = CardDefaults.border(
                 focusedBorder = Border(
                     border = BorderStroke(3.dp, Color.White),
@@ -780,7 +781,7 @@ private fun EpisodesSection(
         } else {
             TvLazyRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(end = 48.dp)
+                contentPadding = PaddingValues(start = 24.dp, end = 48.dp)
             ) {
                 items(items = episodes, key = { it.id }) { episode ->
                     EpisodeCard(
@@ -814,6 +815,7 @@ private fun EpisodeCard(
                 .onFocusChanged { focusState ->
                     isFocused = focusState.isFocused
                 },
+            scale = CardDefaults.scale(focusedScale = 1f),
             border = CardDefaults.border(
                 focusedBorder = Border(
                     border = BorderStroke(3.dp, Color.White),
@@ -843,7 +845,7 @@ private fun EpisodeCard(
                         .padding(8.dp)
                         .clip(NuvioShapes.badge)
                         .background(
-                            if (isNextEpisode || isFocused) MaterialTheme.colorScheme.primary
+                            if (isFocused) MaterialTheme.colorScheme.primary
                             else Color.Black.copy(alpha = 0.7f)
                         )
                         .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -899,7 +901,7 @@ private fun RecommendationsSection(
 
         TvLazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(end = 48.dp)
+            contentPadding = PaddingValues(start = 24.dp, end = 48.dp)
         ) {
             items(items = recommendations, key = { it.id }) { content ->
                 ContentCard(
