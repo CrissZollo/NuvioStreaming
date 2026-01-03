@@ -366,3 +366,71 @@ data class TMDBFindResultsDto(
     @SerialName("tv_episode_results")
     val tvEpisodeResults: List<TMDBEpisodeDto>? = null
 )
+
+/**
+ * TMDB person details response.
+ */
+@Serializable
+data class TMDBPersonDto(
+    val id: Int,
+    val name: String,
+    val biography: String? = null,
+    val birthday: String? = null,
+    val deathday: String? = null,
+    @SerialName("place_of_birth")
+    val placeOfBirth: String? = null,
+    @SerialName("profile_path")
+    val profilePath: String? = null,
+    @SerialName("known_for_department")
+    val knownForDepartment: String? = null,
+    val popularity: Float? = null,
+    val gender: Int? = null,
+    @SerialName("also_known_as")
+    val alsoKnownAs: List<String>? = null,
+    val homepage: String? = null,
+    @SerialName("imdb_id")
+    val imdbId: String? = null,
+    @SerialName("combined_credits")
+    val combinedCredits: TMDBPersonCombinedCreditsDto? = null
+)
+
+/**
+ * TMDB person combined credits (movies and TV shows).
+ */
+@Serializable
+data class TMDBPersonCombinedCreditsDto(
+    val cast: List<TMDBPersonCreditDto>? = null,
+    val crew: List<TMDBPersonCreditDto>? = null
+)
+
+/**
+ * TMDB person credit item (movie or TV show they appeared in).
+ */
+@Serializable
+data class TMDBPersonCreditDto(
+    val id: Int,
+    @SerialName("media_type")
+    val mediaType: String,
+    // Movie fields
+    val title: String? = null,
+    @SerialName("release_date")
+    val releaseDate: String? = null,
+    // TV fields
+    val name: String? = null,
+    @SerialName("first_air_date")
+    val firstAirDate: String? = null,
+    // Common fields
+    val character: String? = null,
+    @SerialName("poster_path")
+    val posterPath: String? = null,
+    @SerialName("backdrop_path")
+    val backdropPath: String? = null,
+    @SerialName("vote_average")
+    val voteAverage: Float? = null,
+    val popularity: Float? = null,
+    @SerialName("episode_count")
+    val episodeCount: Int? = null,
+    // Crew fields
+    val job: String? = null,
+    val department: String? = null
+)

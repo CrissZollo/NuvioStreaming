@@ -14,6 +14,7 @@ import com.nuvio.tv.domain.model.StreamingContent
 import com.nuvio.tv.domain.model.WatchProgress
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -81,14 +82,22 @@ class HomeViewModel @Inject constructor(
 
     private fun initializeRepositories() {
         viewModelScope.launch {
-            // Initialize repositories
-            addonRepository.initialize()
-            watchProgressRepository.initialize()
-            traktRepository.initialize()
-            settingsRepository.initialize()
+            // Initialize repositories in parallel for faster startup
+            val addonInit = async { addonRepository.initialize() }
+            val watchProgressInit = async { watchProgressRepository.initialize() }
+            val traktInit = async { traktRepository.initialize() }
+            val settingsInit = async { settingsRepository.initialize() }
 
-            // Load home content
+            // Wait for addon repository first (required for catalogs)
+            addonInit.await()
+
+            // Start loading home content immediately, don't wait for other repos
             loadHomeContent()
+
+            // Let other repos finish in background
+            watchProgressInit.await()
+            traktInit.await()
+            settingsInit.await()
         }
     }
 
@@ -133,9 +142,6 @@ class HomeViewModel @Inject constructor(
                 // Check if addons are installed
                 val installedAddons = addonRepository.getInstalledAddonsSync()
                 Log.d(TAG, "Installed addons count: ${installedAddons.size}")
-                installedAddons.forEach { addon ->
-                    Log.d(TAG, "  - ${addon.name}: ${addon.catalogs.size} catalogs")
-                }
 
                 if (installedAddons.isEmpty()) {
                     Log.d(TAG, "No addons installed, showing empty state")
@@ -150,32 +156,21 @@ class HomeViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Load content in parallel
-                Log.d(TAG, "Loading home catalogs...")
-                val catalogsDeferred = async { catalogRepository.getHomeCatalogs() }
-                val thisWeekDeferred = async { loadThisWeek() }
+                // Mark as having addons immediately
+                _uiState.update { it.copy(hasAddons = true) }
 
-                val catalogs = catalogsDeferred.await()
-                Log.d(TAG, "Loaded ${catalogs.size} catalogs")
-                catalogs.forEach { catalog ->
-                    Log.d(TAG, "  - ${catalog.config.catalogName}: ${catalog.items.size} items")
-                }
+                // Load catalogs progressively - first catalog first for featured content
+                Log.d(TAG, "Loading home catalogs progressively...")
+                loadCatalogsProgressively()
 
-                val thisWeekItems = thisWeekDeferred.await()
-
-                // Extract featured content from the first catalog
-                val featuredContent = extractFeaturedContent(catalogs)
-                Log.d(TAG, "Featured content: ${featuredContent.size} items")
-
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        hasAddons = true,
-                        featuredContent = featuredContent,
-                        thisWeek = thisWeekItems,
-                        catalogs = catalogs,
-                        error = null
-                    )
+                // Load this week in background
+                viewModelScope.launch {
+                    try {
+                        val thisWeekItems = loadThisWeek()
+                        _uiState.update { it.copy(thisWeek = thisWeekItems) }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to load this week", e)
+                    }
                 }
 
             } catch (e: Exception) {
@@ -188,6 +183,70 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Load catalogs progressively - show content as it becomes available.
+     */
+    private suspend fun loadCatalogsProgressively() {
+        val catalogConfigs = catalogRepository.getAllCatalogConfigs()
+        if (catalogConfigs.isEmpty()) {
+            _uiState.update { it.copy(isLoading = false) }
+            return
+        }
+
+        Log.d(TAG, "Loading ${catalogConfigs.size} catalogs progressively")
+
+        // Load first catalog immediately for featured content
+        val firstConfig = catalogConfigs.first()
+        try {
+            val firstCatalog = catalogRepository.fetchCatalog(firstConfig.second, firstConfig.first)
+            val featuredContent = extractFeaturedContent(listOf(firstCatalog))
+
+            // Show featured content and first catalog immediately
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    featuredContent = featuredContent,
+                    catalogs = listOf(firstCatalog)
+                )
+            }
+            Log.d(TAG, "First catalog loaded: ${firstCatalog.config.catalogName} with ${firstCatalog.items.size} items")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load first catalog", e)
+            _uiState.update { it.copy(isLoading = false) }
+        }
+
+        // Load remaining catalogs in parallel batches
+        if (catalogConfigs.size > 1) {
+            val remainingConfigs = catalogConfigs.drop(1)
+            val batchSize = 3 // Load 3 catalogs at a time
+
+            remainingConfigs.chunked(batchSize).forEach { batch ->
+                kotlinx.coroutines.coroutineScope {
+                    val results = batch.map { (config, addon) ->
+                        async {
+                            try {
+                                catalogRepository.fetchCatalog(addon, config)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to load catalog ${config.catalogName}", e)
+                                null
+                            }
+                        }
+                    }.awaitAll().filterNotNull()
+
+                    // Add new catalogs to UI as they arrive
+                    if (results.isNotEmpty()) {
+                        _uiState.update { current ->
+                            current.copy(catalogs = current.catalogs + results)
+                        }
+                        Log.d(TAG, "Added ${results.size} more catalogs, total: ${_uiState.value.catalogs.size}")
+                    }
+                }
+            }
+        }
+
+        Log.d(TAG, "All catalogs loaded: ${_uiState.value.catalogs.size}")
     }
 
     companion object {

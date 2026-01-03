@@ -64,6 +64,7 @@ object NavRoutes {
     const val STREAMS = "streams/{type}/{id}"
     const val CATALOG = "catalog/{addonId}/{type}/{catalogId}"
     const val PLAYER = "player/{type}/{id}"
+    const val FILMOGRAPHY = "filmography/{personId}/{personName}"
 
     // Settings sub-screens
     const val SETTINGS_CONTENT_DISCOVERY = "settings/content-discovery"
@@ -96,6 +97,8 @@ object NavRoutes {
     fun catalog(addonId: String, type: String, catalogId: String): String =
         "catalog/$addonId/$type/$catalogId"
     fun player(type: String, id: String): String = "player/$type/$id"
+    fun filmography(personId: Int, personName: String): String =
+        "filmography/$personId/${java.net.URLEncoder.encode(personName, "UTF-8")}"
 }
 
 /**
@@ -107,4 +110,6 @@ object NavArgs {
     const val ADDON_ID = "addonId"
     const val CATALOG_ID = "catalogId"
     const val EPISODE_ID = "episodeId"
+    const val PERSON_ID = "personId"
+    const val PERSON_NAME = "personName"
 }

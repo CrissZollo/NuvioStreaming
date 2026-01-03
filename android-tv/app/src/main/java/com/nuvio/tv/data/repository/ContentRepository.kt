@@ -9,6 +9,8 @@ import com.nuvio.tv.domain.model.Addon
 import com.nuvio.tv.domain.model.CastMember
 import com.nuvio.tv.domain.model.CrewMember
 import com.nuvio.tv.domain.model.Episode
+import com.nuvio.tv.domain.model.PersonCredit
+import com.nuvio.tv.domain.model.PersonDetails
 import com.nuvio.tv.domain.model.PosterShape
 import com.nuvio.tv.domain.model.Season
 import com.nuvio.tv.domain.model.SeasonInfo
@@ -370,6 +372,47 @@ class ContentRepository @Inject constructor(
                     }
                 }
             }.awaitAll().filterNotNull().flatten()
+        }
+    }
+
+    /**
+     * Get person (actor/director) details with filmography.
+     */
+    suspend fun getPersonDetails(personId: Int): PersonDetails? = withContext(Dispatchers.IO) {
+        try {
+            val response = tmdbApi.getPerson(personId)
+            if (!response.isSuccessful) return@withContext null
+
+            val person = response.body() ?: return@withContext null
+
+            // Get cast credits sorted by popularity
+            val filmography = person.combinedCredits?.cast?.mapNotNull { credit ->
+                val title = credit.title ?: credit.name ?: return@mapNotNull null
+                PersonCredit(
+                    id = credit.id,
+                    mediaType = if (credit.mediaType == "tv") "series" else "movie",
+                    title = title,
+                    character = credit.character,
+                    posterPath = credit.posterPath,
+                    releaseDate = credit.releaseDate ?: credit.firstAirDate,
+                    voteAverage = credit.voteAverage,
+                    popularity = credit.popularity
+                )
+            }?.sortedByDescending { it.popularity ?: 0f } ?: emptyList()
+
+            PersonDetails(
+                id = person.id,
+                name = person.name,
+                biography = person.biography,
+                birthday = person.birthday,
+                deathday = person.deathday,
+                placeOfBirth = person.placeOfBirth,
+                profilePath = person.profilePath,
+                knownForDepartment = person.knownForDepartment,
+                filmography = filmography
+            )
+        } catch (e: Exception) {
+            null
         }
     }
 

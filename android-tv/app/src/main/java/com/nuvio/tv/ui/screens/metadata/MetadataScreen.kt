@@ -1,6 +1,8 @@
 package com.nuvio.tv.ui.screens.metadata
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,8 +37,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -48,12 +56,18 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.TvLazyRow
 import androidx.tv.foundation.lazy.list.items
+import androidx.tv.foundation.lazy.list.rememberTvLazyListState
+import androidx.tv.material3.Border
+import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.ExperimentalTvMaterial3Api
 import coil.compose.AsyncImage
 import com.nuvio.tv.domain.model.CastMember
 import com.nuvio.tv.domain.model.Episode
 import com.nuvio.tv.domain.model.Season
 import com.nuvio.tv.domain.model.StreamingContent
 import com.nuvio.tv.ui.components.cards.ContentCard
+import com.nuvio.tv.ui.components.dialogs.CastDetailsDialog
 import com.nuvio.tv.ui.theme.NuvioShapes
 import com.nuvio.tv.ui.theme.NuvioTypography
 
@@ -68,12 +82,27 @@ fun MetadataScreen(
     onPlayClick: (StreamingContent, String?) -> Unit,
     onEpisodeClick: (StreamingContent, Episode) -> Unit = { _, _ -> },
     onContentClick: (StreamingContent) -> Unit = {},
+    onFilmographyClick: (Int, String) -> Unit = { _, _ -> },
     onBackClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val playButtonFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(contentType, contentId) {
         viewModel.loadMetadata(contentType, contentId)
+    }
+
+    // Request focus on play button when content loads
+    LaunchedEffect(uiState.content) {
+        if (uiState.content != null && !uiState.isLoading) {
+            // Small delay to ensure the button is composed
+            kotlinx.coroutines.delay(100)
+            try {
+                playButtonFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Focus request may fail if element not yet composed
+            }
+        }
     }
 
     Box(
@@ -97,8 +126,25 @@ fun MetadataScreen(
                     onSeasonSelect = { viewModel.selectSeason(it) },
                     onToggleLibrary = { viewModel.toggleLibrary() },
                     onToggleWatchlist = { viewModel.toggleWatchlist() },
-                    onMarkWatched = { viewModel.markAsWatched() }
+                    onMarkWatched = { viewModel.markAsWatched() },
+                    onCastMemberClick = { viewModel.onCastMemberClick(it) },
+                    playButtonFocusRequester = playButtonFocusRequester
                 )
+
+                // Cast Details Dialog
+                val selectedCast = uiState.selectedCastMember
+                if (uiState.showCastDialog && selectedCast != null) {
+                    CastDetailsDialog(
+                        castMember = selectedCast,
+                        personDetails = uiState.personDetails,
+                        isLoading = uiState.isLoadingPersonDetails,
+                        onDismiss = { viewModel.closeCastDialog() },
+                        onFilmographyClick = { personDetails ->
+                            viewModel.closeCastDialog()
+                            onFilmographyClick(personDetails.id, personDetails.name)
+                        }
+                    )
+                }
             }
         }
     }
@@ -157,45 +203,66 @@ private fun MetadataContent(
     onSeasonSelect: (Int) -> Unit,
     onToggleLibrary: () -> Unit,
     onToggleWatchlist: () -> Unit,
-    onMarkWatched: () -> Unit
+    onMarkWatched: () -> Unit,
+    onCastMemberClick: (CastMember) -> Unit,
+    playButtonFocusRequester: FocusRequester
 ) {
     val content = uiState.content ?: return
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Background Image with Gradient
-        AsyncImage(
-            model = content.background ?: content.poster,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(500.dp)
-        )
+    val listState = rememberTvLazyListState()
 
-        // Gradient overlay
+    // Cache background image URL to prevent recomposition
+    val backgroundImage = remember(content.id) { content.background ?: content.poster }
+    val backgroundColor = MaterialTheme.colorScheme.background
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Layer 1: Fixed Background Image - uses graphicsLayer to isolate from scroll
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(600.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.8f),
-                            MaterialTheme.colorScheme.background
-                        ),
-                        startY = 0f,
-                        endY = 1200f
+                .fillMaxHeight(0.6f)
+                .align(Alignment.TopStart)
+        ) {
+            AsyncImage(
+                model = backgroundImage,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Gradient overlay on image
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Transparent,
+                                backgroundColor.copy(alpha = 0.8f),
+                                backgroundColor
+                            )
+                        )
                     )
-                )
+            )
+        }
+
+        // Layer 2: Full screen background color (behind scrollable content)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.5f)
+                .align(Alignment.BottomCenter)
+                .background(backgroundColor)
         )
 
-        // Content
+        // Layer 3: Scrollable content on top
         TvLazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 48.dp)
         ) {
-            // Hero Section
+            // Hero Section - takes full screen height when focused
             item(key = "hero") {
                 HeroSection(
                     content = content,
@@ -204,44 +271,72 @@ private fun MetadataContent(
                     isInWatchlist = uiState.isInWatchlist,
                     onPlayClick = onPlayClick,
                     onToggleLibrary = onToggleLibrary,
-                    onToggleWatchlist = onToggleWatchlist
+                    onToggleWatchlist = onToggleWatchlist,
+                    playButtonFocusRequester = playButtonFocusRequester
                 )
             }
 
-            // Cast Section
+            // Cast Section - with solid background for readability
             if (uiState.cast.isNotEmpty()) {
                 item(key = "cast") {
-                    CastSection(cast = uiState.cast)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(backgroundColor)
+                    ) {
+                        CastSection(
+                            cast = uiState.cast,
+                            onCastMemberClick = onCastMemberClick
+                        )
+                    }
                 }
             }
 
-            // Seasons & Episodes (for series)
+            // Seasons & Episodes (for series) - with solid background
             if (content.isSeries && uiState.seasons.isNotEmpty()) {
                 item(key = "seasons") {
-                    SeasonsSection(
-                        seasons = uiState.seasons,
-                        selectedSeason = uiState.selectedSeason,
-                        onSeasonSelect = onSeasonSelect
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(backgroundColor)
+                    ) {
+                        SeasonsSection(
+                            seasons = uiState.seasons,
+                            selectedSeason = uiState.selectedSeason,
+                            onSeasonSelect = onSeasonSelect
+                        )
+                    }
                 }
 
                 item(key = "episodes") {
-                    EpisodesSection(
-                        episodes = uiState.episodes,
-                        isLoading = uiState.isLoadingEpisodes,
-                        nextEpisode = uiState.nextEpisode,
-                        onEpisodeClick = onEpisodeClick
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(backgroundColor)
+                    ) {
+                        EpisodesSection(
+                            episodes = uiState.episodes,
+                            isLoading = uiState.isLoadingEpisodes,
+                            nextEpisode = uiState.nextEpisode,
+                            onEpisodeClick = onEpisodeClick
+                        )
+                    }
                 }
             }
 
-            // Recommendations
+            // Recommendations - with solid background
             if (uiState.recommendations.isNotEmpty()) {
                 item(key = "recommendations") {
-                    RecommendationsSection(
-                        recommendations = uiState.recommendations,
-                        onContentClick = onContentClick
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(backgroundColor)
+                    ) {
+                        RecommendationsSection(
+                            recommendations = uiState.recommendations,
+                            onContentClick = onContentClick
+                        )
+                    }
                 }
             }
         }
@@ -256,154 +351,244 @@ private fun HeroSection(
     isInWatchlist: Boolean,
     onPlayClick: () -> Unit,
     onToggleLibrary: () -> Unit,
-    onToggleWatchlist: () -> Unit
+    onToggleWatchlist: () -> Unit,
+    playButtonFocusRequester: FocusRequester
 ) {
-    Row(
+    var isPlayButtonFocused by remember { mutableStateOf(false) }
+    var isWatchlistButtonFocused by remember { mutableStateOf(false) }
+    var isFavoriteButtonFocused by remember { mutableStateOf(false) }
+
+    // Hero section with padding to center content vertically
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp, vertical = 24.dp)
-            .padding(top = 200.dp)
+            .padding(top = 80.dp, bottom = 24.dp)
     ) {
-        // Poster
-        AsyncImage(
-            model = content.poster,
-            contentDescription = content.name,
-            contentScale = ContentScale.Crop,
+        Row(
             modifier = Modifier
-                .width(200.dp)
-                .aspectRatio(2f / 3f)
-                .clip(NuvioShapes.card)
-        )
-
-        Spacer(modifier = Modifier.width(32.dp))
-
-        // Details
-        Column(modifier = Modifier.weight(1f)) {
-            // Title
-            Text(
-                text = content.name,
-                style = NuvioTypography.displaySmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Bold
+                .fillMaxWidth()
+                .padding(horizontal = 48.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Poster
+            AsyncImage(
+                model = content.poster,
+                contentDescription = content.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(200.dp)
+                    .aspectRatio(2f / 3f)
+                    .clip(NuvioShapes.card)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.width(40.dp))
 
-            // Metadata Row
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                content.year?.let { year ->
-                    Text(
-                        text = year.toString(),
-                        style = NuvioTypography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                }
+            // Details column
+            Column(modifier = Modifier.weight(1f)) {
+                // Title
+                Text(
+                    text = content.name,
+                    style = NuvioTypography.displaySmall,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
 
-                content.formattedRuntime?.let { runtime ->
-                    Text(
-                        text = runtime,
-                        style = NuvioTypography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                }
+                Spacer(modifier = Modifier.height(16.dp))
 
-                content.imdbRating?.let { rating ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                // Action Buttons - right after title
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Play Button - auto-focused on load
+                    Button(
+                        onClick = onPlayClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isPlayButtonFocused) {
+                                Color.White
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                            contentColor = if (isPlayButtonFocused) {
+                                Color.Black
+                            } else {
+                                Color.White
+                            }
+                        ),
+                        modifier = Modifier
+                            .focusRequester(playButtonFocusRequester)
+                            .onFocusChanged { focusState ->
+                                isPlayButtonFocused = focusState.isFocused
+                            }
+                            .then(
+                                if (isPlayButtonFocused) {
+                                    Modifier.border(
+                                        width = 3.dp,
+                                        color = Color.White,
+                                        shape = ButtonDefaults.shape
+                                    )
+                                } else {
+                                    Modifier
+                                }
+                            )
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Star,
+                            imageVector = Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = Color(0xFFF5C518),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(24.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = rating,
-                            style = NuvioTypography.bodyMedium,
-                            color = Color(0xFFF5C518),
-                            fontWeight = FontWeight.Bold
+                            text = if (watchProgress != null && watchProgress > 0.05f) "Resume" else "Play",
+                            style = NuvioTypography.labelLarge,
+                            fontWeight = if (isPlayButtonFocused) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+
+                    // Watchlist Button
+                    OutlinedButton(
+                        onClick = onToggleWatchlist,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (isWatchlistButtonFocused) {
+                                Color.White
+                            } else {
+                                Color.White.copy(alpha = 0.15f)
+                            },
+                            contentColor = if (isWatchlistButtonFocused) {
+                                Color.Black
+                            } else {
+                                Color.White
+                            }
+                        ),
+                        border = BorderStroke(
+                            width = if (isWatchlistButtonFocused) 3.dp else 2.dp,
+                            color = if (isWatchlistButtonFocused) Color.White else Color.White.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.onFocusChanged { focusState ->
+                            isWatchlistButtonFocused = focusState.isFocused
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (isInWatchlist) Icons.Default.Check else Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isInWatchlist) "In Watchlist" else "Watchlist",
+                            style = NuvioTypography.labelLarge,
+                            fontWeight = if (isWatchlistButtonFocused) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+
+                    // Favorite Button
+                    OutlinedButton(
+                        onClick = onToggleLibrary,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (isFavoriteButtonFocused) {
+                                Color.White
+                            } else {
+                                Color.White.copy(alpha = 0.15f)
+                            },
+                            contentColor = if (isFavoriteButtonFocused) {
+                                Color.Black
+                            } else {
+                                Color.White
+                            }
+                        ),
+                        border = BorderStroke(
+                            width = if (isFavoriteButtonFocused) 3.dp else 2.dp,
+                            color = if (isFavoriteButtonFocused) Color.White else Color.White.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.onFocusChanged { focusState ->
+                            isFavoriteButtonFocused = focusState.isFocused
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (isInLibrary) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            tint = when {
+                                isFavoriteButtonFocused && isInLibrary -> Color.Red
+                                isFavoriteButtonFocused -> Color.Black
+                                isInLibrary -> Color.Red
+                                else -> Color.White
+                            },
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
-            }
 
-            // Genres
-            if (content.genres.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = content.genres.joinToString(" • "),
-                    style = NuvioTypography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
+                // Metadata Row (year, runtime, rating)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    content.year?.let { year ->
+                        Text(
+                            text = year.toString(),
+                            style = NuvioTypography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                    }
 
-            // Description
-            content.description?.let { desc ->
-                Text(
-                    text = desc,
-                    style = NuvioTypography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+                    content.formattedRuntime?.let { runtime ->
+                        Text(
+                            text = runtime,
+                            style = NuvioTypography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                    }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                    content.imdbRating?.let { rating ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFF5C518),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = rating,
+                                style = NuvioTypography.bodyMedium,
+                                color = Color(0xFFF5C518),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
 
-            // Action Buttons
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Play Button
-                Button(
-                    onClick = onPlayClick,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                // Genres
+                if (content.genres.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = if (watchProgress != null && watchProgress > 0.05f) "Resume" else "Play",
-                        style = NuvioTypography.labelLarge
+                        text = content.genres.joinToString(" • "),
+                        style = NuvioTypography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 
-                // Watchlist Button
-                OutlinedButton(onClick = onToggleWatchlist) {
-                    Icon(
-                        imageVector = if (isInWatchlist) Icons.Default.Check else Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                // Description
+                content.description?.let { desc ->
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = if (isInWatchlist) "In Watchlist" else "Watchlist",
-                        style = NuvioTypography.labelLarge
+                        text = desc,
+                        style = NuvioTypography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-
-                // Favorite Button
-                OutlinedButton(onClick = onToggleLibrary) {
-                    Icon(
-                        imageVector = if (isInLibrary) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        tint = if (isInLibrary) Color.Red else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-    }
+            } // Column
+    } // Row (poster + details)
+} // Box
 }
 
 @Composable
-private fun CastSection(cast: List<CastMember>) {
+private fun CastSection(
+    cast: List<CastMember>,
+    onCastMemberClick: (CastMember) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -422,34 +607,60 @@ private fun CastSection(cast: List<CastMember>) {
             contentPadding = PaddingValues(end = 48.dp)
         ) {
             items(items = cast.take(10), key = { it.id }) { member ->
-                CastCard(cast = member)
+                CastCard(
+                    cast = member,
+                    onClick = { onCastMemberClick(member) }
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun CastCard(cast: CastMember) {
+private fun CastCard(
+    cast: CastMember,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(100.dp)
     ) {
-        AsyncImage(
-            model = cast.profileUrl,
-            contentDescription = cast.name,
-            contentScale = ContentScale.Crop,
+        Card(
+            onClick = onClick,
             modifier = Modifier
                 .size(80.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        )
+                .onFocusChanged { focusState ->
+                    isFocused = focusState.isFocused
+                },
+            border = CardDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(3.dp, Color.White),
+                    shape = CircleShape
+                )
+            ),
+            shape = CardDefaults.shape(shape = CircleShape),
+            colors = CardDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            AsyncImage(
+                model = cast.profileUrl,
+                contentDescription = cast.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = cast.name,
             style = NuvioTypography.labelSmall,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = if (isFocused) Color.White else MaterialTheme.colorScheme.onBackground,
+            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -458,7 +669,7 @@ private fun CastCard(cast: CastMember) {
             Text(
                 text = character,
                 style = NuvioTypography.labelSmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                color = if (isFocused) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

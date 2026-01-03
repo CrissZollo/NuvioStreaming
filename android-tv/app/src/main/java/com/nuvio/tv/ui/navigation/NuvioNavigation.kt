@@ -38,6 +38,7 @@ import com.nuvio.tv.ui.screens.settings.playback.AudioLanguageSelectionScreen
 import com.nuvio.tv.ui.screens.settings.playback.PlaybackSettingsScreen
 import com.nuvio.tv.ui.screens.settings.playback.SubtitleLanguageSelectionScreen
 import com.nuvio.tv.ui.screens.settings.playback.SubtitleSourceSelectionScreen
+import com.nuvio.tv.ui.screens.filmography.FilmographyScreen
 import com.nuvio.tv.ui.screens.player.NuvioPlayerScreen
 import com.nuvio.tv.ui.screens.splash.SplashScreen
 import com.nuvio.tv.ui.screens.streams.StreamsScreen
@@ -190,6 +191,9 @@ fun NuvioNavigation(
                     onPlayClick = { content, episodeId ->
                         navController.navigate(NavRoutes.streams(content.type, content.id))
                     },
+                    onFilmographyClick = { personId, personName ->
+                        navController.navigate(NavRoutes.filmography(personId, personName))
+                    },
                     onBackClick = {
                         navController.popBackStack()
                     }
@@ -258,6 +262,33 @@ fun NuvioNavigation(
                 NuvioPlayerScreen(
                     contentType = type,
                     contentId = id,
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            // Filmography Screen
+            composable(
+                route = NavRoutes.FILMOGRAPHY,
+                arguments = listOf(
+                    navArgument(NavArgs.PERSON_ID) { type = NavType.IntType },
+                    navArgument(NavArgs.PERSON_NAME) { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val personId = backStackEntry.arguments?.getInt(NavArgs.PERSON_ID) ?: 0
+                val personName = java.net.URLDecoder.decode(
+                    backStackEntry.arguments?.getString(NavArgs.PERSON_NAME) ?: "",
+                    "UTF-8"
+                )
+
+                FilmographyScreen(
+                    personId = personId,
+                    personName = personName,
+                    onContentClick = { mediaType, tmdbId ->
+                        // Navigate to metadata screen with tmdb ID
+                        navController.navigate(NavRoutes.metadata(mediaType, "tmdb:$tmdbId"))
+                    },
                     onBackClick = {
                         navController.popBackStack()
                     }

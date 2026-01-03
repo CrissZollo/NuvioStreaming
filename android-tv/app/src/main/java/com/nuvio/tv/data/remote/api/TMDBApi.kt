@@ -4,6 +4,7 @@ import com.nuvio.tv.data.remote.dto.TMDBFindResultsDto
 import com.nuvio.tv.data.remote.dto.TMDBMovieDto
 import com.nuvio.tv.data.remote.dto.TMDBMovieResultsDto
 import com.nuvio.tv.data.remote.dto.TMDBMultiSearchResultsDto
+import com.nuvio.tv.data.remote.dto.TMDBPersonDto
 import com.nuvio.tv.data.remote.dto.TMDBSeasonDto
 import com.nuvio.tv.data.remote.dto.TMDBTVResultsDto
 import com.nuvio.tv.data.remote.dto.TMDBTVShowDto
@@ -217,4 +218,15 @@ interface TMDBApi {
         @Path("external_id") externalId: String,
         @Query("external_source") externalSource: String = "imdb_id"
     ): Response<TMDBFindResultsDto>
+
+    // ==================== Person Endpoints ====================
+
+    /**
+     * Get person details with credits.
+     */
+    @GET("person/{person_id}")
+    suspend fun getPerson(
+        @Path("person_id") personId: Int,
+        @Query("append_to_response") appendToResponse: String = "combined_credits"
+    ): Response<TMDBPersonDto>
 }

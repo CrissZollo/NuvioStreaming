@@ -9,6 +9,7 @@ import com.nuvio.tv.data.repository.TraktRepository
 import com.nuvio.tv.data.repository.WatchProgressRepository
 import com.nuvio.tv.domain.model.CastMember
 import com.nuvio.tv.domain.model.Episode
+import com.nuvio.tv.domain.model.PersonDetails
 import com.nuvio.tv.domain.model.Season
 import com.nuvio.tv.domain.model.StreamingContent
 import com.nuvio.tv.domain.model.TrailerStream
@@ -40,7 +41,12 @@ data class MetadataUiState(
     val isInWatchlist: Boolean = false,
     val isTraktAuthenticated: Boolean = false,
     val watchProgress: WatchProgress? = null,
-    val nextEpisode: Episode? = null
+    val nextEpisode: Episode? = null,
+    // Cast dialog state
+    val showCastDialog: Boolean = false,
+    val selectedCastMember: CastMember? = null,
+    val personDetails: PersonDetails? = null,
+    val isLoadingPersonDetails: Boolean = false
 )
 
 /**
@@ -312,5 +318,43 @@ class MetadataViewModel @Inject constructor(
      */
     fun refresh() {
         loadMetadata(contentType, contentId)
+    }
+
+    /**
+     * Open cast member details dialog.
+     */
+    fun onCastMemberClick(castMember: CastMember) {
+        _uiState.update {
+            it.copy(
+                showCastDialog = true,
+                selectedCastMember = castMember,
+                personDetails = null,
+                isLoadingPersonDetails = true
+            )
+        }
+
+        // Load person details
+        viewModelScope.launch {
+            val personDetails = contentRepository.getPersonDetails(castMember.id)
+            _uiState.update {
+                it.copy(
+                    personDetails = personDetails,
+                    isLoadingPersonDetails = false
+                )
+            }
+        }
+    }
+
+    /**
+     * Close cast details dialog.
+     */
+    fun closeCastDialog() {
+        _uiState.update {
+            it.copy(
+                showCastDialog = false,
+                selectedCastMember = null,
+                personDetails = null
+            )
+        }
     }
 }

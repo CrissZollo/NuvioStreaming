@@ -30,6 +30,43 @@ class CatalogRepository @Inject constructor(
     companion object {
         private const val TAG = "CatalogRepository"
         private const val DEFAULT_PAGE_SIZE = 100
+        private const val CACHE_EXPIRY_MS = 5 * 60 * 1000L // 5 minutes cache
+    }
+
+    // Simple in-memory cache for catalog content
+    private data class CachedCatalog(
+        val content: CatalogContent,
+        val timestamp: Long
+    )
+
+    private val catalogCache = mutableMapOf<String, CachedCatalog>()
+
+    private fun getCacheKey(config: CatalogConfig, page: Int = 1, genre: String? = null, search: String? = null): String {
+        return "${config.addonId}:${config.catalogId}:${config.type}:$page:${genre ?: ""}:${search ?: ""}"
+    }
+
+    private fun getCachedCatalog(key: String): CatalogContent? {
+        val cached = catalogCache[key] ?: return null
+        val now = System.currentTimeMillis()
+        return if (now - cached.timestamp < CACHE_EXPIRY_MS) {
+            Log.d(TAG, "Cache hit for: $key")
+            cached.content
+        } else {
+            catalogCache.remove(key)
+            null
+        }
+    }
+
+    private fun cacheCatalog(key: String, content: CatalogContent) {
+        catalogCache[key] = CachedCatalog(content, System.currentTimeMillis())
+    }
+
+    /**
+     * Clear all cached catalogs.
+     */
+    fun clearCache() {
+        catalogCache.clear()
+        Log.d(TAG, "Catalog cache cleared")
     }
 
     /**
@@ -118,6 +155,10 @@ class CatalogRepository @Inject constructor(
         genre: String? = null,
         search: String? = null
     ): CatalogContent = withContext(Dispatchers.IO) {
+        // Check cache first
+        val cacheKey = getCacheKey(config, page, genre, search)
+        getCachedCatalog(cacheKey)?.let { return@withContext it }
+
         val baseUrl = addon.url.removeSuffix("/")
         val catalog = addon.catalogs.find { it.id == config.catalogId }
             ?: throw Exception("Catalog not found")
@@ -172,11 +213,16 @@ class CatalogRepository @Inject constructor(
         // Determine if there are more pages
         val hasMore = items.size >= DEFAULT_PAGE_SIZE && catalog.supportsPagination
 
-        CatalogContent(
+        val result = CatalogContent(
             config = config,
             items = items,
             hasMore = hasMore
         )
+
+        // Cache the result
+        cacheCatalog(cacheKey, result)
+
+        result
     }
 
     /**

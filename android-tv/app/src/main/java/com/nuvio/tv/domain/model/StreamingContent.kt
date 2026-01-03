@@ -170,3 +170,77 @@ data class CatalogContent(
     val items: List<StreamingContent>,
     val hasMore: Boolean = false
 )
+
+/**
+ * Person (actor/director) details.
+ */
+data class PersonDetails(
+    val id: Int,
+    val name: String,
+    val biography: String? = null,
+    val birthday: String? = null,
+    val deathday: String? = null,
+    val placeOfBirth: String? = null,
+    val profilePath: String? = null,
+    val knownForDepartment: String? = null,
+    val filmography: List<PersonCredit> = emptyList()
+) {
+    val profileUrl: String?
+        get() = profilePath?.let { "https://image.tmdb.org/t/p/w342$it" }
+
+    val age: Int?
+        get() {
+            val birth = birthday ?: return null
+            try {
+                val birthParts = birth.split("-")
+                if (birthParts.size < 3) return null
+                val birthYear = birthParts[0].toIntOrNull() ?: return null
+
+                val endDate = deathday ?: java.time.LocalDate.now().toString()
+                val endParts = endDate.split("-")
+                if (endParts.size < 3) return null
+                val endYear = endParts[0].toIntOrNull() ?: return null
+
+                return endYear - birthYear
+            } catch (e: Exception) {
+                return null
+            }
+        }
+
+    val formattedBirthday: String?
+        get() {
+            val birth = birthday ?: return null
+            try {
+                val parts = birth.split("-")
+                if (parts.size < 3) return birth
+                val months = listOf("", "January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December")
+                val month = parts[1].toIntOrNull() ?: return birth
+                val day = parts[2].toIntOrNull() ?: return birth
+                val year = parts[0]
+                return "${months.getOrElse(month) { "" }} $day, $year"
+            } catch (e: Exception) {
+                return birth
+            }
+        }
+}
+
+/**
+ * A movie or TV show credit for a person.
+ */
+data class PersonCredit(
+    val id: Int,
+    val mediaType: String, // "movie" or "tv"
+    val title: String,
+    val character: String? = null,
+    val posterPath: String? = null,
+    val releaseDate: String? = null,
+    val voteAverage: Float? = null,
+    val popularity: Float? = null
+) {
+    val posterUrl: String?
+        get() = posterPath?.let { "https://image.tmdb.org/t/p/w185$it" }
+
+    val year: Int?
+        get() = releaseDate?.take(4)?.toIntOrNull()
+}
