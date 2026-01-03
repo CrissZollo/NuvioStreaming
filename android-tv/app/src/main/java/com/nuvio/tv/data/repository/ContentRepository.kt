@@ -41,14 +41,24 @@ class ContentRepository @Inject constructor(
     /**
      * Get detailed metadata for content.
      * Fetches from Stremio addons and enriches with TMDB data.
+     * Supports both IMDB IDs (tt1234567) and TMDB IDs (tmdb:12345).
      */
     suspend fun getMetadata(
         type: String,
         id: String,
         preferredAddonId: String? = null
     ): StreamingContent? = withContext(Dispatchers.IO) {
+        // Handle TMDB ID format - convert to IMDB ID first
+        val actualId = if (id.startsWith("tmdb:")) {
+            val tmdbId = id.removePrefix("tmdb:").toIntOrNull()
+                ?: return@withContext null
+            getImdbIdFromTmdb(type, tmdbId) ?: return@withContext null
+        } else {
+            id
+        }
+
         // Get metadata from Stremio addon
-        val stremioMeta = fetchStremioMetadata(type, id, preferredAddonId)
+        val stremioMeta = fetchStremioMetadata(type, actualId, preferredAddonId)
             ?: return@withContext null
 
         // Try to enrich with TMDB data
@@ -59,6 +69,31 @@ class ContentRepository @Inject constructor(
         }
 
         enrichedContent
+    }
+
+    /**
+     * Get IMDB ID from TMDB ID.
+     */
+    private suspend fun getImdbIdFromTmdb(type: String, tmdbId: Int): String? {
+        return try {
+            when (type) {
+                "movie" -> {
+                    val response = tmdbApi.getMovie(tmdbId)
+                    if (response.isSuccessful) {
+                        response.body()?.externalIds?.imdbId
+                    } else null
+                }
+                "series" -> {
+                    val response = tmdbApi.getTVShow(tmdbId)
+                    if (response.isSuccessful) {
+                        response.body()?.externalIds?.imdbId
+                    } else null
+                }
+                else -> null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /**
