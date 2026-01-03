@@ -29,6 +29,7 @@ import com.nuvio.tv.ui.screens.settings.debrid.DebridIntegrationScreen
 import com.nuvio.tv.ui.screens.settings.integrations.IntegrationsSettingsScreen
 import com.nuvio.tv.ui.screens.settings.playback.PlaybackSettingsScreen
 import com.nuvio.tv.ui.screens.player.NetflixPlayerScreen
+import com.nuvio.tv.ui.screens.splash.SplashScreen
 import com.nuvio.tv.ui.screens.streams.StreamsScreen
 
 /**
@@ -47,7 +48,8 @@ fun NuvioNavigation(
     val currentRoute = navBackStackEntry?.destination?.route
 
     // Routes where navigation rail should be hidden (full-screen experiences)
-    val isFullScreenRoute = currentRoute?.startsWith("streams/") == true ||
+    val isFullScreenRoute = currentRoute == NavRoutes.SPLASH ||
+        currentRoute?.startsWith("streams/") == true ||
         currentRoute?.startsWith("player/") == true
 
     Row(modifier = modifier.fillMaxSize()) {
@@ -74,9 +76,20 @@ fun NuvioNavigation(
         // Main Content Area
         NavHost(
             navController = navController,
-            startDestination = NavRoutes.HOME,
+            startDestination = NavRoutes.SPLASH,
             modifier = Modifier.weight(1f)
         ) {
+            // Splash Screen
+            composable(NavRoutes.SPLASH) {
+                SplashScreen(
+                    onSplashComplete = {
+                        navController.navigate(NavRoutes.HOME) {
+                            popUpTo(NavRoutes.SPLASH) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             // Main Tab Screens
             composable(NavRoutes.HOME) {
                 HomeScreen(

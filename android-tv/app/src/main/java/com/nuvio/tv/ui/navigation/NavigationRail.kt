@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -36,9 +37,11 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import coil.compose.AsyncImage
+import com.nuvio.tv.R
 import com.nuvio.tv.ui.theme.NuvioTypography
 
 /**
@@ -65,16 +68,14 @@ fun NuvioNavigationRail(
         // App Logo
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(56.dp)
                 .padding(bottom = 8.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Placeholder for logo - will use actual logo asset
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primary)
+            Image(
+                painter = painterResource(id = R.drawable.nuvio_logo),
+                contentDescription = "Nuvio",
+                modifier = Modifier.size(48.dp)
             )
         }
 

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import com.nuvio.tv.domain.model.StreamingContent
 import com.nuvio.tv.ui.components.cards.ContentCard
@@ -67,7 +68,8 @@ fun ContentCarousel(
     onSeeAllClick: (() -> Unit)? = null,
     showTitle: Boolean = true,
     onRowFocused: (() -> Unit)? = null,
-    cardWidth: Int = CARD_WIDTH
+    cardWidth: Int = CARD_WIDTH,
+    keyPrefix: String = title // Unique prefix to avoid key collisions across carousels
 ) {
     val listState = rememberLazyListState()
     var seeAllFocused by remember { mutableStateOf(false) }
@@ -168,31 +170,50 @@ fun ContentCarousel(
                 .fillMaxWidth()
                 .height(rowHeight.dp)
         ) {
-            LazyRow(
-                state = listState,
-                contentPadding = PaddingValues(end = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(
-                    items = items,
-                    key = { it.id }
-                ) { content ->
-                    ContentCard(
-                        content = content,
-                        onClick = { onItemClick(content) },
-                        cardWidth = cardWidth,
-                        modifier = Modifier.onFocusChanged { focusState ->
-                            if (focusState.isFocused) {
-                                // Always trigger scroll when any card gets focus
-                                // This handles both horizontal navigation within row
-                                // and vertical navigation between rows
-                                onRowFocused?.invoke()
-                                anyCardFocused = true
-                            } else if (!focusState.isFocused) {
-                                anyCardFocused = false
-                            }
-                        }
+            if (items.isEmpty()) {
+                // Empty state placeholder
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(rowHeight.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = "No content found",
+                        style = NuvioTypography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                     )
+                }
+            } else {
+                LazyRow(
+                    state = listState,
+                    contentPadding = PaddingValues(end = 48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Use itemsIndexed with a composite key to handle:
+                    // 1. Duplicate IDs within the same carousel (using index)
+                    // 2. Same IDs across different carousels (using keyPrefix)
+                    itemsIndexed(
+                        items = items,
+                        key = { index, content -> "$keyPrefix:${content.id}:$index" }
+                    ) { _, content ->
+                        ContentCard(
+                            content = content,
+                            onClick = { onItemClick(content) },
+                            cardWidth = cardWidth,
+                            modifier = Modifier.onFocusChanged { focusState ->
+                                if (focusState.isFocused) {
+                                    // Always trigger scroll when any card gets focus
+                                    // This handles both horizontal navigation within row
+                                    // and vertical navigation between rows
+                                    onRowFocused?.invoke()
+                                    anyCardFocused = true
+                                } else if (!focusState.isFocused) {
+                                    anyCardFocused = false
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -213,6 +234,7 @@ fun <T> GenericCarousel(
     onSeeAllClick: (() -> Unit)? = null,
     rowHeight: Dp = 200.dp, // Default height for generic carousels
     onRowFocused: (() -> Unit)? = null,
+    keyPrefix: String = title, // Unique prefix to avoid key collisions
     itemContent: @Composable (T) -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -307,29 +329,46 @@ fun <T> GenericCarousel(
                 .fillMaxWidth()
                 .height(rowHeight)
         ) {
-            LazyRow(
-                state = listState,
-                contentPadding = PaddingValues(end = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(
-                    items = items,
-                    key = itemKey
-                ) { item ->
-                    Box(
-                        modifier = Modifier.onFocusChanged { focusState ->
-                            if (focusState.hasFocus) {
-                                // Always trigger scroll when any card gets focus
-                                // This handles both horizontal navigation within row
-                                // and vertical navigation between rows
-                                onRowFocused?.invoke()
-                                anyCardFocused = true
-                            } else if (!focusState.hasFocus) {
-                                anyCardFocused = false
+            if (items.isEmpty()) {
+                // Empty state placeholder
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(rowHeight),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = "No content found",
+                        style = NuvioTypography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    )
+                }
+            } else {
+                LazyRow(
+                    state = listState,
+                    contentPadding = PaddingValues(end = 48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Use itemsIndexed with a composite key to handle duplicates
+                    itemsIndexed(
+                        items = items,
+                        key = { index, item -> "$keyPrefix:${itemKey(item)}:$index" }
+                    ) { _, item ->
+                        Box(
+                            modifier = Modifier.onFocusChanged { focusState ->
+                                if (focusState.hasFocus) {
+                                    // Always trigger scroll when any card gets focus
+                                    // This handles both horizontal navigation within row
+                                    // and vertical navigation between rows
+                                    onRowFocused?.invoke()
+                                    anyCardFocused = true
+                                } else if (!focusState.hasFocus) {
+                                    anyCardFocused = false
+                                }
                             }
+                        ) {
+                            itemContent(item)
                         }
-                    ) {
-                        itemContent(item)
                     }
                 }
             }

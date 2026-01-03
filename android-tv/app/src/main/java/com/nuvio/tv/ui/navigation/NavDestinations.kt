@@ -50,6 +50,9 @@ enum class MainNavDestination(
  * All navigation routes in the app.
  */
 object NavRoutes {
+    // Splash screen
+    const val SPLASH = "splash"
+
     // Main tabs
     const val HOME = "home"
     const val LIBRARY = "library"
