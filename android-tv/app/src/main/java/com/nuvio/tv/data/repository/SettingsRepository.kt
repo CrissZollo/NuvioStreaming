@@ -43,6 +43,7 @@ class SettingsRepository @Inject constructor() {
         private const val KEY_PLAYER_TYPE = "player_type"
         private const val KEY_CACHE_SIZE_MB = "cache_size_mb"
         private const val KEY_STREAM_SORT_MODE = "stream_sort_mode"
+        private const val KEY_SUBTITLE_SOURCE_PRIORITY = "subtitle_source_priority"
 
         // Default values
         const val DEFAULT_THEME = "nuvio"
@@ -53,6 +54,9 @@ class SettingsRepository @Inject constructor() {
         const val DEFAULT_PLAYER_TYPE = "exoplayer"
         const val DEFAULT_CACHE_SIZE = 500 // MB
         const val DEFAULT_STREAM_SORT_MODE = "addon_order" // addon_order (respects addon sorting), quality, size, or addon
+        const val DEFAULT_SUBTITLE_SOURCE_PRIORITY = "embedded" // embedded or external
+        const val DEFAULT_PREFERRED_AUDIO_LANGUAGE = "eng" // ISO 639-2 language code
+        const val DEFAULT_PREFERRED_SUBTITLE_LANGUAGE = "none" // ISO 639-2 language code or "none"
     }
 
     private val mmkv: MMKV by lazy {
@@ -189,32 +193,44 @@ class SettingsRepository @Inject constructor() {
 
     // ==================== LANGUAGE PREFERENCES ====================
 
-    fun getPreferredAudioLanguage(): String? {
-        return mmkv.decodeString(KEY_PREFERRED_AUDIO_LANG)
+    fun getPreferredAudioLanguage(): String {
+        return mmkv.decodeString(KEY_PREFERRED_AUDIO_LANG, DEFAULT_PREFERRED_AUDIO_LANGUAGE)
+            ?: DEFAULT_PREFERRED_AUDIO_LANGUAGE
     }
 
-    suspend fun setPreferredAudioLanguage(language: String?) {
+    suspend fun setPreferredAudioLanguage(language: String) {
         withContext(Dispatchers.IO) {
-            if (language != null) {
-                mmkv.encode(KEY_PREFERRED_AUDIO_LANG, language)
-            } else {
-                mmkv.removeValueForKey(KEY_PREFERRED_AUDIO_LANG)
-            }
+            mmkv.encode(KEY_PREFERRED_AUDIO_LANG, language)
             loadSettings()
         }
     }
 
-    fun getPreferredSubtitleLanguage(): String? {
-        return mmkv.decodeString(KEY_PREFERRED_SUBTITLE_LANG)
+    fun getPreferredSubtitleLanguage(): String {
+        return mmkv.decodeString(KEY_PREFERRED_SUBTITLE_LANG, DEFAULT_PREFERRED_SUBTITLE_LANGUAGE)
+            ?: DEFAULT_PREFERRED_SUBTITLE_LANGUAGE
     }
 
-    suspend fun setPreferredSubtitleLanguage(language: String?) {
+    suspend fun setPreferredSubtitleLanguage(language: String) {
         withContext(Dispatchers.IO) {
-            if (language != null) {
-                mmkv.encode(KEY_PREFERRED_SUBTITLE_LANG, language)
-            } else {
-                mmkv.removeValueForKey(KEY_PREFERRED_SUBTITLE_LANG)
-            }
+            mmkv.encode(KEY_PREFERRED_SUBTITLE_LANG, language)
+            loadSettings()
+        }
+    }
+
+    /**
+     * Get subtitle source priority.
+     * Options:
+     * - "embedded": Prefer embedded/internal subtitles first
+     * - "external": Prefer external subtitles first (from addons)
+     */
+    fun getSubtitleSourcePriority(): String {
+        return mmkv.decodeString(KEY_SUBTITLE_SOURCE_PRIORITY, DEFAULT_SUBTITLE_SOURCE_PRIORITY)
+            ?: DEFAULT_SUBTITLE_SOURCE_PRIORITY
+    }
+
+    suspend fun setSubtitleSourcePriority(priority: String) {
+        withContext(Dispatchers.IO) {
+            mmkv.encode(KEY_SUBTITLE_SOURCE_PRIORITY, priority)
             loadSettings()
         }
     }
@@ -348,6 +364,7 @@ class SettingsRepository @Inject constructor() {
             defaultQuality = getDefaultQuality(),
             preferredAudioLanguage = getPreferredAudioLanguage(),
             preferredSubtitleLanguage = getPreferredSubtitleLanguage(),
+            subtitleSourcePriority = getSubtitleSourcePriority(),
             showContinueWatching = isShowContinueWatchingEnabled(),
             showThisWeek = isShowThisWeekEnabled(),
             debridService = getDebridService(),
@@ -388,8 +405,9 @@ data class AppSettings(
     val skipCredits: Boolean = false,
     val resumePlayback: Boolean = true,
     val defaultQuality: String = SettingsRepository.DEFAULT_QUALITY,
-    val preferredAudioLanguage: String? = null,
-    val preferredSubtitleLanguage: String? = null,
+    val preferredAudioLanguage: String = SettingsRepository.DEFAULT_PREFERRED_AUDIO_LANGUAGE,
+    val preferredSubtitleLanguage: String = SettingsRepository.DEFAULT_PREFERRED_SUBTITLE_LANGUAGE,
+    val subtitleSourcePriority: String = SettingsRepository.DEFAULT_SUBTITLE_SOURCE_PRIORITY,
     val showContinueWatching: Boolean = true,
     val showThisWeek: Boolean = true,
     val debridService: String? = null,

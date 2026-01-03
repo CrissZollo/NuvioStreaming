@@ -1,16 +1,19 @@
 package com.nuvio.tv.ui.screens.player
 
 import android.content.Context
+import android.util.Log
 import android.view.SurfaceView
 import android.view.View
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
 import com.nuvio.tv.data.repository.ContentRepository
+import com.nuvio.tv.data.repository.SettingsRepository
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.domain.model.Subtitle
 import com.nuvio.tv.player.PlaybackRequest
 import com.nuvio.tv.player.PlaybackStateHolder
+import com.nuvio.tv.player.engine.EngineAudioTrack
 import com.nuvio.tv.player.engine.EngineSubtitleTrack
 import com.nuvio.tv.player.engine.EngineType
 import com.nuvio.tv.player.engine.UnifiedPlayer
@@ -62,8 +65,13 @@ class UnifiedPlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val unifiedPlayer: UnifiedPlayer,
     private val playbackStateHolder: PlaybackStateHolder,
-    private val contentRepository: ContentRepository
+    private val contentRepository: ContentRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "UnifiedPlayerVM"
+    }
 
     val playerState: StateFlow<UnifiedPlayerState> = unifiedPlayer.state
 
@@ -74,6 +82,7 @@ class UnifiedPlayerViewModel @Inject constructor(
     private var currentStream: Stream? = null
     private var cachedPlaybackRequest: PlaybackRequest? = null
     private var subtitlesLoaded = false
+    private var autoSelectApplied = false
 
     init {
         observePlayerEvents()
@@ -121,15 +130,195 @@ class UnifiedPlayerViewModel @Inject constructor(
             }
         }
 
-        // Observe player state to detect when playback starts
+        // Observe player state to detect when playback starts and apply auto-selection
         viewModelScope.launch {
             unifiedPlayer.state.collect { state ->
                 // Hide loading when video starts playing
                 if (state.engineState.isPlaying && _uiState.value.isLoading) {
                     _uiState.update { it.copy(isLoading = false) }
                 }
+
+                // Apply auto-selection when tracks become available
+                if (!autoSelectApplied && state.engineState.audioTracks.isNotEmpty()) {
+                    applyAutoSelection(state)
+                }
             }
         }
+    }
+
+    /**
+     * Apply auto-selection of audio and subtitle tracks based on user preferences.
+     */
+    private fun applyAutoSelection(state: UnifiedPlayerState) {
+        if (autoSelectApplied) return
+        autoSelectApplied = true
+
+        val preferredAudioLang = settingsRepository.getPreferredAudioLanguage()
+        val preferredSubtitleLang = settingsRepository.getPreferredSubtitleLanguage()
+        val subtitleSourcePriority = settingsRepository.getSubtitleSourcePriority()
+
+        Log.d(TAG, "Applying auto-selection: audio=$preferredAudioLang, subtitle=$preferredSubtitleLang, source=$subtitleSourcePriority")
+
+        // Auto-select audio track
+        autoSelectAudioTrack(state.engineState.audioTracks, preferredAudioLang)
+
+        // Auto-select subtitle track (if not "none")
+        if (preferredSubtitleLang != "none") {
+            autoSelectSubtitleTrack(
+                embeddedTracks = state.engineState.subtitleTracks,
+                externalSubtitles = _uiState.value.externalSubtitles,
+                preferredLang = preferredSubtitleLang,
+                preferEmbedded = subtitleSourcePriority == "embedded"
+            )
+        } else {
+            Log.d(TAG, "Subtitle auto-selection disabled (set to 'none')")
+        }
+    }
+
+    /**
+     * Auto-select audio track based on preferred language.
+     * Falls back to the default track if preferred language is not found.
+     */
+    private fun autoSelectAudioTrack(tracks: List<EngineAudioTrack>, preferredLang: String) {
+        if (tracks.isEmpty()) {
+            Log.d(TAG, "No audio tracks available for auto-selection")
+            return
+        }
+
+        // Find track matching preferred language
+        val matchingTrack = tracks.indexOfFirst { track ->
+            matchesLanguage(track.language, preferredLang)
+        }
+
+        if (matchingTrack >= 0) {
+            Log.d(TAG, "Auto-selecting audio track $matchingTrack (matches $preferredLang)")
+            selectAudioTrack(matchingTrack)
+        } else {
+            // Find default track
+            val defaultTrack = tracks.indexOfFirst { it.isDefault }
+            if (defaultTrack >= 0) {
+                Log.d(TAG, "Preferred audio language not found, using default track $defaultTrack")
+                selectAudioTrack(defaultTrack)
+            } else {
+                Log.d(TAG, "No matching or default audio track found")
+            }
+        }
+    }
+
+    /**
+     * Auto-select subtitle track based on preferred language and source priority.
+     */
+    private fun autoSelectSubtitleTrack(
+        embeddedTracks: List<EngineSubtitleTrack>,
+        externalSubtitles: List<Subtitle>,
+        preferredLang: String,
+        preferEmbedded: Boolean
+    ) {
+        Log.d(TAG, "Auto-selecting subtitles: ${embeddedTracks.size} embedded, ${externalSubtitles.size} external")
+
+        // Try primary source first, then fallback
+        val foundInPrimary = if (preferEmbedded) {
+            trySelectEmbeddedSubtitle(embeddedTracks, preferredLang)
+        } else {
+            trySelectExternalSubtitle(externalSubtitles, preferredLang)
+        }
+
+        if (!foundInPrimary) {
+            // Try fallback source
+            val foundInFallback = if (preferEmbedded) {
+                trySelectExternalSubtitle(externalSubtitles, preferredLang)
+            } else {
+                trySelectEmbeddedSubtitle(embeddedTracks, preferredLang)
+            }
+
+            if (!foundInFallback) {
+                Log.d(TAG, "No subtitle matching $preferredLang found in either source")
+            }
+        }
+    }
+
+    /**
+     * Try to select an embedded subtitle track matching the preferred language.
+     * Returns true if found and selected.
+     */
+    private fun trySelectEmbeddedSubtitle(tracks: List<EngineSubtitleTrack>, preferredLang: String): Boolean {
+        val matchingIndex = tracks.indexOfFirst { track ->
+            matchesLanguage(track.language, preferredLang)
+        }
+
+        if (matchingIndex >= 0) {
+            Log.d(TAG, "Auto-selecting embedded subtitle track $matchingIndex")
+            selectSubtitleTrack(matchingIndex)
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Try to select an external subtitle matching the preferred language.
+     * Returns true if found and selected.
+     */
+    private fun trySelectExternalSubtitle(subtitles: List<Subtitle>, preferredLang: String): Boolean {
+        val matchingIndex = subtitles.indexOfFirst { subtitle ->
+            matchesLanguage(subtitle.lang, preferredLang)
+        }
+
+        if (matchingIndex >= 0) {
+            Log.d(TAG, "Auto-selecting external subtitle $matchingIndex")
+            selectExternalSubtitle(matchingIndex)
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Check if a track language matches the preferred language.
+     * Handles various language code formats (ISO 639-1, ISO 639-2, full names).
+     */
+    private fun matchesLanguage(trackLang: String?, preferredLang: String): Boolean {
+        if (trackLang.isNullOrBlank()) return false
+
+        val track = trackLang.lowercase().trim()
+        val preferred = preferredLang.lowercase().trim()
+
+        // Direct match
+        if (track == preferred) return true
+
+        // Map common language codes
+        val languageMap = mapOf(
+            "eng" to listOf("en", "english"),
+            "spa" to listOf("es", "spanish", "español"),
+            "fra" to listOf("fr", "french", "français"),
+            "deu" to listOf("de", "german", "deutsch"),
+            "ita" to listOf("it", "italian", "italiano"),
+            "por" to listOf("pt", "portuguese", "português"),
+            "rus" to listOf("ru", "russian", "русский"),
+            "jpn" to listOf("ja", "japanese", "日本語"),
+            "kor" to listOf("ko", "korean", "한국어"),
+            "zho" to listOf("zh", "chi", "chinese", "中文"),
+            "ara" to listOf("ar", "arabic", "العربية"),
+            "hin" to listOf("hi", "hindi", "हिन्दी"),
+            "pol" to listOf("pl", "polish", "polski"),
+            "tur" to listOf("tr", "turkish", "türkçe"),
+            "nld" to listOf("nl", "dutch", "nederlands"),
+            "swe" to listOf("sv", "swedish", "svenska"),
+            "nor" to listOf("no", "norwegian", "norsk"),
+            "dan" to listOf("da", "danish", "dansk"),
+            "fin" to listOf("fi", "finnish", "suomi")
+        )
+
+        // Check if preferred code maps to track language
+        val preferredAliases = languageMap[preferred] ?: emptyList()
+        if (track in preferredAliases || track == preferred) return true
+
+        // Check if track code maps to preferred language
+        for ((code, aliases) in languageMap) {
+            if (preferred == code || preferred in aliases) {
+                if (track == code || track in aliases) return true
+            }
+        }
+
+        return false
     }
 
     /**
@@ -206,19 +395,19 @@ class UnifiedPlayerViewModel @Inject constructor(
      * Select an external subtitle from addons.
      */
     fun selectExternalSubtitle(index: Int) {
-        android.util.Log.d("UnifiedPlayerVM", "selectExternalSubtitle called with index: $index")
+        Log.d(TAG, "selectExternalSubtitle called with index: $index")
         val subtitles = _uiState.value.externalSubtitles
-        android.util.Log.d("UnifiedPlayerVM", "  Available external subtitles: ${subtitles.size}")
+        Log.d(TAG, "  Available external subtitles: ${subtitles.size}")
 
         if (index < 0 || index >= subtitles.size) {
             // Deselect external subtitle
-            android.util.Log.d("UnifiedPlayerVM", "  Deselecting external subtitle")
+            Log.d(TAG, "  Deselecting external subtitle")
             _uiState.update { it.copy(selectedExternalSubtitleIndex = -1) }
             return
         }
 
         val subtitle = subtitles[index]
-        android.util.Log.d("UnifiedPlayerVM", "  Selected subtitle: url=${subtitle.url}, lang=${subtitle.lang}, label=${subtitle.label}")
+        Log.d(TAG, "  Selected subtitle: url=${subtitle.url}, lang=${subtitle.lang}, label=${subtitle.label}")
         _uiState.update { it.copy(selectedExternalSubtitleIndex = index) }
 
         // Determine MIME type from format or URL
@@ -233,7 +422,7 @@ class UnifiedPlayerViewModel @Inject constructor(
             else -> "text/vtt" // Default to VTT
         }
 
-        android.util.Log.d("UnifiedPlayerVM", "  Adding external subtitle with mimeType: $mimeType")
+        Log.d(TAG, "  Adding external subtitle with mimeType: $mimeType")
         unifiedPlayer.addExternalSubtitle(
             url = subtitle.url,
             language = subtitle.lang,
@@ -316,9 +505,9 @@ class UnifiedPlayerViewModel @Inject constructor(
      * Select subtitle track (embedded).
      */
     fun selectSubtitleTrack(index: Int) {
-        android.util.Log.d("UnifiedPlayerVM", "selectSubtitleTrack called with index: $index")
-        android.util.Log.d("UnifiedPlayerVM", "  Active engine: ${unifiedPlayer.getActiveEngineType()}")
-        android.util.Log.d("UnifiedPlayerVM", "  Available embedded tracks: ${playerState.value.engineState.subtitleTracks.size}")
+        Log.d(TAG, "selectSubtitleTrack called with index: $index")
+        Log.d(TAG, "  Active engine: ${unifiedPlayer.getActiveEngineType()}")
+        Log.d(TAG, "  Available embedded tracks: ${playerState.value.engineState.subtitleTracks.size}")
         unifiedPlayer.selectSubtitleTrack(index)
     }
 
@@ -400,6 +589,7 @@ class UnifiedPlayerViewModel @Inject constructor(
         unifiedPlayer.release()
         isInitialized = false
         subtitlesLoaded = false
+        autoSelectApplied = false
         _uiState.update { PlayerUiState() }
     }
 

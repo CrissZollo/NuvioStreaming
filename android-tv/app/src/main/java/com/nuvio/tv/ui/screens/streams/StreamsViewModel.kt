@@ -236,9 +236,9 @@ class StreamsViewModel @Inject constructor(
         try {
             val subtitles = contentRepository.getSubtitles(type, id)
 
-            // Sort by preferred language if set
+            // Sort by preferred language if set (and not "none")
             val preferredLang = settingsRepository.getPreferredSubtitleLanguage()
-            val sortedSubtitles = if (preferredLang != null) {
+            val sortedSubtitles = if (preferredLang != "none") {
                 subtitles.sortedByDescending { it.lang.equals(preferredLang, ignoreCase = true) }
             } else {
                 subtitles

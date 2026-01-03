@@ -34,7 +34,10 @@ import com.nuvio.tv.ui.screens.settings.backup.BackupRestoreSettingsScreen
 import com.nuvio.tv.ui.screens.settings.content.ContentDiscoverySettingsScreen
 import com.nuvio.tv.ui.screens.settings.debrid.DebridIntegrationScreen
 import com.nuvio.tv.ui.screens.settings.integrations.IntegrationsSettingsScreen
+import com.nuvio.tv.ui.screens.settings.playback.AudioLanguageSelectionScreen
 import com.nuvio.tv.ui.screens.settings.playback.PlaybackSettingsScreen
+import com.nuvio.tv.ui.screens.settings.playback.SubtitleLanguageSelectionScreen
+import com.nuvio.tv.ui.screens.settings.playback.SubtitleSourceSelectionScreen
 import com.nuvio.tv.ui.screens.player.NuvioPlayerScreen
 import com.nuvio.tv.ui.screens.splash.SplashScreen
 import com.nuvio.tv.ui.screens.streams.StreamsScreen
@@ -369,15 +372,21 @@ fun NuvioNavigation(
             }
 
             composable(NavRoutes.SETTINGS_AUDIO_LANGUAGE) {
-                // AudioLanguageSettingsScreen - TODO
+                AudioLanguageSelectionScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
             }
 
             composable(NavRoutes.SETTINGS_SUBTITLE_LANGUAGE) {
-                // SubtitleLanguageSettingsScreen - TODO
+                SubtitleLanguageSelectionScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
             }
 
             composable(NavRoutes.SETTINGS_SUBTITLE_SOURCE) {
-                // SubtitleSourceSettingsScreen - TODO
+                SubtitleSourceSelectionScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
             }
 
             composable(NavRoutes.SETTINGS_NOTIFICATIONS) {
