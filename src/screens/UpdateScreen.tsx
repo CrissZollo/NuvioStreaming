@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import { mmkvStorage } from '../services/mmkvStorage';
 import { useGithubMajorUpdate } from '../hooks/useGithubMajorUpdate';
 import { getDisplayedAppVersion } from '../utils/version';
 import { isAnyUpgrade } from '../services/githubReleaseService';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -72,6 +74,15 @@ const UpdateScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const github = useGithubMajorUpdate();
   const { showInfo } = useToast();
+  const isTV = useIsTV();
+
+  // TV focus refs
+  const backButtonRef = useRef<FocusableRef>(null);
+  const checkUpdatesRef = useRef<FocusableRef>(null);
+  const installUpdateRef = useRef<FocusableRef>(null);
+  const viewReleaseRef = useRef<FocusableRef>(null);
+  const otaToggleRef = useRef<FocusableRef>(null);
+  const majorToggleRef = useRef<FocusableRef>(null);
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -402,16 +413,44 @@ const UpdateScreen: React.FC = () => {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.highEmphasis} />
-          <Text style={[styles.backText, { color: currentTheme.colors.highEmphasis }]}>
-            Settings
-          </Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            autoFocus
+            nextFocusDown={checkUpdatesRef.current?.getViewRef()}
+            borderRadius={8}
+            focusScale={1.05}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons
+                  name="arrow-back"
+                  size={24}
+                  color={focused ? '#000' : currentTheme.colors.highEmphasis}
+                />
+                <Text style={[
+                  styles.backText,
+                  { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                ]}>
+                  Settings
+                </Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.highEmphasis} />
+            <Text style={[styles.backText, { color: currentTheme.colors.highEmphasis }]}>
+              Settings
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}
@@ -473,48 +512,120 @@ const UpdateScreen: React.FC = () => {
 
               {/* Action Section */}
               <View style={styles.actionSection}>
-                <TouchableOpacity
-                  style={[
-                    styles.modernButton,
-                    styles.primaryAction,
-                    { backgroundColor: currentTheme.colors.primary },
-                    (isChecking || isInstalling) && styles.disabledAction
-                  ]}
-                  onPress={checkForUpdates}
-                  disabled={isChecking || isInstalling}
-                  activeOpacity={0.8}
-                >
-                  {isChecking ? (
-                    <MaterialIcons name="refresh" size={18} color="white" />
-                  ) : (
-                    <MaterialIcons name="system-update" size={18} color="white" />
-                  )}
-                  <Text style={styles.modernButtonText}>
-                    {isChecking ? 'Checking...' : 'Check for Updates'}
-                  </Text>
-                </TouchableOpacity>
-
-                {updateInfo?.isAvailable && updateStatus !== 'success' && (
+                {isTV ? (
+                  <Focusable
+                    ref={checkUpdatesRef}
+                    onPress={checkForUpdates}
+                    disabled={isChecking || isInstalling}
+                    style={[
+                      styles.modernButton,
+                      styles.primaryAction,
+                      { backgroundColor: currentTheme.colors.primary },
+                      (isChecking || isInstalling) && styles.disabledAction
+                    ]}
+                    borderRadius={12}
+                    focusScale={1.05}
+                    animateBackground={false}
+                    nextFocusUp={backButtonRef.current?.getViewRef()}
+                    nextFocusDown={updateInfo?.isAvailable && updateStatus !== 'success'
+                      ? installUpdateRef.current?.getViewRef()
+                      : otaToggleRef.current?.getViewRef()}
+                  >
+                    {(focused) => (
+                      <>
+                        {isChecking ? (
+                          <MaterialIcons name="refresh" size={18} color={focused ? '#000' : 'white'} />
+                        ) : (
+                          <MaterialIcons name="system-update" size={18} color={focused ? '#000' : 'white'} />
+                        )}
+                        <Text style={[
+                          styles.modernButtonText,
+                          focused && { color: '#000' }
+                        ]}>
+                          {isChecking ? 'Checking...' : 'Check for Updates'}
+                        </Text>
+                      </>
+                    )}
+                  </Focusable>
+                ) : (
                   <TouchableOpacity
                     style={[
                       styles.modernButton,
-                      styles.installAction,
-                      { backgroundColor: currentTheme.colors.success || '#34C759' },
-                      (isInstalling) && styles.disabledAction
+                      styles.primaryAction,
+                      { backgroundColor: currentTheme.colors.primary },
+                      (isChecking || isInstalling) && styles.disabledAction
                     ]}
-                    onPress={installUpdate}
-                    disabled={isInstalling}
+                    onPress={checkForUpdates}
+                    disabled={isChecking || isInstalling}
                     activeOpacity={0.8}
                   >
-                    {isInstalling ? (
-                      <MaterialIcons name="install-mobile" size={18} color="white" />
+                    {isChecking ? (
+                      <MaterialIcons name="refresh" size={18} color="white" />
                     ) : (
-                      <MaterialIcons name="download" size={18} color="white" />
+                      <MaterialIcons name="system-update" size={18} color="white" />
                     )}
                     <Text style={styles.modernButtonText}>
-                      {isInstalling ? 'Installing...' : 'Install Update'}
+                      {isChecking ? 'Checking...' : 'Check for Updates'}
                     </Text>
                   </TouchableOpacity>
+                )}
+
+                {updateInfo?.isAvailable && updateStatus !== 'success' && (
+                  isTV ? (
+                    <Focusable
+                      ref={installUpdateRef}
+                      onPress={installUpdate}
+                      disabled={isInstalling}
+                      style={[
+                        styles.modernButton,
+                        styles.installAction,
+                        { backgroundColor: currentTheme.colors.success || '#34C759' },
+                        (isInstalling) && styles.disabledAction
+                      ]}
+                      borderRadius={12}
+                      focusScale={1.05}
+                      animateBackground={false}
+                      nextFocusUp={checkUpdatesRef.current?.getViewRef()}
+                      nextFocusDown={otaToggleRef.current?.getViewRef()}
+                    >
+                      {(focused) => (
+                        <>
+                          {isInstalling ? (
+                            <MaterialIcons name="install-mobile" size={18} color={focused ? '#000' : 'white'} />
+                          ) : (
+                            <MaterialIcons name="download" size={18} color={focused ? '#000' : 'white'} />
+                          )}
+                          <Text style={[
+                            styles.modernButtonText,
+                            focused && { color: '#000' }
+                          ]}>
+                            {isInstalling ? 'Installing...' : 'Install Update'}
+                          </Text>
+                        </>
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      style={[
+                        styles.modernButton,
+                        styles.installAction,
+                        { backgroundColor: currentTheme.colors.success || '#34C759' },
+                        (isInstalling) && styles.disabledAction
+                      ]}
+                      onPress={installUpdate}
+                      disabled={isInstalling}
+                      activeOpacity={0.8}
+                    >
+                      {isInstalling ? (
+                        <MaterialIcons name="install-mobile" size={18} color="white" />
+                      ) : (
+                        <MaterialIcons name="download" size={18} color="white" />
+                      )}
+                      <Text style={styles.modernButtonText}>
+                        {isInstalling ? 'Installing...' : 'Install Update'}
+                      </Text>
+                    </TouchableOpacity>
+                  )
                 )}
 
               </View>
@@ -627,14 +738,37 @@ const UpdateScreen: React.FC = () => {
 
                 <View style={[styles.actionSection, { marginTop: 8 }]}>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TouchableOpacity
-                      style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
-                      onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialIcons name="open-in-new" size={18} color="white" />
-                      <Text style={styles.modernButtonText}>View Release</Text>
-                    </TouchableOpacity>
+                    {isTV ? (
+                      <Focusable
+                        ref={viewReleaseRef}
+                        onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
+                        style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
+                        borderRadius={12}
+                        focusScale={1.05}
+                        animateBackground={false}
+                        nextFocusUp={checkUpdatesRef.current?.getViewRef()}
+                        nextFocusDown={otaToggleRef.current?.getViewRef()}
+                      >
+                        {(focused) => (
+                          <>
+                            <MaterialIcons name="open-in-new" size={18} color={focused ? '#000' : 'white'} />
+                            <Text style={[
+                              styles.modernButtonText,
+                              focused && { color: '#000' }
+                            ]}>View Release</Text>
+                          </>
+                        )}
+                      </Focusable>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
+                        onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialIcons name="open-in-new" size={18} color="white" />
+                        <Text style={styles.modernButtonText}>View Release</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -644,42 +778,131 @@ const UpdateScreen: React.FC = () => {
           {/* Update Notification Settings */}
           <SettingsCard title="NOTIFICATION SETTINGS" isTablet={isTablet}>
             {/* OTA Updates Toggle */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
-                  OTA Update Alerts
-                </Text>
-                <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                  Show notifications for over-the-air updates
-                </Text>
+            {isTV ? (
+              <Focusable
+                ref={otaToggleRef}
+                onPress={() => handleOtaAlertsToggle(!otaAlertsEnabled)}
+                style={styles.settingRow}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+                nextFocusUp={checkUpdatesRef.current?.getViewRef()}
+                nextFocusDown={majorToggleRef.current?.getViewRef()}
+              >
+                {(focused) => (
+                  <>
+                    <View style={styles.settingInfo}>
+                      <Text style={[
+                        styles.settingLabel,
+                        { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                      ]}>
+                        OTA Update Alerts
+                      </Text>
+                      <Text style={[
+                        styles.settingDescription,
+                        { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                      ]}>
+                        Show notifications for over-the-air updates
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.tvToggle,
+                      otaAlertsEnabled ? styles.tvToggleOn : styles.tvToggleOff,
+                      { borderColor: focused ? '#000' : 'transparent' }
+                    ]}>
+                      <Text style={[
+                        styles.tvToggleText,
+                        { color: otaAlertsEnabled ? '#fff' : (focused ? '#000' : currentTheme.colors.mediumEmphasis) }
+                      ]}>
+                        {otaAlertsEnabled ? 'ON' : 'OFF'}
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </Focusable>
+            ) : (
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
+                    OTA Update Alerts
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Show notifications for over-the-air updates
+                  </Text>
+                </View>
+                <Switch
+                  value={otaAlertsEnabled}
+                  onValueChange={handleOtaAlertsToggle}
+                  trackColor={{ false: '#505050', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                  ios_backgroundColor="#505050"
+                />
               </View>
-              <Switch
-                value={otaAlertsEnabled}
-                onValueChange={handleOtaAlertsToggle}
-                trackColor={{ false: '#505050', true: currentTheme.colors.primary }}
-                thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-                ios_backgroundColor="#505050"
-              />
-            </View>
+            )}
 
             {/* Major Updates Toggle */}
-            <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
-                  Major Update Alerts
-                </Text>
-                <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                  Show notifications for new app versions on GitHub
-                </Text>
+            {isTV ? (
+              <Focusable
+                ref={majorToggleRef}
+                onPress={() => handleMajorAlertsToggle(!majorAlertsEnabled)}
+                style={[styles.settingRow, { borderBottomWidth: 0 }]}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+                nextFocusUp={otaToggleRef.current?.getViewRef()}
+              >
+                {(focused) => (
+                  <>
+                    <View style={styles.settingInfo}>
+                      <Text style={[
+                        styles.settingLabel,
+                        { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                      ]}>
+                        Major Update Alerts
+                      </Text>
+                      <Text style={[
+                        styles.settingDescription,
+                        { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                      ]}>
+                        Show notifications for new app versions on GitHub
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.tvToggle,
+                      majorAlertsEnabled ? styles.tvToggleOn : styles.tvToggleOff,
+                      { borderColor: focused ? '#000' : 'transparent' }
+                    ]}>
+                      <Text style={[
+                        styles.tvToggleText,
+                        { color: majorAlertsEnabled ? '#fff' : (focused ? '#000' : currentTheme.colors.mediumEmphasis) }
+                      ]}>
+                        {majorAlertsEnabled ? 'ON' : 'OFF'}
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </Focusable>
+            ) : (
+              <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
+                    Major Update Alerts
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Show notifications for new app versions on GitHub
+                  </Text>
+                </View>
+                <Switch
+                  value={majorAlertsEnabled}
+                  onValueChange={handleMajorAlertsToggle}
+                  trackColor={{ false: '#505050', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                  ios_backgroundColor="#505050"
+                />
               </View>
-              <Switch
-                value={majorAlertsEnabled}
-                onValueChange={handleMajorAlertsToggle}
-                trackColor={{ false: '#505050', true: currentTheme.colors.primary }}
-                thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-                ios_backgroundColor="#505050"
-              />
-            </View>
+            )}
 
             {/* Warning note */}
             <View style={[styles.infoItem, { paddingHorizontal: 16, paddingBottom: 12 }]}>
@@ -1102,6 +1325,27 @@ const styles = StyleSheet.create({
   settingDescription: {
     fontSize: 13,
     lineHeight: 18,
+  },
+
+  // TV Toggle styles
+  tvToggle: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 2,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tvToggleOn: {
+    backgroundColor: '#4CAF50',
+  },
+  tvToggleOff: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  tvToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

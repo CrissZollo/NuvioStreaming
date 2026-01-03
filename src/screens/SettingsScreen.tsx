@@ -580,6 +580,7 @@ const SettingsScreen: React.FC = () => {
   const visibleCategories = SETTINGS_CATEGORIES.filter(category => {
     if (category.id === 'developer' && !__DEV__) return false;
     if (category.id === 'cache' && !mdblistKeySet) return false;
+    if (category.id === 'ai' && isTVDevice) return false;
     return true;
   });
 
@@ -1141,7 +1142,7 @@ const SettingsScreen: React.FC = () => {
             {renderCategoryContent('content')}
             {renderCategoryContent('appearance')}
             {renderCategoryContent('integrations')}
-            {renderCategoryContent('ai')}
+            {!isTVDevice && renderCategoryContent('ai')}
             {renderCategoryContent('playback')}
             {renderCategoryContent('backup')}
             {renderCategoryContent('updates')}

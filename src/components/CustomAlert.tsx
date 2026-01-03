@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import {
   Modal,
   View,
@@ -16,6 +16,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
 import { Portal } from 'react-native-paper';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from './tv/Focusable';
 
 interface CustomAlertProps {
   visible: boolean;
@@ -41,8 +43,12 @@ export const CustomAlert = ({
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.95);
   const { currentTheme } = useTheme();
+  const isTV = useIsTV();
   // Using hardcoded dark theme values to match SeriesContent modal
   const themeColors = currentTheme.colors;
+
+  // Refs for TV focus navigation between action buttons
+  const actionRefs = useRef<(FocusableRef | null)[]>([]);
 
   useEffect(() => {
     const duration = Platform.OS === 'android' ? 200 : 150;
@@ -119,6 +125,44 @@ export const CustomAlert = ({
               ]}>
                 {actions.map((action, idx) => {
                   const isPrimary = idx === actions.length - 1;
+                  const isFirst = idx === 0;
+
+                  if (isTV) {
+                    return (
+                      <Focusable
+                        key={action.label}
+                        ref={(ref) => {
+                          actionRefs.current[idx] = ref;
+                        }}
+                        onPress={() => handleActionPress(action)}
+                        style={[
+                          styles.actionButton,
+                          isPrimary
+                            ? { backgroundColor: themeColors.primary }
+                            : styles.secondaryButton,
+                          action.style,
+                          actions.length === 1 && { minWidth: 120, maxWidth: '100%' }
+                        ]}
+                        autoFocus={isFirst}
+                        borderRadius={12}
+                        focusScale={1.05}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                        nextFocusLeft={idx > 0 ? actionRefs.current[idx - 1]?.getViewRef() : undefined}
+                        nextFocusRight={idx < actions.length - 1 ? actionRefs.current[idx + 1]?.getViewRef() : undefined}
+                      >
+                        {(focused) => (
+                          <Text style={[
+                            styles.actionText,
+                            { color: focused ? '#000' : '#FFFFFF' }
+                          ]}>
+                            {action.label}
+                          </Text>
+                        )}
+                      </Focusable>
+                    );
+                  }
+
                   return (
                     <TouchableOpacity
                       key={action.label}
