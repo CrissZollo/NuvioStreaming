@@ -111,7 +111,7 @@ interface SettingItemProps {
   description?: string;
   icon?: string;
   customIcon?: React.ReactNode;
-  renderControl?: () => React.ReactNode;
+  renderControl?: (focused?: boolean) => React.ReactNode;
   isLast?: boolean;
   onPress?: () => void;
   badge?: string | number;
@@ -188,7 +188,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
       </View>
       {renderControl && !disabled && (
         <View style={styles.settingControl}>
-          {renderControl()}
+          {renderControl(focused)}
         </View>
       )}
     </>
@@ -221,6 +221,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
         ]}
         borderRadius={0}
         focusScale={1.02}
+        animateBackground={true}
+        showFocusBorder={true}
       >
         {(focused) => content(focused)}
       </Focusable>
@@ -794,13 +796,29 @@ const SettingsScreen: React.FC = () => {
               title="Show Trailers"
               description="Display trailers in hero section"
               icon="film"
-              renderControl={() => (
-                <Switch
-                  value={settings?.showTrailers ?? true}
-                  onValueChange={(value) => updateSetting('showTrailers', value)}
-                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
-                  thumbColor={settings?.showTrailers ? '#fff' : '#f4f3f4'}
-                />
+              onPress={isTVDevice ? () => updateSetting('showTrailers', !(settings?.showTrailers ?? true)) : undefined}
+              renderControl={(focused) => (
+                isTVDevice ? (
+                  <View style={styles.tvSwitchContainer}>
+                    <View style={[
+                      styles.tvSwitchTrack,
+                      { backgroundColor: focused ? ((settings?.showTrailers ?? true) ? '#333' : '#666') : ((settings?.showTrailers ?? true) ? currentTheme.colors.primary : currentTheme.colors.elevation2) }
+                    ]}>
+                      <View style={[
+                        styles.tvSwitchThumb,
+                        (settings?.showTrailers ?? true) ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                        { backgroundColor: focused ? '#000' : ((settings?.showTrailers ?? true) ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis) }
+                      ]} />
+                    </View>
+                  </View>
+                ) : (
+                  <Switch
+                    value={settings?.showTrailers ?? true}
+                    onValueChange={(value) => updateSetting('showTrailers', value)}
+                    trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                    thumbColor={settings?.showTrailers ? '#fff' : '#f4f3f4'}
+                  />
+                )
               )}
               isTablet={isTablet}
               isTV={isTVDevice}
@@ -1633,6 +1651,31 @@ const styles = StyleSheet.create({
   tvQrHint: {
     fontSize: 12,
     textAlign: 'center',
+  },
+  // TV Toggle styles - thin track with floating thumb
+  tvSwitchContainer: {
+    width: 51,
+    height: 26,
+    justifyContent: 'center',
+  },
+  tvSwitchTrack: {
+    width: 51,
+    height: 14,
+    borderRadius: 7,
+    position: 'relative' as const,
+  },
+  tvSwitchThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    position: 'absolute' as const,
+    top: -6,
+  },
+  tvSwitchThumbOn: {
+    right: 0,
+  },
+  tvSwitchThumbOff: {
+    left: 0,
   },
 });
 

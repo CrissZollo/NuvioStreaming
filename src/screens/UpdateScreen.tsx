@@ -806,17 +806,17 @@ const UpdateScreen: React.FC = () => {
                         Show notifications for over-the-air updates
                       </Text>
                     </View>
-                    <View style={[
-                      styles.tvToggle,
-                      otaAlertsEnabled ? styles.tvToggleOn : styles.tvToggleOff,
-                      { borderColor: focused ? '#000' : 'transparent' }
-                    ]}>
-                      <Text style={[
-                        styles.tvToggleText,
-                        { color: otaAlertsEnabled ? '#fff' : (focused ? '#000' : currentTheme.colors.mediumEmphasis) }
+                    <View style={styles.tvSwitchContainer}>
+                      <View style={[
+                        styles.tvSwitchTrack,
+                        { backgroundColor: focused ? (otaAlertsEnabled ? '#333' : '#666') : (otaAlertsEnabled ? currentTheme.colors.primary : '#505050') }
                       ]}>
-                        {otaAlertsEnabled ? 'ON' : 'OFF'}
-                      </Text>
+                        <View style={[
+                          styles.tvSwitchThumb,
+                          otaAlertsEnabled ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                          { backgroundColor: focused ? '#000' : '#fff' }
+                        ]} />
+                      </View>
                     </View>
                   </>
                 )}
@@ -869,17 +869,17 @@ const UpdateScreen: React.FC = () => {
                         Show notifications for new app versions on GitHub
                       </Text>
                     </View>
-                    <View style={[
-                      styles.tvToggle,
-                      majorAlertsEnabled ? styles.tvToggleOn : styles.tvToggleOff,
-                      { borderColor: focused ? '#000' : 'transparent' }
-                    ]}>
-                      <Text style={[
-                        styles.tvToggleText,
-                        { color: majorAlertsEnabled ? '#fff' : (focused ? '#000' : currentTheme.colors.mediumEmphasis) }
+                    <View style={styles.tvSwitchContainer}>
+                      <View style={[
+                        styles.tvSwitchTrack,
+                        { backgroundColor: focused ? (majorAlertsEnabled ? '#333' : '#666') : (majorAlertsEnabled ? currentTheme.colors.primary : '#505050') }
                       ]}>
-                        {majorAlertsEnabled ? 'ON' : 'OFF'}
-                      </Text>
+                        <View style={[
+                          styles.tvSwitchThumb,
+                          majorAlertsEnabled ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                          { backgroundColor: focused ? '#000' : '#fff' }
+                        ]} />
+                      </View>
                     </View>
                   </>
                 )}
@@ -1327,25 +1327,30 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // TV Toggle styles
-  tvToggle: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 2,
-    minWidth: 60,
-    alignItems: 'center',
+  // TV Toggle styles - thin track with floating thumb
+  tvSwitchContainer: {
+    width: 51,
+    height: 26,
     justifyContent: 'center',
   },
-  tvToggleOn: {
-    backgroundColor: '#4CAF50',
+  tvSwitchTrack: {
+    width: 51,
+    height: 14,
+    borderRadius: 7,
+    position: 'relative' as const,
   },
-  tvToggleOff: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  tvSwitchThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    position: 'absolute' as const,
+    top: -6,
   },
-  tvToggleText: {
-    fontSize: 14,
-    fontWeight: '600',
+  tvSwitchThumbOn: {
+    right: 0,
+  },
+  tvSwitchThumbOff: {
+    left: 0,
   },
 });
 

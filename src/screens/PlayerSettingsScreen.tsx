@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { useSettings, AppSettings } from '../hooks/useSettings';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../contexts/ThemeContext';
 import CustomAlert from '../components/CustomAlert';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -25,6 +27,8 @@ interface SettingItemProps {
   isSelected: boolean;
   onPress: () => void;
   isLast?: boolean;
+  isTV?: boolean;
+  autoFocus?: boolean;
 }
 
 const SettingItem: React.FC<SettingItemProps> = ({
@@ -34,8 +38,73 @@ const SettingItem: React.FC<SettingItemProps> = ({
   isSelected,
   onPress,
   isLast,
+  isTV = false,
+  autoFocus = false,
 }) => {
   const { currentTheme } = useTheme();
+
+  const content = (focused: boolean = false) => (
+    <View style={styles.settingContent}>
+      <View style={[
+        styles.settingIconContainer,
+        { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+      ]}>
+        <MaterialIcons
+          name={icon}
+          size={20}
+          color={focused ? '#000' : currentTheme.colors.primary}
+        />
+      </View>
+      <View style={styles.settingText}>
+        <Text
+          style={[
+            styles.settingTitle,
+            { color: focused ? '#000' : currentTheme.colors.text },
+          ]}
+        >
+          {title}
+        </Text>
+        {description && (
+          <Text
+            style={[
+              styles.settingDescription,
+              { color: focused ? '#333' : currentTheme.colors.textMuted },
+            ]}
+          >
+            {description}
+          </Text>
+        )}
+      </View>
+      {isSelected && (
+        <MaterialIcons
+          name="check"
+          size={24}
+          color={focused ? '#000' : currentTheme.colors.primary}
+          style={styles.checkIcon}
+        />
+      )}
+    </View>
+  );
+
+  if (isTV) {
+    return (
+      <Focusable
+        onPress={onPress}
+        autoFocus={autoFocus}
+        style={[
+          styles.settingItem,
+          !isLast && styles.settingItemBorder,
+          { borderBottomColor: 'rgba(255,255,255,0.08)' },
+        ]}
+        borderRadius={0}
+        focusScale={1.02}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => content(focused)}
+      </Focusable>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -47,46 +116,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
         { borderBottomColor: 'rgba(255,255,255,0.08)' },
       ]}
     >
-      <View style={styles.settingContent}>
-        <View style={[
-          styles.settingIconContainer,
-          { backgroundColor: 'rgba(255,255,255,0.1)' }
-        ]}>
-          <MaterialIcons
-            name={icon}
-            size={20}
-            color={currentTheme.colors.primary}
-          />
-        </View>
-        <View style={styles.settingText}>
-          <Text
-            style={[
-              styles.settingTitle,
-              { color: currentTheme.colors.text },
-            ]}
-          >
-            {title}
-          </Text>
-          {description && (
-            <Text
-              style={[
-                styles.settingDescription,
-                { color: currentTheme.colors.textMuted },
-              ]}
-            >
-              {description}
-            </Text>
-          )}
-        </View>
-        {isSelected && (
-          <MaterialIcons
-            name="check"
-            size={24}
-            color={currentTheme.colors.primary}
-            style={styles.checkIcon}
-          />
-        )}
-      </View>
+      {content(false)}
     </TouchableOpacity>
   );
 };
@@ -95,6 +125,10 @@ const PlayerSettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
   const navigation = useNavigation();
+  const isTV = useIsTV();
+
+  // TV focus refs
+  const backButtonRef = useRef<FocusableRef>(null);
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -173,20 +207,46 @@ const PlayerSettingsScreen: React.FC = () => {
       />
 
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={handleBack}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons
-            name="arrow-back"
-            size={24}
-            color={currentTheme.colors.text}
-          />
-          <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
-            Settings
-          </Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            ref={backButtonRef}
+            onPress={handleBack}
+            style={styles.backButton}
+            autoFocus
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons
+                  name="arrow-back"
+                  size={24}
+                  color={focused ? '#000' : currentTheme.colors.text}
+                />
+                <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.text }]}>
+                  Settings
+                </Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            onPress={handleBack}
+            style={styles.backButton}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name="arrow-back"
+              size={24}
+              color={currentTheme.colors.text}
+            />
+            <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
+              Settings
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}
@@ -237,6 +297,8 @@ const PlayerSettingsScreen: React.FC = () => {
                   }
                 }}
                 isLast={index === playerOptions.length - 1}
+                isTV={isTV}
+                autoFocus={isTV && index === 0}
               />
             ))}
           </View>
@@ -259,92 +321,69 @@ const PlayerSettingsScreen: React.FC = () => {
               },
             ]}
           >
-            <View style={styles.settingItem}>
-              <View style={styles.settingContent}>
-                <View style={[
-                  styles.settingIconContainer,
-                  { backgroundColor: 'rgba(255,255,255,0.1)' }
-                ]}>
-                  <MaterialIcons
-                    name="play-arrow"
-                    size={20}
-                    color={currentTheme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingText}>
-                  <Text
-                    style={[
-                      styles.settingTitle,
-                      { color: currentTheme.colors.text },
-                    ]}
-                  >
-                    Auto-play Best Stream
-                  </Text>
-                  <Text
-                    style={[
-                      styles.settingDescription,
-                      { color: currentTheme.colors.textMuted },
-                    ]}
-                  >
-                    Automatically start the highest quality stream available.
-                  </Text>
-                </View>
-                <Switch
-                  value={settings.autoplayBestStream}
-                  onValueChange={(value) => updateSetting('autoplayBestStream', value)}
-                  thumbColor={settings.autoplayBestStream ? currentTheme.colors.primary : undefined}
-                />
-              </View>
-            </View>
-
-            <View style={styles.settingItem}>
-              <View style={styles.settingContent}>
-                <View style={[
-                  styles.settingIconContainer,
-                  { backgroundColor: 'rgba(255,255,255,0.1)' }
-                ]}>
-                  <MaterialIcons
-                    name="restore"
-                    size={20}
-                    color={currentTheme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingText}>
-                  <Text
-                    style={[
-                      styles.settingTitle,
-                      { color: currentTheme.colors.text },
-                    ]}
-                  >
-                    Always Resume
-                  </Text>
-                  <Text
-                    style={[
-                      styles.settingDescription,
-                      { color: currentTheme.colors.textMuted },
-                    ]}
-                  >
-                    Skip the resume prompt and automatically continue where you left off (if less than 85% watched).
-                  </Text>
-                </View>
-                <Switch
-                  value={settings.alwaysResume}
-                  onValueChange={(value) => updateSetting('alwaysResume', value)}
-                  thumbColor={settings.alwaysResume ? currentTheme.colors.primary : undefined}
-                />
-              </View>
-            </View>
-
-            {/* Hardware Decoding for Android Internal Player */}
-            {Platform.OS === 'android' && !settings.useExternalPlayer && (
-              <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+            {isTV ? (
+              <Focusable
+                onPress={() => updateSetting('autoplayBestStream', !settings.autoplayBestStream)}
+                style={styles.settingItem}
+                borderRadius={0}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="play-arrow"
+                        size={20}
+                        color={focused ? '#000' : currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: focused ? '#000' : currentTheme.colors.text },
+                        ]}
+                      >
+                        Auto-play Best Stream
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        Automatically start the highest quality stream available.
+                      </Text>
+                    </View>
+                    <View style={styles.tvSwitchContainer}>
+                      <View style={[
+                        styles.tvSwitchTrack,
+                        { backgroundColor: focused ? (settings.autoplayBestStream ? '#333' : '#666') : (settings.autoplayBestStream ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                      ]}>
+                        <View style={[
+                          styles.tvSwitchThumb,
+                          settings.autoplayBestStream ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                          { backgroundColor: focused ? '#000' : (settings.autoplayBestStream ? '#fff' : '#888') }
+                        ]} />
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </Focusable>
+            ) : (
+              <View style={styles.settingItem}>
                 <View style={styles.settingContent}>
                   <View style={[
                     styles.settingIconContainer,
                     { backgroundColor: 'rgba(255,255,255,0.1)' }
                   ]}>
                     <MaterialIcons
-                      name="memory"
+                      name="play-arrow"
                       size={20}
                       color={currentTheme.colors.primary}
                     />
@@ -356,7 +395,7 @@ const PlayerSettingsScreen: React.FC = () => {
                         { color: currentTheme.colors.text },
                       ]}
                     >
-                      Hardware Decoding
+                      Auto-play Best Stream
                     </Text>
                     <Text
                       style={[
@@ -364,26 +403,223 @@ const PlayerSettingsScreen: React.FC = () => {
                         { color: currentTheme.colors.textMuted },
                       ]}
                     >
-                      Use GPU for video decoding. May improve performance but can cause issues on some devices.
+                      Automatically start the highest quality stream available.
                     </Text>
                   </View>
                   <Switch
-                    value={settings.useHardwareDecoding}
-                    onValueChange={(value) => {
-                      updateSetting('useHardwareDecoding', value);
-                      openAlert(
-                        'Restart Required',
-                        'Please restart the app for the decoding change to take effect.'
-                      );
-                    }}
-                    thumbColor={settings.useHardwareDecoding ? currentTheme.colors.primary : undefined}
+                    value={settings.autoplayBestStream}
+                    onValueChange={(value) => updateSetting('autoplayBestStream', value)}
+                    thumbColor={settings.autoplayBestStream ? currentTheme.colors.primary : undefined}
                   />
                 </View>
               </View>
             )}
 
-            {/* External Player for Downloads */}
-            {((Platform.OS === 'android' && settings.useExternalPlayer) ||
+            {isTV ? (
+              <Focusable
+                onPress={() => updateSetting('alwaysResume', !settings.alwaysResume)}
+                style={styles.settingItem}
+                borderRadius={0}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="restore"
+                        size={20}
+                        color={focused ? '#000' : currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: focused ? '#000' : currentTheme.colors.text },
+                        ]}
+                      >
+                        Always Resume
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        Skip the resume prompt and automatically continue where you left off (if less than 85% watched).
+                      </Text>
+                    </View>
+                    <View style={styles.tvSwitchContainer}>
+                      <View style={[
+                        styles.tvSwitchTrack,
+                        { backgroundColor: focused ? (settings.alwaysResume ? '#333' : '#666') : (settings.alwaysResume ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                      ]}>
+                        <View style={[
+                          styles.tvSwitchThumb,
+                          settings.alwaysResume ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                          { backgroundColor: focused ? '#000' : (settings.alwaysResume ? '#fff' : '#888') }
+                        ]} />
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </Focusable>
+            ) : (
+              <View style={styles.settingItem}>
+                <View style={styles.settingContent}>
+                  <View style={[
+                    styles.settingIconContainer,
+                    { backgroundColor: 'rgba(255,255,255,0.1)' }
+                  ]}>
+                    <MaterialIcons
+                      name="restore"
+                      size={20}
+                      color={currentTheme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingText}>
+                    <Text
+                      style={[
+                        styles.settingTitle,
+                        { color: currentTheme.colors.text },
+                      ]}
+                    >
+                      Always Resume
+                    </Text>
+                    <Text
+                      style={[
+                        styles.settingDescription,
+                        { color: currentTheme.colors.textMuted },
+                      ]}
+                    >
+                      Skip the resume prompt and automatically continue where you left off (if less than 85% watched).
+                    </Text>
+                  </View>
+                  <Switch
+                    value={settings.alwaysResume}
+                    onValueChange={(value) => updateSetting('alwaysResume', value)}
+                    thumbColor={settings.alwaysResume ? currentTheme.colors.primary : undefined}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Hardware Decoding for Android Internal Player */}
+            {Platform.OS === 'android' && !settings.useExternalPlayer && (
+              isTV ? (
+                <Focusable
+                  onPress={() => {
+                    updateSetting('useHardwareDecoding', !settings.useHardwareDecoding);
+                    openAlert(
+                      'Restart Required',
+                      'Please restart the app for the decoding change to take effect.'
+                    );
+                  }}
+                  style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}
+                  borderRadius={0}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <View style={styles.settingContent}>
+                      <View style={[
+                        styles.settingIconContainer,
+                        { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+                      ]}>
+                        <MaterialIcons
+                          name="memory"
+                          size={20}
+                          color={focused ? '#000' : currentTheme.colors.primary}
+                        />
+                      </View>
+                      <View style={styles.settingText}>
+                        <Text
+                          style={[
+                            styles.settingTitle,
+                            { color: focused ? '#000' : currentTheme.colors.text },
+                          ]}
+                        >
+                          Hardware Decoding
+                        </Text>
+                        <Text
+                          style={[
+                            styles.settingDescription,
+                            { color: focused ? '#333' : currentTheme.colors.textMuted },
+                          ]}
+                        >
+                          Use GPU for video decoding. May improve performance but can cause issues on some devices.
+                        </Text>
+                      </View>
+                      <View style={styles.tvSwitchContainer}>
+                        <View style={[
+                          styles.tvSwitchTrack,
+                          { backgroundColor: focused ? (settings.useHardwareDecoding ? '#333' : '#666') : (settings.useHardwareDecoding ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                        ]}>
+                          <View style={[
+                            styles.tvSwitchThumb,
+                            settings.useHardwareDecoding ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                            { backgroundColor: focused ? '#000' : (settings.useHardwareDecoding ? '#fff' : '#888') }
+                          ]} />
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </Focusable>
+              ) : (
+                <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="memory"
+                        size={20}
+                        color={currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: currentTheme.colors.text },
+                        ]}
+                      >
+                        Hardware Decoding
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        Use GPU for video decoding. May improve performance but can cause issues on some devices.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={settings.useHardwareDecoding}
+                      onValueChange={(value) => {
+                        updateSetting('useHardwareDecoding', value);
+                        openAlert(
+                          'Restart Required',
+                          'Please restart the app for the decoding change to take effect.'
+                        );
+                      }}
+                      thumbColor={settings.useHardwareDecoding ? currentTheme.colors.primary : undefined}
+                    />
+                  </View>
+                </View>
+              )
+            )}
+
+            {/* External Player for Downloads - hide on TV */}
+            {!isTV && ((Platform.OS === 'android' && settings.useExternalPlayer) ||
               (Platform.OS === 'ios' && settings.preferredPlayer !== 'internal')) && (
                 <View style={[styles.settingItem, styles.settingItemBorder, { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }]}>
                   <View style={styles.settingContent}>
@@ -531,6 +767,31 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     marginLeft: 16,
+  },
+  // TV Toggle styles - thin track with floating thumb
+  tvSwitchContainer: {
+    width: 51,
+    height: 26,
+    justifyContent: 'center',
+  },
+  tvSwitchTrack: {
+    width: 51,
+    height: 14,
+    borderRadius: 7,
+    position: 'relative' as const,
+  },
+  tvSwitchThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    position: 'absolute' as const,
+    top: -6,
+  },
+  tvSwitchThumbOn: {
+    right: 0,
+  },
+  tvSwitchThumbOff: {
+    left: 0,
   },
 });
 
