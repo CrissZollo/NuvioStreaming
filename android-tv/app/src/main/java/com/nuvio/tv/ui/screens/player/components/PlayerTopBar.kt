@@ -42,7 +42,7 @@ import com.nuvio.tv.ui.theme.NuvioShapes
 import com.nuvio.tv.ui.theme.NuvioTypography
 
 /**
- * Top bar for the Netflix-style player.
+ * Top bar for the video player.
  * Shows title, episode info, back button, and engine badge.
  */
 @Composable

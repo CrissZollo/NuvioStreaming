@@ -6,9 +6,12 @@ import android.view.View
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
+import com.nuvio.tv.data.repository.ContentRepository
 import com.nuvio.tv.domain.model.Stream
+import com.nuvio.tv.domain.model.Subtitle
 import com.nuvio.tv.player.PlaybackRequest
 import com.nuvio.tv.player.PlaybackStateHolder
+import com.nuvio.tv.player.engine.EngineSubtitleTrack
 import com.nuvio.tv.player.engine.EngineType
 import com.nuvio.tv.player.engine.UnifiedPlayer
 import com.nuvio.tv.player.engine.UnifiedPlayerEvent
@@ -23,7 +26,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * UI state for the Netflix-style player.
+ * UI state for the Nuvio player.
  */
 data class PlayerUiState(
     val showControls: Boolean = true,
@@ -37,18 +40,29 @@ data class PlayerUiState(
     val showEngineSwitchNotification: Boolean = false,
     val engineSwitchFrom: EngineType? = null,
     val engineSwitchTo: EngineType? = null,
-    val engineSwitchReason: String? = null
+    val engineSwitchReason: String? = null,
+    // Loading state
+    val isLoading: Boolean = true,
+    val loadingMessage: String = "Loading...",
+    // External subtitles from addons
+    val externalSubtitles: List<Subtitle> = emptyList(),
+    val selectedExternalSubtitleIndex: Int = -1,
+    // Content info for loading screen
+    val contentTitle: String? = null,
+    val contentPoster: String? = null,
+    val contentLogo: String? = null
 )
 
 /**
- * ViewModel for the unified Netflix-style player.
+ * ViewModel for the unified Nuvio player.
  * Manages the UnifiedPlayer and exposes state to the UI.
  */
 @HiltViewModel
 class UnifiedPlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val unifiedPlayer: UnifiedPlayer,
-    private val playbackStateHolder: PlaybackStateHolder
+    private val playbackStateHolder: PlaybackStateHolder,
+    private val contentRepository: ContentRepository
 ) : ViewModel() {
 
     val playerState: StateFlow<UnifiedPlayerState> = unifiedPlayer.state
@@ -59,6 +73,7 @@ class UnifiedPlayerViewModel @Inject constructor(
     private var isInitialized = false
     private var currentStream: Stream? = null
     private var cachedPlaybackRequest: PlaybackRequest? = null
+    private var subtitlesLoaded = false
 
     init {
         observePlayerEvents()
@@ -105,6 +120,16 @@ class UnifiedPlayerViewModel @Inject constructor(
                 }
             }
         }
+
+        // Observe player state to detect when playback starts
+        viewModelScope.launch {
+            unifiedPlayer.state.collect { state ->
+                // Hide loading when video starts playing
+                if (state.engineState.isPlaying && _uiState.value.isLoading) {
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            }
+        }
     }
 
     /**
@@ -116,12 +141,112 @@ class UnifiedPlayerViewModel @Inject constructor(
     }
 
     /**
-     * Play a stream.
+     * Play a stream and load external subtitles.
      */
     fun playStream(stream: Stream, startPosition: Long = 0L) {
         currentStream = stream
         val headers = stream.headers ?: emptyMap()
+
+        // Set loading state with content info
+        val request = cachedPlaybackRequest
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                loadingMessage = "Loading stream...",
+                contentTitle = request?.content?.name,
+                contentPoster = request?.content?.poster,
+                contentLogo = request?.content?.logo
+            )
+        }
+
         unifiedPlayer.playStream(stream, startPosition, headers)
+
+        // Load subtitles from the playback request and addons
+        loadSubtitles()
+    }
+
+    /**
+     * Load subtitles from playback request and fetch additional from addons.
+     */
+    private fun loadSubtitles() {
+        if (subtitlesLoaded) return
+        subtitlesLoaded = true
+
+        viewModelScope.launch {
+            val request = cachedPlaybackRequest ?: return@launch
+
+            // Combine subtitles from:
+            // 1. PlaybackRequest (already fetched by StreamsViewModel)
+            // 2. Stream's embedded subtitles (if any)
+            val requestSubtitles = request.subtitles
+            val streamSubtitles = request.stream.subtitles
+
+            // Merge and deduplicate subtitles
+            val allExternalSubtitles = (requestSubtitles + streamSubtitles)
+                .distinctBy { it.url }
+
+            _uiState.update { it.copy(externalSubtitles = allExternalSubtitles) }
+
+            // If no subtitles from request, try to fetch from addons
+            if (allExternalSubtitles.isEmpty()) {
+                val contentId = request.episodeId ?: request.content?.id ?: return@launch
+                val contentType = request.content?.type ?: "movie"
+
+                try {
+                    val addonSubtitles = contentRepository.getSubtitles(contentType, contentId)
+                    _uiState.update { it.copy(externalSubtitles = addonSubtitles) }
+                } catch (e: Exception) {
+                    // Subtitles are optional, don't fail playback
+                }
+            }
+        }
+    }
+
+    /**
+     * Select an external subtitle from addons.
+     */
+    fun selectExternalSubtitle(index: Int) {
+        android.util.Log.d("UnifiedPlayerVM", "selectExternalSubtitle called with index: $index")
+        val subtitles = _uiState.value.externalSubtitles
+        android.util.Log.d("UnifiedPlayerVM", "  Available external subtitles: ${subtitles.size}")
+
+        if (index < 0 || index >= subtitles.size) {
+            // Deselect external subtitle
+            android.util.Log.d("UnifiedPlayerVM", "  Deselecting external subtitle")
+            _uiState.update { it.copy(selectedExternalSubtitleIndex = -1) }
+            return
+        }
+
+        val subtitle = subtitles[index]
+        android.util.Log.d("UnifiedPlayerVM", "  Selected subtitle: url=${subtitle.url}, lang=${subtitle.lang}, label=${subtitle.label}")
+        _uiState.update { it.copy(selectedExternalSubtitleIndex = index) }
+
+        // Determine MIME type from format or URL
+        val mimeType = when {
+            subtitle.format?.contains("vtt", ignoreCase = true) == true -> "text/vtt"
+            subtitle.format?.contains("srt", ignoreCase = true) == true -> "application/x-subrip"
+            subtitle.format?.contains("ass", ignoreCase = true) == true -> "text/x-ssa"
+            subtitle.url.endsWith(".vtt", ignoreCase = true) -> "text/vtt"
+            subtitle.url.endsWith(".srt", ignoreCase = true) -> "application/x-subrip"
+            subtitle.url.endsWith(".ass", ignoreCase = true) -> "text/x-ssa"
+            subtitle.url.endsWith(".ssa", ignoreCase = true) -> "text/x-ssa"
+            else -> "text/vtt" // Default to VTT
+        }
+
+        android.util.Log.d("UnifiedPlayerVM", "  Adding external subtitle with mimeType: $mimeType")
+        unifiedPlayer.addExternalSubtitle(
+            url = subtitle.url,
+            language = subtitle.lang,
+            label = subtitle.label ?: subtitle.lang,
+            mimeType = mimeType
+        )
+    }
+
+    /**
+     * Mark loading as complete when playback starts.
+     */
+    fun onPlaybackStarted() {
+        _uiState.update { it.copy(isLoading = false) }
     }
 
     /**
@@ -188,9 +313,12 @@ class UnifiedPlayerViewModel @Inject constructor(
     }
 
     /**
-     * Select subtitle track.
+     * Select subtitle track (embedded).
      */
     fun selectSubtitleTrack(index: Int) {
+        android.util.Log.d("UnifiedPlayerVM", "selectSubtitleTrack called with index: $index")
+        android.util.Log.d("UnifiedPlayerVM", "  Active engine: ${unifiedPlayer.getActiveEngineType()}")
+        android.util.Log.d("UnifiedPlayerVM", "  Available embedded tracks: ${playerState.value.engineState.subtitleTracks.size}")
         unifiedPlayer.selectSubtitleTrack(index)
     }
 
@@ -231,6 +359,13 @@ class UnifiedPlayerViewModel @Inject constructor(
     }
 
     /**
+     * Get the ExoPlayer's PlayerView with subtitle support.
+     */
+    fun getExoPlayerView(): android.view.View? {
+        return unifiedPlayer.getExoPlayerEngine().getVideoView()
+    }
+
+    /**
      * Get the current active engine type.
      */
     fun getActiveEngineType(): EngineType {
@@ -264,6 +399,8 @@ class UnifiedPlayerViewModel @Inject constructor(
     fun release() {
         unifiedPlayer.release()
         isInitialized = false
+        subtitlesLoaded = false
+        _uiState.update { PlayerUiState() }
     }
 
     override fun onCleared() {

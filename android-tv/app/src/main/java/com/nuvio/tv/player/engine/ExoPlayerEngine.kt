@@ -158,6 +158,10 @@ class ExoPlayerEngine @Inject constructor() : VideoEngine {
                     buildUponParameters()
                         .setPreferredAudioLanguage("en")
                         .setPreferredTextLanguage("en")
+                        // Ensure text renderer is enabled by default
+                        .setRendererDisabled(C.TRACK_TYPE_TEXT, false)
+                        // Select text tracks even if language is undetermined
+                        .setSelectUndeterminedTextLanguage(true)
                 )
             }
 
@@ -202,7 +206,32 @@ class ExoPlayerEngine @Inject constructor() : VideoEngine {
             this.player = player
             useController = false
             setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+
+            // Configure subtitle view for proper rendering
+            subtitleView?.apply {
+                // Make sure subtitles are visible and on top
+                visibility = android.view.View.VISIBLE
+                bringToFront()
+                setApplyEmbeddedStyles(true)
+                setApplyEmbeddedFontSizes(true)
+                // Set default subtitle style for TV viewing
+                setStyle(
+                    androidx.media3.ui.CaptionStyleCompat(
+                        android.graphics.Color.WHITE,
+                        android.graphics.Color.argb(160, 0, 0, 0), // Semi-transparent black background
+                        android.graphics.Color.TRANSPARENT,
+                        androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW,
+                        android.graphics.Color.BLACK,
+                        null // Use default typeface
+                    )
+                )
+                setFractionalTextSize(0.0533f) // ~5.33% of screen height
+                // Add bottom padding for better positioning on TV
+                setBottomPaddingFraction(0.08f)
+            }
         }
+
+        Log.d(TAG, "PlayerView created with subtitle view: ${playerView?.subtitleView != null}")
     }
 
     override fun playStream(stream: Stream, startPosition: Long, headers: Map<String, String>) {
@@ -371,10 +400,14 @@ class ExoPlayerEngine @Inject constructor() : VideoEngine {
         val player = exoPlayer ?: return
         val selector = trackSelector ?: return
 
+        Log.d(TAG, "selectSubtitleTrack called with index: $trackIndex")
+
         if (trackIndex < 0) {
+            Log.d(TAG, "Disabling subtitles")
             selector.setParameters(
                 selector.buildUponParameters()
                     .setRendererDisabled(C.TRACK_TYPE_TEXT, true)
+                    .clearOverridesOfType(C.TRACK_TYPE_TEXT)
             )
             _playerState.update { it.copy(selectedSubtitleTrack = -1) }
             return
@@ -383,18 +416,37 @@ class ExoPlayerEngine @Inject constructor() : VideoEngine {
         val tracks = player.currentTracks
         val textGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
 
+        Log.d(TAG, "Available text track groups: ${textGroups.size}")
+        textGroups.forEachIndexed { index, group ->
+            val format = group.getTrackFormat(0)
+            Log.d(TAG, "  Group $index: language=${format.language}, label=${format.label}, isSelected=${group.isTrackSelected(0)}")
+        }
+
         if (trackIndex < textGroups.size) {
             val group = textGroups[trackIndex]
             val override = TrackSelectionOverride(group.mediaTrackGroup, 0)
+            val format = group.getTrackFormat(0)
+
+            Log.d(TAG, "Selecting subtitle track $trackIndex: language=${format.language}, label=${format.label}")
 
             selector.setParameters(
                 selector.buildUponParameters()
                     .setRendererDisabled(C.TRACK_TYPE_TEXT, false)
-                    .setOverrideForType(override)
+                    .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                    .addOverride(override)
+                    .setSelectUndeterminedTextLanguage(true)
             )
 
             _playerState.update { it.copy(selectedSubtitleTrack = trackIndex) }
-            updateTrackInfo(player.currentTracks)
+
+            // Force track update after a short delay to ensure selection takes effect
+            engineScope.launch {
+                delay(100)
+                updateTrackInfo(player.currentTracks)
+                Log.d(TAG, "Subtitle track $trackIndex selected and verified")
+            }
+        } else {
+            Log.w(TAG, "Track index $trackIndex out of bounds (max: ${textGroups.size - 1})")
         }
     }
 
@@ -431,7 +483,10 @@ class ExoPlayerEngine @Inject constructor() : VideoEngine {
 
     override fun addExternalSubtitle(url: String, language: String, label: String?, mimeType: String?) {
         val player = exoPlayer ?: return
+        val selector = trackSelector ?: return
         val currentItem = player.currentMediaItem ?: return
+
+        Log.d(TAG, "Adding external subtitle: $url, language: $language, mimeType: $mimeType")
 
         val subtitle = MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(url))
             .setMimeType(mimeType ?: MimeTypes.TEXT_VTT)
@@ -440,14 +495,34 @@ class ExoPlayerEngine @Inject constructor() : VideoEngine {
             .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
             .build()
 
+        // Combine existing subtitles with the new one
+        val existingSubtitles = currentItem.localConfiguration?.subtitleConfigurations ?: emptyList()
+        val allSubtitles = existingSubtitles + subtitle
+
         val newItem = currentItem.buildUpon()
-            .setSubtitleConfigurations(listOf(subtitle))
+            .setSubtitleConfigurations(allSubtitles)
             .build()
 
         val currentPosition = player.currentPosition
+        val wasPlaying = player.isPlaying
+
         player.setMediaItem(newItem)
         player.seekTo(currentPosition)
         player.prepare()
+
+        if (wasPlaying) {
+            player.play()
+        }
+
+        // Enable subtitle renderer with forced selection
+        selector.setParameters(
+            selector.buildUponParameters()
+                .setRendererDisabled(C.TRACK_TYPE_TEXT, false)
+                .setPreferredTextLanguage(language)
+                .setSelectUndeterminedTextLanguage(true)
+        )
+
+        Log.d(TAG, "External subtitle added and enabled for language: $language")
     }
 
     override fun updateState() {

@@ -70,7 +70,7 @@ data class NextEpisodeInfo(
 )
 
 /**
- * Netflix-style "Up Next" panel that slides up from the bottom.
+ * "Up Next" panel that slides up from the bottom.
  * Appears near the end of an episode with a countdown.
  */
 @Composable

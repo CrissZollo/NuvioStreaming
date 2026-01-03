@@ -42,7 +42,7 @@ val Elevation3 = Color(0x1CFFFFFF) // 11% white
 val Elevation4 = Color(0x1FFFFFFF) // 12% white
 
 // Special Colors
-val ProgressRed = Color(0xFFE50914) // Netflix-style progress
+val ProgressRed = Color(0xFFE50914) // Progress indicator color
 val QualityBadgeBackground = Color(0x33E50914) // 20% red
 val FocusBorder = Primary
 val FocusGlow = Color(0x402D9CDB) // 25% primary

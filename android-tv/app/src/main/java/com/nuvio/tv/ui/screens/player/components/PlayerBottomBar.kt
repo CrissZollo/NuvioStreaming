@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.tv.ui.theme.NuvioTypography
 
 /**
- * Bottom bar for the Netflix-style player.
+ * Bottom bar for the video player.
  * Contains seek bar, time display, and playback controls.
  */
 @Composable

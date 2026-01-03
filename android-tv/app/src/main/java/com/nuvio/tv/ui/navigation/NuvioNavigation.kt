@@ -35,7 +35,7 @@ import com.nuvio.tv.ui.screens.settings.content.ContentDiscoverySettingsScreen
 import com.nuvio.tv.ui.screens.settings.debrid.DebridIntegrationScreen
 import com.nuvio.tv.ui.screens.settings.integrations.IntegrationsSettingsScreen
 import com.nuvio.tv.ui.screens.settings.playback.PlaybackSettingsScreen
-import com.nuvio.tv.ui.screens.player.NetflixPlayerScreen
+import com.nuvio.tv.ui.screens.player.NuvioPlayerScreen
 import com.nuvio.tv.ui.screens.splash.SplashScreen
 import com.nuvio.tv.ui.screens.streams.StreamsScreen
 
@@ -252,7 +252,7 @@ fun NuvioNavigation(
 
                 // Get the stream from the PlaybackStateHolder
                 // The stream should be set before navigating here from StreamsScreen
-                NetflixPlayerScreen(
+                NuvioPlayerScreen(
                     contentType = type,
                     contentId = id,
                     onBackClick = {

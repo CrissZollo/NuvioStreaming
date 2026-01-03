@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.tv.ui.theme.NuvioShapes
 
 /**
- * Netflix-style seek bar with focus handling for TV remote.
+ * Seek bar with focus handling for TV remote.
  * Expands on focus for better visibility.
  */
 @Composable

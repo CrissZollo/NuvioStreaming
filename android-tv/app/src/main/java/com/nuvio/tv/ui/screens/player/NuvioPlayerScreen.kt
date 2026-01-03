@@ -36,13 +36,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.media3.ui.PlayerView
 import com.nuvio.tv.domain.model.Stream
-import com.nuvio.tv.player.PlaybackStateHolder
 import com.nuvio.tv.player.engine.EngineType
 import com.nuvio.tv.ui.screens.player.components.BufferingOverlay
 import com.nuvio.tv.ui.screens.player.components.EngineSwitchNotification
 import com.nuvio.tv.ui.screens.player.components.ErrorOverlay
+import com.nuvio.tv.ui.screens.player.components.LoadingOverlay
 import com.nuvio.tv.ui.screens.player.components.PlayPauseIndicator
 import com.nuvio.tv.ui.screens.player.components.PlaybackInfoOverlay
 import com.nuvio.tv.ui.screens.player.components.PlayerBottomBar
@@ -56,14 +55,14 @@ import com.nuvio.tv.ui.screens.player.panels.UpNextPanel
 import kotlinx.coroutines.delay
 
 /**
- * Netflix-style video player screen with unified engine support.
+ * Nuvio video player screen with unified engine support.
  *
  * This screen can be called in two ways:
  * 1. With navigation parameters (contentType, contentId) - stream is obtained from PlaybackStateHolder
  * 2. Directly with a Stream object for testing or embedding
  */
 @Composable
-fun NetflixPlayerScreen(
+fun NuvioPlayerScreen(
     contentId: String,
     contentType: String,
     stream: Stream? = null,
@@ -299,9 +298,18 @@ fun NetflixPlayerScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Buffering Overlay
+        // Loading Overlay (shows poster and logo while initial loading)
+        LoadingOverlay(
+            visible = playerUiState.isLoading,
+            contentTitle = playerUiState.contentTitle ?: actualContentTitle,
+            contentPoster = playerUiState.contentPoster ?: playbackRequest?.content?.poster,
+            contentLogo = playerUiState.contentLogo ?: playbackRequest?.content?.logo,
+            loadingMessage = playerUiState.loadingMessage
+        )
+
+        // Buffering Overlay (shows during mid-playback buffering, not initial load)
         BufferingOverlay(
-            isBuffering = playerState.engineState.isBuffering,
+            isBuffering = playerState.engineState.isBuffering && !playerUiState.isLoading,
             bufferedPercent = playerState.engineState.bufferedPercent
         )
 
@@ -352,10 +360,10 @@ fun NetflixPlayerScreen(
                     isPlaying = playerState.engineState.isPlaying,
                     isSeeking = isSeeking,
                     seekPreviewPosition = seekPreviewPosition,
-                    hasSubtitles = playerState.engineState.subtitleTracks.isNotEmpty(),
+                    hasSubtitles = playerState.engineState.subtitleTracks.isNotEmpty() || playerUiState.externalSubtitles.isNotEmpty(),
                     hasAudioTracks = playerState.engineState.audioTracks.size > 1,
                     hasQualityLevels = playerState.engineState.qualityLevels.isNotEmpty(),
-                    subtitleSelected = playerState.engineState.selectedSubtitleTrack >= 0,
+                    subtitleSelected = playerState.engineState.selectedSubtitleTrack >= 0 || playerUiState.selectedExternalSubtitleIndex >= 0,
                     currentAudioTrack = playerState.engineState.audioTracks
                         .getOrNull(playerState.engineState.selectedAudioTrack)?.language,
                     currentQuality = playerState.engineState.qualityLevels
@@ -409,6 +417,8 @@ fun NetflixPlayerScreen(
             panelType = activePanelType ?: TrackPanelType.SUBTITLE,
             subtitleTracks = playerState.engineState.subtitleTracks,
             selectedSubtitleIndex = playerState.engineState.selectedSubtitleTrack,
+            externalSubtitles = playerUiState.externalSubtitles,
+            selectedExternalSubtitleIndex = playerUiState.selectedExternalSubtitleIndex,
             audioTracks = playerState.engineState.audioTracks,
             selectedAudioIndex = playerState.engineState.selectedAudioTrack,
             qualityLevels = playerState.engineState.qualityLevels,
@@ -416,6 +426,10 @@ fun NetflixPlayerScreen(
             currentSpeed = playerState.engineState.playbackSpeed,
             onSubtitleSelect = { index ->
                 viewModel.selectSubtitleTrack(index)
+                activePanelType = null
+            },
+            onExternalSubtitleSelect = { index ->
+                viewModel.selectExternalSubtitle(index)
                 activePanelType = null
             },
             onAudioSelect = { index ->
@@ -526,16 +540,20 @@ private fun VideoSurface(
             }
         }
         EngineType.EXOPLAYER -> {
-            // ExoPlayer uses PlayerView
-            val exoPlayer = viewModel.getExoPlayer()
-            if (exoPlayer != null) {
+            // Use the engine's PlayerView which has subtitle support configured
+            val exoPlayerView = remember { viewModel.getExoPlayerView() }
+            if (exoPlayerView != null) {
                 AndroidView(
-                    factory = { context ->
-                        PlayerView(context).apply {
-                            player = exoPlayer
-                            useController = false
-                            setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                        }
+                    factory = { _ ->
+                        // Remove from parent if already attached
+                        (exoPlayerView.parent as? android.view.ViewGroup)?.removeView(exoPlayerView)
+                        // Return the engine's PlayerView directly
+                        // Subtitle rendering is configured in ExoPlayerEngine
+                        exoPlayerView
+                    },
+                    update = { view ->
+                        // Ensure the PlayerView's subtitle view is visible
+                        (view as? androidx.media3.ui.PlayerView)?.subtitleView?.visibility = android.view.View.VISIBLE
                     },
                     modifier = modifier
                 )

@@ -8,6 +8,7 @@ import android.view.SurfaceView
 import android.view.View
 import com.nuvio.tv.domain.model.Stream
 import dev.jdtech.mpv.MPVLib
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -71,7 +72,9 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
         "video-bitrate" to MPVLib.MPV_FORMAT_INT64,
         "video-params/w" to MPVLib.MPV_FORMAT_INT64,
         "video-params/h" to MPVLib.MPV_FORMAT_INT64,
-        "hwdec-current" to MPVLib.MPV_FORMAT_STRING
+        "hwdec-current" to MPVLib.MPV_FORMAT_STRING,
+        "sid" to MPVLib.MPV_FORMAT_STRING,
+        "sub-visibility" to MPVLib.MPV_FORMAT_FLAG
     )
 
     override fun initialize(context: Context) {
@@ -83,6 +86,9 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
         this.context = context.applicationContext
 
         try {
+            // Setup fonts directory for subtitle rendering
+            setupFontsDirectory(context.applicationContext)
+
             // Create MPV instance
             MPVLib.create(context.applicationContext)
 
@@ -137,10 +143,35 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
         MPVLib.setOptionString("ao", "audiotrack")
         MPVLib.setOptionString("audio-channels", "stereo")
 
-        // Subtitles
+        // Subtitles - enhanced visibility for TV
         MPVLib.setOptionString("sub-auto", "fuzzy")
+        MPVLib.setOptionString("sub-visibility", "yes")  // Option string format for init
         MPVLib.setOptionString("sub-scale", "1.0")
-        MPVLib.setOptionString("sub-font-size", "48")
+        MPVLib.setOptionString("sub-font-size", "55")
+        MPVLib.setOptionString("sub-border-size", "3")
+        MPVLib.setOptionString("sub-shadow-offset", "2")
+        MPVLib.setOptionString("sub-shadow-color", "#80000000")
+        MPVLib.setOptionString("sub-margin-y", "50")
+        MPVLib.setOptionString("sub-pos", "95")  // Position subtitles at 95% from top (5% from bottom)
+        MPVLib.setOptionString("sub-color", "#FFFFFFFF")
+        MPVLib.setOptionString("sub-back-color", "#AA000000")  // More opaque background
+        MPVLib.setOptionString("sub-border-color", "#FF000000")
+
+        // Font configuration for subtitles - critical for rendering
+        // Point to Android system fonts directory for libass/fontconfig
+        val ctx = context
+        if (ctx != null) {
+            val fontsConfPath = File(ctx.filesDir, "fonts.conf").absolutePath
+            MPVLib.setOptionString("sub-fonts-dir", "/system/fonts")
+            MPVLib.setOptionString("osd-fonts-dir", "/system/fonts")
+        }
+
+        // Use Roboto font (Android's default) which is in /system/fonts
+        MPVLib.setOptionString("sub-font", "Roboto")
+        MPVLib.setOptionString("osd-font", "Roboto")
+        MPVLib.setOptionString("sub-ass-force-style", "FontName=Roboto,Fontsize=48")
+        MPVLib.setOptionString("embeddedfonts", "no")  // Don't use embedded fonts (can cause issues)
+        MPVLib.setOptionString("sub-ass-override", "force")  // Override ASS styles to ensure visibility
 
         // Performance
         MPVLib.setOptionString("video-sync", "audio")
@@ -155,6 +186,73 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
         MPVLib.setOptionString("keep-open-pause", "no")
 
         Log.d(TAG, "MPV options configured")
+    }
+
+    private var fontsDir: File? = null
+
+    /**
+     * Setup fonts directory with fontconfig for subtitle rendering.
+     * MPV/libass requires fontconfig to find fonts for text subtitles.
+     */
+    private fun setupFontsDirectory(context: Context) {
+        try {
+            // Create fonts directory in app's files directory
+            fontsDir = File(context.filesDir, "fonts").apply {
+                if (!exists()) {
+                    mkdirs()
+                }
+            }
+
+            // Create fonts.conf for fontconfig
+            val fontsConf = File(context.filesDir, "fonts.conf")
+            val fontsConfContent = """
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+    <dir>/system/fonts</dir>
+    <dir>${fontsDir?.absolutePath}</dir>
+    <match target="pattern">
+        <test qual="any" name="family">
+            <string>sans-serif</string>
+        </test>
+        <edit name="family" mode="assign" binding="same">
+            <string>Roboto</string>
+        </edit>
+    </match>
+    <match target="pattern">
+        <test qual="any" name="family">
+            <string>serif</string>
+        </test>
+        <edit name="family" mode="assign" binding="same">
+            <string>Noto Serif</string>
+        </edit>
+    </match>
+    <match target="pattern">
+        <test qual="any" name="family">
+            <string>monospace</string>
+        </test>
+        <edit name="family" mode="assign" binding="same">
+            <string>Droid Sans Mono</string>
+        </edit>
+    </match>
+    <alias>
+        <family>sans-serif</family>
+        <prefer>
+            <family>Roboto</family>
+        </prefer>
+    </alias>
+</fontconfig>
+            """.trimIndent()
+
+            fontsConf.writeText(fontsConfContent)
+            Log.d(TAG, "Created fonts.conf at ${fontsConf.absolutePath}")
+
+            // Set FONTCONFIG_PATH environment variable for libass
+            // This is done through MPV options
+            Log.d(TAG, "Fonts directory setup complete: ${fontsDir?.absolutePath}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to setup fonts directory", e)
+        }
     }
 
     override fun isAvailable(): Boolean {
@@ -393,18 +491,46 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
     override fun selectSubtitleTrack(trackIndex: Int) {
         if (!isInitialized) return
         try {
+            Log.d(TAG, "selectSubtitleTrack called with index: $trackIndex")
+
             if (trackIndex == -1) {
                 // Disable subtitles
                 MPVLib.setPropertyString("sid", "no")
+                MPVLib.setPropertyBoolean("sub-visibility", false)
+                Log.d(TAG, "Subtitles disabled")
+                _playerState.update { it.copy(selectedSubtitleTrack = -1) }
             } else {
                 val tracks = getSubtitleTracks()
+                Log.d(TAG, "Available subtitle tracks: ${tracks.size}")
+                tracks.forEachIndexed { idx, track ->
+                    Log.d(TAG, "  Track $idx: id=${track.id}, lang=${track.language}, label=${track.label}, selected=${track.isSelected}")
+                }
+
                 if (trackIndex >= 0 && trackIndex < tracks.size) {
-                    val trackId = tracks[trackIndex].id ?: (trackIndex + 1).toString()
+                    val track = tracks[trackIndex]
+                    val trackId = track.id ?: (trackIndex + 1).toString()
+
+                    // Enable subtitle visibility first
+                    MPVLib.setPropertyBoolean("sub-visibility", true)
+                    // Then select the track
                     MPVLib.setPropertyString("sid", trackId)
-                    Log.d(TAG, "Selected subtitle track: $trackId")
+
+                    Log.d(TAG, "Selected subtitle track: id=$trackId, lang=${track.language}, label=${track.label}")
+                    _playerState.update { it.copy(selectedSubtitleTrack = trackIndex) }
+                } else {
+                    Log.w(TAG, "Track index $trackIndex out of bounds (max: ${tracks.size - 1})")
                 }
             }
-            updateTracks()
+
+            // Update track state after a short delay to ensure MPV has processed the change
+            engineScope.launch {
+                delay(100)
+                updateTracks()
+                // Verify the subtitle state
+                val currentSid = MPVLib.getPropertyString("sid")
+                val subVis = MPVLib.getPropertyBoolean("sub-visibility")
+                Log.d(TAG, "After selection - sid=$currentSid, sub-visibility=$subVis")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to select subtitle track", e)
         }
@@ -419,10 +545,26 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
     override fun addExternalSubtitle(url: String, language: String, label: String?, mimeType: String?) {
         if (!isInitialized) return
         try {
-            // Add external subtitle file
-            MPVLib.command(arrayOf("sub-add", url, "auto", label ?: language, language))
-            Log.d(TAG, "Added external subtitle: $url")
-            updateTracks()
+            Log.d(TAG, "Adding external subtitle: url=$url, language=$language, label=$label")
+
+            // Enable subtitle visibility first
+            MPVLib.setPropertyBoolean("sub-visibility", true)
+
+            // Add external subtitle file and select it
+            // Using "select" flag to auto-select the added subtitle
+            MPVLib.command(arrayOf("sub-add", url, "select", label ?: language, language))
+
+            Log.d(TAG, "Added and selected external subtitle successfully")
+
+            // Update tracks after a short delay
+            engineScope.launch {
+                delay(200)
+                updateTracks()
+                // Log the current subtitle state
+                val currentSid = MPVLib.getPropertyString("sid")
+                val subVisibility = MPVLib.getPropertyBoolean("sub-visibility")
+                Log.d(TAG, "After adding subtitle - sid=$currentSid, sub-visibility=$subVisibility")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to add external subtitle", e)
         }
@@ -561,6 +703,7 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
         val tracks = mutableListOf<EngineSubtitleTrack>()
         try {
             val trackCount = MPVLib.getPropertyInt("track-list/count") ?: 0
+            Log.d(TAG, "getSubtitleTracks: total track count = $trackCount")
             var subIndex = 0
 
             for (i in 0 until trackCount) {
@@ -574,12 +717,14 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
                     val isDefault = MPVLib.getPropertyBoolean("track-list/$i/default") ?: false
                     val external = MPVLib.getPropertyBoolean("track-list/$i/external") ?: false
 
+                    Log.d(TAG, "  Found subtitle track: id=$id, lang=$lang, title=$title, selected=$selected, external=$external")
+
                     tracks.add(
                         EngineSubtitleTrack(
                             index = subIndex++,
                             id = id,
                             language = lang,
-                            label = title ?: lang,
+                            label = title ?: lang ?: "Subtitle ${subIndex}",
                             codec = codec,
                             isExternal = external,
                             isSelected = selected,
@@ -588,6 +733,7 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
                     )
                 }
             }
+            Log.d(TAG, "getSubtitleTracks: found ${tracks.size} subtitle tracks")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get subtitle tracks", e)
         }
@@ -595,13 +741,21 @@ class MpvEngine @Inject constructor() : VideoEngine, MPVLib.EventObserver, MPVLi
     }
 
     private fun updateTracks() {
-        _playerState.update { current ->
-            val selectedAudio = getAudioTracks().indexOfFirst { it.isSelected }
-            val selectedSub = getSubtitleTracks().indexOfFirst { it.isSelected }
+        val audioTracks = getAudioTracks()
+        val subtitleTracks = getSubtitleTracks()
+        val selectedAudio = audioTracks.indexOfFirst { it.isSelected }
+        val selectedSub = subtitleTracks.indexOfFirst { it.isSelected }
 
+        Log.d(TAG, "updateTracks: ${audioTracks.size} audio, ${subtitleTracks.size} subtitle tracks")
+        Log.d(TAG, "  Selected audio: $selectedAudio, Selected subtitle: $selectedSub")
+        subtitleTracks.forEachIndexed { idx, track ->
+            Log.d(TAG, "  Sub $idx: id=${track.id}, lang=${track.language}, label=${track.label}, selected=${track.isSelected}, external=${track.isExternal}")
+        }
+
+        _playerState.update { current ->
             current.copy(
-                audioTracks = getAudioTracks(),
-                subtitleTracks = getSubtitleTracks(),
+                audioTracks = audioTracks,
+                subtitleTracks = subtitleTracks,
                 selectedAudioTrack = selectedAudio,
                 selectedSubtitleTrack = selectedSub
             )

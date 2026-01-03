@@ -53,6 +53,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import com.nuvio.tv.domain.model.Subtitle
 import com.nuvio.tv.player.engine.EngineAudioTrack
 import com.nuvio.tv.player.engine.EngineQualityLevel
 import com.nuvio.tv.player.engine.EngineSubtitleTrack
@@ -70,15 +71,19 @@ enum class TrackPanelType {
 }
 
 /**
- * Netflix-style slide-in panel for track selection.
+ * Slide-in panel for track selection.
+ * Supports both embedded subtitle tracks and external subtitles from addons.
  */
 @Composable
 fun TrackSelectionPanel(
     visible: Boolean,
     panelType: TrackPanelType,
-    // Subtitle options
+    // Embedded subtitle options
     subtitleTracks: List<EngineSubtitleTrack> = emptyList(),
     selectedSubtitleIndex: Int = -1,
+    // External subtitle options (from addons)
+    externalSubtitles: List<Subtitle> = emptyList(),
+    selectedExternalSubtitleIndex: Int = -1,
     // Audio options
     audioTracks: List<EngineAudioTrack> = emptyList(),
     selectedAudioIndex: Int = -1,
@@ -90,6 +95,7 @@ fun TrackSelectionPanel(
     currentSpeed: Float = 1f,
     // Callbacks
     onSubtitleSelect: (Int) -> Unit = {},
+    onExternalSubtitleSelect: (Int) -> Unit = {},
     onAudioSelect: (Int) -> Unit = {},
     onQualitySelect: (Int) -> Unit = {},
     onSpeedSelect: (Float) -> Unit = {},
@@ -162,10 +168,13 @@ fun TrackSelectionPanel(
                     when (panelType) {
                         TrackPanelType.SUBTITLE -> {
                             SubtitleList(
-                                tracks = subtitleTracks,
-                                selectedIndex = selectedSubtitleIndex,
+                                embeddedTracks = subtitleTracks,
+                                selectedEmbeddedIndex = selectedSubtitleIndex,
+                                externalSubtitles = externalSubtitles,
+                                selectedExternalIndex = selectedExternalSubtitleIndex,
                                 focusRequester = focusRequester,
-                                onSelect = onSubtitleSelect
+                                onEmbeddedSelect = onSubtitleSelect,
+                                onExternalSelect = onExternalSubtitleSelect
                             )
                         }
                         TrackPanelType.AUDIO -> {
@@ -279,12 +288,20 @@ private fun CloseButton(
 
 @Composable
 private fun SubtitleList(
-    tracks: List<EngineSubtitleTrack>,
-    selectedIndex: Int,
+    embeddedTracks: List<EngineSubtitleTrack>,
+    selectedEmbeddedIndex: Int,
+    externalSubtitles: List<Subtitle>,
+    selectedExternalIndex: Int,
     focusRequester: FocusRequester,
-    onSelect: (Int) -> Unit
+    onEmbeddedSelect: (Int) -> Unit,
+    onExternalSelect: (Int) -> Unit
 ) {
     val listState = rememberLazyListState()
+    val hasEmbedded = embeddedTracks.isNotEmpty()
+    val hasExternal = externalSubtitles.isNotEmpty()
+
+    // Determine if "Off" should be focused (no subtitle selected)
+    val isOffSelected = selectedEmbeddedIndex == -1 && selectedExternalIndex == -1
 
     LazyColumn(
         state = listState,
@@ -295,22 +312,78 @@ private fun SubtitleList(
         item {
             TrackItem(
                 label = "Off",
-                isSelected = selectedIndex == -1,
-                focusRequester = if (selectedIndex == -1) focusRequester else null,
-                onClick = { onSelect(-1) }
+                isSelected = isOffSelected,
+                focusRequester = if (isOffSelected) focusRequester else null,
+                onClick = {
+                    onEmbeddedSelect(-1)
+                    onExternalSelect(-1)
+                }
             )
         }
 
-        itemsIndexed(tracks) { index, track ->
-            TrackItem(
-                label = track.label ?: track.language ?: "Track ${index + 1}",
-                subtitle = buildSubtitleInfo(track),
-                isSelected = index == selectedIndex,
-                focusRequester = if (index == selectedIndex || (selectedIndex == -1 && index == 0)) focusRequester else null,
-                onClick = { onSelect(index) }
-            )
+        // Embedded tracks section
+        if (hasEmbedded) {
+            item {
+                SectionHeader(title = "Embedded")
+            }
+
+            itemsIndexed(embeddedTracks) { index, track ->
+                TrackItem(
+                    label = track.label ?: track.language ?: "Track ${index + 1}",
+                    subtitle = buildSubtitleInfo(track),
+                    isSelected = index == selectedEmbeddedIndex,
+                    focusRequester = if (index == selectedEmbeddedIndex) focusRequester
+                                     else if (isOffSelected && index == 0 && !hasExternal) focusRequester
+                                     else null,
+                    onClick = {
+                        onExternalSelect(-1) // Deselect external
+                        onEmbeddedSelect(index)
+                    }
+                )
+            }
+        }
+
+        // External subtitles section (from addons)
+        if (hasExternal) {
+            item {
+                SectionHeader(title = "External")
+            }
+
+            itemsIndexed(externalSubtitles) { index, subtitle ->
+                TrackItem(
+                    label = subtitle.label ?: subtitle.lang,
+                    subtitle = buildExternalSubtitleInfo(subtitle),
+                    isSelected = index == selectedExternalIndex,
+                    focusRequester = if (index == selectedExternalIndex) focusRequester
+                                     else if (isOffSelected && index == 0 && !hasEmbedded) focusRequester
+                                     else null,
+                    onClick = {
+                        onEmbeddedSelect(-1) // Deselect embedded
+                        onExternalSelect(index)
+                    }
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = NuvioTypography.labelSmall,
+        color = Color.White.copy(alpha = 0.5f),
+        modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
+    )
+}
+
+private fun buildExternalSubtitleInfo(subtitle: Subtitle): String? {
+    val parts = mutableListOf<String>()
+    subtitle.format?.let { parts.add(it.uppercase()) }
+    if (subtitle.lang != subtitle.label) {
+        parts.add(subtitle.lang.uppercase())
+    }
+    return if (parts.isNotEmpty()) parts.joinToString(" • ") else null
 }
 
 private fun buildSubtitleInfo(track: EngineSubtitleTrack): String? {
