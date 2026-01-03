@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchContributors, GitHubContributor } from '../services/githubReleaseService';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable, FocusableRef } from '../components/tv/Focusable';
+import QRCode from 'react-native-qrcode-svg';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -83,12 +86,70 @@ interface ContributorCardProps {
   currentTheme: any;
   isTablet: boolean;
   isLargeTablet: boolean;
+  isTV?: boolean;
+  autoFocus?: boolean;
 }
 
-const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, currentTheme, isTablet, isLargeTablet }) => {
+const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, currentTheme, isTablet, isLargeTablet, isTV = false, autoFocus = false }) => {
   const handlePress = useCallback(() => {
     Linking.openURL(contributor.html_url);
   }, [contributor.html_url]);
+
+  if (isTV) {
+    // On TV, show focusable card with QR code added
+    return (
+      <Focusable
+        onPress={handlePress}
+        style={[
+          styles.contributorCard,
+          { backgroundColor: currentTheme.colors.elevation1 },
+          isTablet && styles.tabletContributorCard
+        ]}
+        autoFocus={autoFocus}
+        borderRadius={16}
+        focusScale={1.03}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <>
+            <FastImage
+              source={{ uri: contributor.avatar_url }}
+              style={[
+                styles.avatar,
+                isTablet && styles.tabletAvatar
+              ]}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+            <View style={styles.contributorInfo}>
+              <Text style={[
+                styles.username,
+                { color: focused ? '#000' : currentTheme.colors.highEmphasis },
+                isTablet && styles.tabletUsername
+              ]}>
+                {contributor.login}
+              </Text>
+              <Text style={[
+                styles.contributions,
+                { color: focused ? '#333' : currentTheme.colors.mediumEmphasis },
+                isTablet && styles.tabletContributions
+              ]}>
+                {contributor.contributions} contributions
+              </Text>
+            </View>
+            <View style={styles.tvQrCode}>
+              <QRCode
+                value={contributor.html_url}
+                size={50}
+                backgroundColor="#FFFFFF"
+                color="#000000"
+              />
+            </View>
+          </>
+        )}
+      </Focusable>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -140,9 +201,11 @@ interface SpecialMentionCardProps {
   currentTheme: any;
   isTablet: boolean;
   isLargeTablet: boolean;
+  isTV?: boolean;
+  autoFocus?: boolean;
 }
 
-const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, currentTheme, isTablet, isLargeTablet }) => {
+const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, currentTheme, isTablet, isLargeTablet, isTV = false, autoFocus = false }) => {
   const handlePress = useCallback(() => {
     // Try to open Discord profile
     const discordUrl = `discord://-/users/${mention.discordId}`;
@@ -163,16 +226,94 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
   // Default avatar fallback
   const defaultAvatar = `https://cdn.discordapp.com/embed/avatars/0.png`;
 
-  return (
-    <TouchableOpacity
-      style={[
-        styles.contributorCard,
-        { backgroundColor: currentTheme.colors.elevation1 },
-        isTablet && styles.tabletContributorCard
-      ]}
-      onPress={handlePress}
-      activeOpacity={0.7}
-    >
+  // Discord profile URL for QR code
+  const discordProfileUrl = `https://discord.com/users/${mention.discordId}`;
+
+  // TV layout with QR code - focusable (same as original but with QR code added)
+  if (isTV) {
+    return (
+      <Focusable
+        onPress={handlePress}
+        style={[
+          styles.contributorCard,
+          { backgroundColor: currentTheme.colors.elevation1 },
+          isTablet && styles.tabletContributorCard
+        ]}
+        autoFocus={autoFocus}
+        borderRadius={16}
+        focusScale={1.03}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <>
+            {/* Avatar with Discord badge */}
+            <View style={styles.specialAvatarContainer}>
+              {mention.isLoading ? (
+                <View style={[
+                  styles.avatar,
+                  isTablet && styles.tabletAvatar,
+                  { backgroundColor: currentTheme.colors.elevation2, justifyContent: 'center', alignItems: 'center' }
+                ]}>
+                  <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+                </View>
+              ) : (
+                <FastImage
+                  source={{ uri: mention.avatarUrl || defaultAvatar }}
+                  style={[
+                    styles.avatar,
+                    isTablet && styles.tabletAvatar
+                  ]}
+                  resizeMode={FastImage.resizeMode.cover}
+                />
+              )}
+              <View style={[styles.discordBadgeSmall, { backgroundColor: DISCORD_BRAND_COLOR }]}>
+                <FontAwesome5 name="discord" size={10} color="#FFFFFF" />
+              </View>
+            </View>
+
+            {/* User info */}
+            <View style={styles.contributorInfo}>
+              <Text style={[
+                styles.username,
+                { color: focused ? '#000' : currentTheme.colors.highEmphasis },
+                isTablet && styles.tabletUsername
+              ]}>
+                {mention.isLoading ? 'Loading...' : mention.name}
+              </Text>
+              {!mention.isLoading && mention.username && (
+                <Text style={[
+                  styles.contributions,
+                  { color: focused ? '#333' : currentTheme.colors.mediumEmphasis },
+                  isTablet && styles.tabletContributions
+                ]}>
+                  @{mention.username}
+                </Text>
+              )}
+              <View style={[styles.roleBadgeSmall, { backgroundColor: focused ? 'rgba(0,0,0,0.15)' : currentTheme.colors.primary + '20' }]}>
+                <Text style={[styles.roleBadgeText, { color: focused ? '#000' : currentTheme.colors.primary }]}>
+                  {mention.role}
+                </Text>
+              </View>
+            </View>
+
+            {/* QR Code */}
+            <View style={styles.tvQrCode}>
+              <QRCode
+                value={discordProfileUrl}
+                size={50}
+                backgroundColor="#FFFFFF"
+                color="#000000"
+              />
+            </View>
+          </>
+        )}
+      </Focusable>
+    );
+  }
+
+  const renderContent = (focused: boolean = false) => (
+    <>
       {/* Avatar with Discord badge */}
       <View style={styles.specialAvatarContainer}>
         {mention.isLoading ? (
@@ -202,7 +343,7 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
       <View style={styles.contributorInfo}>
         <Text style={[
           styles.username,
-          { color: currentTheme.colors.highEmphasis },
+          { color: focused ? '#000' : currentTheme.colors.highEmphasis },
           isTablet && styles.tabletUsername
         ]}>
           {mention.isLoading ? 'Loading...' : mention.name}
@@ -210,14 +351,14 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
         {!mention.isLoading && mention.username && (
           <Text style={[
             styles.contributions,
-            { color: currentTheme.colors.mediumEmphasis },
+            { color: focused ? '#333' : currentTheme.colors.mediumEmphasis },
             isTablet && styles.tabletContributions
           ]}>
             @{mention.username}
           </Text>
         )}
-        <View style={[styles.roleBadgeSmall, { backgroundColor: currentTheme.colors.primary + '20' }]}>
-          <Text style={[styles.roleBadgeText, { color: currentTheme.colors.primary }]}>
+        <View style={[styles.roleBadgeSmall, { backgroundColor: focused ? 'rgba(0,0,0,0.15)' : currentTheme.colors.primary + '20' }]}>
+          <Text style={[styles.roleBadgeText, { color: focused ? '#000' : currentTheme.colors.primary }]}>
             {mention.role}
           </Text>
         </View>
@@ -227,9 +368,23 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
       <FontAwesome5
         name="discord"
         size={isTablet ? 20 : 16}
-        color={currentTheme.colors.mediumEmphasis}
+        color={focused ? '#333' : currentTheme.colors.mediumEmphasis}
         style={styles.externalIcon}
       />
+    </>
+  );
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.contributorCard,
+        { backgroundColor: currentTheme.colors.elevation1 },
+        isTablet && styles.tabletContributorCard
+      ]}
+      onPress={handlePress}
+      activeOpacity={0.7}
+    >
+      {renderContent(false)}
     </TouchableOpacity>
   );
 };
@@ -238,6 +393,12 @@ const ContributorsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  const isTV = useIsTV();
+
+  // TV focus refs
+  const backButtonRef = useRef<FocusableRef>(null);
+  const contributorsTabRef = useRef<FocusableRef>(null);
+  const specialTabRef = useRef<FocusableRef>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>('contributors');
   const [contributors, setContributors] = useState<GitHubContributor[]>([]);
@@ -400,16 +561,31 @@ const ContributorsScreen: React.FC = () => {
     loadContributors(true);
   }, [loadContributors]);
 
-  const renderContributor = useCallback(({ item }: { item: GitHubContributor }) => (
+  const renderContributor = useCallback(({ item, index }: { item: GitHubContributor; index: number }) => (
     <ContributorCard
       contributor={item}
       currentTheme={currentTheme}
       isTablet={isTablet}
       isLargeTablet={isLargeTablet}
+      isTV={isTV}
+      autoFocus={isTV && index === 0}
     />
-  ), [currentTheme]);
+  ), [currentTheme, isTV]);
 
   const keyExtractor = useCallback((item: GitHubContributor) => item.id.toString(), []);
+
+  const renderSpecialMention = useCallback(({ item, index }: { item: SpecialMention; index: number }) => (
+    <SpecialMentionCard
+      mention={item}
+      currentTheme={currentTheme}
+      isTablet={isTablet}
+      isLargeTablet={isLargeTablet}
+      isTV={isTV}
+      autoFocus={isTV && index === 0}
+    />
+  ), [currentTheme, isTV]);
+
+  const specialMentionKeyExtractor = useCallback((item: SpecialMention) => item.discordId, []);
 
   const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top);
 
@@ -422,13 +598,20 @@ const ContributorsScreen: React.FC = () => {
         <StatusBar barStyle={'light-content'} />
         <View style={[styles.headerContainer, { paddingTop: topSpacing }]}>
           <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
-              <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
-            </TouchableOpacity>
+            {isTV ? (
+              <View style={styles.backButton}>
+                <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
+                <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => navigation.goBack()}
+              >
+                <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
+                <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+              </TouchableOpacity>
+            )}
           </View>
           <Text style={[
             styles.headerTitle,
@@ -457,13 +640,33 @@ const ContributorsScreen: React.FC = () => {
 
       <View style={[styles.headerContainer, { paddingTop: topSpacing }]}>
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
-            <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              ref={backButtonRef}
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+              borderRadius={8}
+              focusScale={1.05}
+              animateBackground={true}
+              showFocusBorder={true}
+              nextFocusDown={contributorsTabRef.current?.getViewRef()}
+            >
+              {(focused) => (
+                <>
+                  <Feather name="chevron-left" size={24} color={focused ? '#000' : currentTheme.colors.primary} />
+                  <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.primary }]}>Settings</Text>
+                </>
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
+              <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <Text style={[
           styles.headerTitle,
@@ -480,40 +683,113 @@ const ContributorsScreen: React.FC = () => {
         { backgroundColor: currentTheme.colors.elevation1 },
         isTablet && styles.tabletTabSwitcher
       ]}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'contributors' && { backgroundColor: currentTheme.colors.primary },
-            isTablet && styles.tabletTab
-          ]}
-          onPress={() => setActiveTab('contributors')}
-          activeOpacity={0.7}
-        >
-          <Text style={[
-            styles.tabText,
-            { color: activeTab === 'contributors' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis },
-            isTablet && styles.tabletTabText
-          ]}>
-            Contributors
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'special' && { backgroundColor: currentTheme.colors.primary },
-            isTablet && styles.tabletTab
-          ]}
-          onPress={() => setActiveTab('special')}
-          activeOpacity={0.7}
-        >
-          <Text style={[
-            styles.tabText,
-            { color: activeTab === 'special' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis },
-            isTablet && styles.tabletTabText
-          ]}>
-            Special Mentions
-          </Text>
-        </TouchableOpacity>
+        {isTV ? (
+          <>
+            <Focusable
+              ref={contributorsTabRef}
+              onPress={() => setActiveTab('contributors')}
+              style={[
+                styles.tab,
+                activeTab === 'contributors' && { backgroundColor: currentTheme.colors.primary },
+                isTablet && styles.tabletTab
+              ]}
+              autoFocus={true}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+              nextFocusUp={backButtonRef.current?.getViewRef()}
+              nextFocusRight={specialTabRef.current?.getViewRef()}
+            >
+              {(focused) => {
+                // Focused: always black text (white bg from animateBackground)
+                // Active + not focused: white text on primary bg
+                // Inactive + not focused: medium text on transparent bg
+                const isActive = activeTab === 'contributors';
+                const textColor = focused
+                  ? '#000'
+                  : (isActive ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis);
+                return (
+                  <Text style={[
+                    styles.tabText,
+                    { color: textColor },
+                    isTablet && styles.tabletTabText
+                  ]}>
+                    Contributors
+                  </Text>
+                );
+              }}
+            </Focusable>
+            <Focusable
+              ref={specialTabRef}
+              onPress={() => setActiveTab('special')}
+              style={[
+                styles.tab,
+                activeTab === 'special' && { backgroundColor: currentTheme.colors.primary },
+                isTablet && styles.tabletTab
+              ]}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+              nextFocusUp={backButtonRef.current?.getViewRef()}
+              nextFocusLeft={contributorsTabRef.current?.getViewRef()}
+            >
+              {(focused) => {
+                const isActive = activeTab === 'special';
+                const textColor = focused
+                  ? '#000'
+                  : (isActive ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis);
+                return (
+                  <Text style={[
+                    styles.tabText,
+                    { color: textColor },
+                    isTablet && styles.tabletTabText
+                  ]}>
+                    Special Mentions
+                  </Text>
+                );
+              }}
+            </Focusable>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'contributors' && { backgroundColor: currentTheme.colors.primary },
+                isTablet && styles.tabletTab
+              ]}
+              onPress={() => setActiveTab('contributors')}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'contributors' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis },
+                isTablet && styles.tabletTabText
+              ]}>
+                Contributors
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'special' && { backgroundColor: currentTheme.colors.primary },
+                isTablet && styles.tabletTab
+              ]}
+              onPress={() => setActiveTab('special')}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'special' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis },
+                isTablet && styles.tabletTabText
+              ]}>
+                Special Mentions
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -530,14 +806,32 @@ const ContributorsScreen: React.FC = () => {
                   <Text style={[styles.errorSubtext, { color: currentTheme.colors.mediumEmphasis }]}>
                     GitHub API rate limit exceeded. Please try again later or pull to refresh.
                   </Text>
-                  <TouchableOpacity
-                    style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
-                    onPress={() => loadContributors()}
-                  >
-                    <Text style={[styles.retryText, { color: currentTheme.colors.white }]}>
-                      Try Again
-                    </Text>
-                  </TouchableOpacity>
+                  {isTV ? (
+                    <Focusable
+                      onPress={() => loadContributors()}
+                      style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
+                      autoFocus={true}
+                      borderRadius={8}
+                      focusScale={1.05}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <Text style={[styles.retryText, { color: focused ? '#000' : currentTheme.colors.white }]}>
+                          Try Again
+                        </Text>
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
+                      onPress={() => loadContributors()}
+                    >
+                      <Text style={[styles.retryText, { color: currentTheme.colors.white }]}>
+                        Try Again
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ) : contributors.length === 0 ? (
                 <View style={styles.emptyContainer}>
@@ -634,15 +928,16 @@ const ContributorsScreen: React.FC = () => {
                 </View>
               </View>
 
-              {specialMentions.map((mention: SpecialMention) => (
-                <SpecialMentionCard
-                  key={mention.discordId}
-                  mention={mention}
-                  currentTheme={currentTheme}
-                  isTablet={isTablet}
-                  isLargeTablet={isLargeTablet}
-                />
-              ))}
+              <FlatList
+                data={specialMentions}
+                renderItem={renderSpecialMention}
+                keyExtractor={specialMentionKeyExtractor}
+                numColumns={isTablet ? 2 : 1}
+                key={isTablet ? 'tablet-special' : 'mobile-special'}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+                columnWrapperStyle={isTablet ? styles.tabletRow : undefined}
+              />
             </ScrollView>
           )}
         </View>
@@ -924,6 +1219,26 @@ const styles = StyleSheet.create({
   },
   tabletTabText: {
     fontSize: 16,
+  },
+  // TV-specific styles
+  tvContributorCard: {
+    padding: 20,
+    marginBottom: 16,
+  },
+  tvAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 16,
+  },
+  tvContributorInfo: {
+    flex: 1,
+  },
+  tvQrCode: {
+    padding: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    marginLeft: 12,
   },
 });
 

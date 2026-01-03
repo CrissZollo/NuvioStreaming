@@ -43,6 +43,7 @@ import MDBListIcon from '../components/icons/MDBListIcon';
 import { campaignService } from '../services/campaignService';
 import { Focusable } from '../components/tv/Focusable';
 import { useIsTV } from '../contexts/TVContext';
+import QRCode from 'react-native-qrcode-svg';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -812,22 +813,61 @@ const SettingsScreen: React.FC = () => {
       case 'about':
         return (
           <SettingsCard title="ABOUT" isTablet={isTablet}>
-            <SettingItem
-              title="Privacy Policy"
-              icon="lock"
-              onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
-              renderControl={ChevronRight}
-              isTablet={isTablet}
-              isTV={isTVDevice}
-            />
-            <SettingItem
-              title="Report Issue"
-              icon="alert-triangle"
-              onPress={() => Sentry.showFeedbackWidget()}
-              renderControl={ChevronRight}
-              isTablet={isTablet}
-              isTV={isTVDevice}
-            />
+            {isTVDevice ? (
+              <View style={styles.tvQrContainer}>
+                <View style={styles.tvQrItem}>
+                  <View style={styles.tvQrCode}>
+                    <QRCode
+                      value="https://tapframe.github.io/NuvioStreaming/#privacy-policy"
+                      size={120}
+                      backgroundColor="#FFFFFF"
+                      color="#000000"
+                    />
+                  </View>
+                  <Text style={[styles.tvQrLabel, { color: currentTheme.colors.highEmphasis }]}>
+                    Privacy Policy
+                  </Text>
+                  <Text style={[styles.tvQrHint, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Scan to view
+                  </Text>
+                </View>
+                <View style={styles.tvQrItem}>
+                  <View style={styles.tvQrCode}>
+                    <QRCode
+                      value="https://github.com/tapframe/NuvioStreaming/issues"
+                      size={120}
+                      backgroundColor="#FFFFFF"
+                      color="#000000"
+                    />
+                  </View>
+                  <Text style={[styles.tvQrLabel, { color: currentTheme.colors.highEmphasis }]}>
+                    Report Issue
+                  </Text>
+                  <Text style={[styles.tvQrHint, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Scan to report
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <>
+                <SettingItem
+                  title="Privacy Policy"
+                  icon="lock"
+                  onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
+                  renderControl={ChevronRight}
+                  isTablet={isTablet}
+                  isTV={isTVDevice}
+                />
+                <SettingItem
+                  title="Report Issue"
+                  icon="alert-triangle"
+                  onPress={() => Sentry.showFeedbackWidget()}
+                  renderControl={ChevronRight}
+                  isTablet={isTablet}
+                  isTV={isTVDevice}
+                />
+              </>
+            )}
             <SettingItem
               title="Version"
               description={getDisplayedAppVersion()}
@@ -1536,6 +1576,34 @@ const styles = StyleSheet.create({
   monkeyAnimation: {
     width: 180,
     height: 180,
+  },
+  // TV QR Code styles
+  tvQrContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'flex-start',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+  },
+  tvQrItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  tvQrCode: {
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  tvQrLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  tvQrHint: {
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
 
