@@ -1,7 +1,10 @@
 package com.nuvio.tv.ui.navigation
 
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -87,33 +90,14 @@ fun NuvioNavigation(
         previousRoute = currentRoute
     }
 
-    Row(modifier = modifier.fillMaxSize()) {
-        // Navigation Rail - hidden on full-screen routes
-        if (!isFullScreenRoute) {
-            NuvioNavigationRail(
-                selectedDestination = selectedDestination,
-                onDestinationSelected = { destination ->
-                    selectedDestination = destination
-                    pendingFocusDestination = destination
-                    navController.navigate(destination.route) {
-                        // Pop up to the start destination to avoid building up a large stack
-                        popUpTo(NavRoutes.HOME) {
-                            saveState = true
-                        }
-                        // Avoid multiple copies of the same destination
-                        launchSingleTop = true
-                        // Restore state when reselecting a previously selected item
-                        restoreState = true
-                    }
-                }
-            )
-        }
-
-        // Main Content Area
+    Box(modifier = modifier.fillMaxSize()) {
+        // Main Content Area - Full screen, with padding for collapsed nav rail
         NavHost(
             navController = navController,
             startDestination = NavRoutes.SPLASH,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = if (!isFullScreenRoute) 56.dp else 0.dp)
         ) {
             // Splash Screen
             composable(NavRoutes.SPLASH) {
@@ -399,6 +383,28 @@ fun NuvioNavigation(
             composable(NavRoutes.SETTINGS_NOTIFICATIONS) {
                 // NotificationsSettingsScreen - TODO
             }
+        }
+
+        // Navigation Rail - Overlay on top of content, hidden on full-screen routes
+        if (!isFullScreenRoute) {
+            NuvioNavigationRail(
+                selectedDestination = selectedDestination,
+                onDestinationSelected = { destination ->
+                    selectedDestination = destination
+                    pendingFocusDestination = destination
+                    navController.navigate(destination.route) {
+                        // Pop up to the start destination to avoid building up a large stack
+                        popUpTo(NavRoutes.HOME) {
+                            saveState = true
+                        }
+                        // Avoid multiple copies of the same destination
+                        launchSingleTop = true
+                        // Restore state when reselecting a previously selected item
+                        restoreState = true
+                    }
+                },
+                modifier = Modifier.zIndex(1f)
+            )
         }
     }
 }

@@ -1,9 +1,14 @@
 package com.nuvio.tv.ui.navigation
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +16,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
@@ -31,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -44,9 +51,14 @@ import coil.compose.AsyncImage
 import com.nuvio.tv.R
 import com.nuvio.tv.ui.theme.NuvioTypography
 
+private val COLLAPSED_WIDTH = 56.dp
+private val EXPANDED_WIDTH = 180.dp
+private val ANIMATION_DURATION = 250
+
 /**
  * Navigation rail for the Nuvio TV app.
  * Displays on the left side of the screen with main navigation items.
+ * Collapses to icons only when not focused, expands with labels when focused.
  */
 @Composable
 fun NuvioNavigationRail(
@@ -54,69 +66,109 @@ fun NuvioNavigationRail(
     onDestinationSelected: (MainNavDestination) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    // Track if any item in the navigation rail has focus
+    var isRailFocused by remember { mutableStateOf(false) }
+
+    // Animate width between collapsed and expanded states
+    val railWidth by animateDpAsState(
+        targetValue = if (isRailFocused) EXPANDED_WIDTH else COLLAPSED_WIDTH,
+        animationSpec = tween(durationMillis = ANIMATION_DURATION),
+        label = "railWidth"
+    )
+
+    // Gradient background that fades from solid to transparent
+    // Extended gradient for better text readability when expanded
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val gradientBrush = Brush.horizontalGradient(
+        colorStops = arrayOf(
+            0.0f to surfaceColor,
+            0.4f to surfaceColor.copy(alpha = 0.98f),
+            0.6f to surfaceColor.copy(alpha = 0.90f),
+            0.75f to surfaceColor.copy(alpha = 0.70f),
+            0.85f to surfaceColor.copy(alpha = 0.40f),
+            0.95f to surfaceColor.copy(alpha = 0.15f),
+            1.0f to Color.Transparent
+        )
+    )
+
+    Box(
         modifier = modifier
-            .width(80.dp)
+            .width(railWidth)
             .fillMaxHeight()
-            .background(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-            )
-            .padding(vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+            .background(brush = gradientBrush)
     ) {
-        // App Logo
-        Box(
+        Column(
             modifier = Modifier
-                .size(56.dp)
-                .padding(bottom = 8.dp),
-            contentAlignment = Alignment.Center
+                .fillMaxHeight()
+                .padding(vertical = 24.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.nuvio_logo),
-                contentDescription = "Nuvio",
-                modifier = Modifier.size(48.dp)
-            )
+            // App Logo
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .padding(bottom = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.nuvio_logo),
+                    contentDescription = "Nuvio",
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Navigation Items
+            MainNavDestination.entries.forEach { destination ->
+                NavigationRailItem(
+                    destination = destination,
+                    isSelected = selectedDestination == destination,
+                    isExpanded = isRailFocused,
+                    onClick = { onDestinationSelected(destination) },
+                    onFocusChanged = { focused ->
+                        if (focused) isRailFocused = true
+                    },
+                    onFocusLost = {
+                        // Check if focus moved outside the rail
+                        isRailFocused = false
+                    },
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Navigation Items
-        MainNavDestination.entries.forEach { destination ->
-            NavigationRailItem(
-                destination = destination,
-                isSelected = selectedDestination == destination,
-                onClick = { onDestinationSelected(destination) },
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
 /**
  * Individual navigation rail item with focus handling for D-pad navigation.
+ * Supports expanded (with label) and collapsed (icon only) states.
  */
 @Composable
 private fun NavigationRailItem(
     destination: MainNavDestination,
     isSelected: Boolean,
+    isExpanded: Boolean,
     onClick: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    onFocusLost: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.1f else 1f,
+        targetValue = if (isFocused) 1.05f else 1f,
         animationSpec = tween(durationMillis = 150),
         label = "scale"
     )
 
     val backgroundColor by animateColorAsState(
         targetValue = when {
-            isFocused -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-            isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            isFocused -> MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+            isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
             else -> Color.Transparent
         },
         animationSpec = tween(durationMillis = 150),
@@ -147,9 +199,16 @@ private fun NavigationRailItem(
         label = "textColor"
     )
 
-    Column(
+    // Animate item width based on expanded state
+    val itemWidth by animateDpAsState(
+        targetValue = if (isExpanded) 128.dp else 48.dp,
+        animationSpec = tween(durationMillis = ANIMATION_DURATION),
+        label = "itemWidth"
+    )
+
+    Row(
         modifier = modifier
-            .width(64.dp)
+            .width(itemWidth)
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .border(
@@ -159,7 +218,12 @@ private fun NavigationRailItem(
             )
             .scale(scale)
             .onFocusChanged { focusState ->
+                val wasFocused = isFocused
                 isFocused = focusState.isFocused
+                onFocusChanged(focusState.isFocused)
+                if (wasFocused && !focusState.isFocused) {
+                    onFocusLost()
+                }
             }
             .focusable()
             .onKeyEvent { event ->
@@ -172,8 +236,9 @@ private fun NavigationRailItem(
                     false
                 }
             }
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(vertical = 12.dp, horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (isExpanded) Arrangement.Start else Arrangement.Center
     ) {
         Icon(
             imageVector = if (isSelected) destination.selectedIcon else destination.unselectedIcon,
@@ -182,13 +247,23 @@ private fun NavigationRailItem(
             modifier = Modifier.size(24.dp)
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = destination.label,
-            style = NuvioTypography.navLabel,
-            color = textColor,
-            maxLines = 1
-        )
+        // Animated label visibility
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn(animationSpec = tween(ANIMATION_DURATION)) +
+                    expandHorizontally(animationSpec = tween(ANIMATION_DURATION)),
+            exit = fadeOut(animationSpec = tween(ANIMATION_DURATION / 2)) +
+                    shrinkHorizontally(animationSpec = tween(ANIMATION_DURATION / 2))
+        ) {
+            Row {
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = destination.label,
+                    style = NuvioTypography.navLabel,
+                    color = textColor,
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
