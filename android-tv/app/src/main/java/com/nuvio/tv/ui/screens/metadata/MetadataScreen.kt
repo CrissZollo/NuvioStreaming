@@ -36,18 +36,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -215,13 +217,29 @@ private fun MetadataContent(
     val backgroundImage = remember(content.id) { content.background ?: content.poster }
     val backgroundColor = MaterialTheme.colorScheme.background
 
+    // Calculate scroll offset for parallax effect using derivedStateOf for reactivity
+    val scrollOffset by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex == 0) {
+                listState.firstVisibleItemScrollOffset.toFloat()
+            } else {
+                // If we've scrolled past the first item, use a large value to keep image scrolled up
+                listState.firstVisibleItemScrollOffset.toFloat() + (listState.firstVisibleItemIndex * 1000f)
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // Layer 1: Fixed Background Image - uses graphicsLayer to isolate from scroll
+        // Layer 1: Background Image that follows scroll (parallax effect)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.6f)
                 .align(Alignment.TopStart)
+                .graphicsLayer {
+                    // Move backdrop up as user scrolls down (parallax at 0.5x speed)
+                    translationY = -scrollOffset * 0.5f
+                }
         ) {
             AsyncImage(
                 model = backgroundImage,
@@ -230,7 +248,7 @@ private fun MetadataContent(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Gradient overlay on image
+            // Gradient overlay on image - follows with the backdrop
             Box(
                 modifier = Modifier
                     .fillMaxSize()
