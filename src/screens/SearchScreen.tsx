@@ -44,6 +44,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ScreenHeader from '../components/common/ScreenHeader';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from '../components/tv/Focusable';
 
 const { width, height } = Dimensions.get('window');
 
@@ -220,6 +222,7 @@ const SimpleSearchAnimation = () => {
 const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = true;
+  const isTVDevice = useIsTV();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GroupedSearchResults>({ byAddon: [], allResults: [] });
   const [searching, setSearching] = useState(false);
@@ -569,49 +572,90 @@ const SearchScreen = () => {
         <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
           Recent Searches
         </Text>
-        {recentSearches.map((search, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.recentSearchItem}
-            onPress={() => {
-              setQuery(search);
-              Keyboard.dismiss();
-            }}
-          >
-            <MaterialIcons
-              name="history"
-              size={20}
-              color={currentTheme.colors.lightGray}
-              style={styles.recentSearchIcon}
-            />
-            <Text style={[styles.recentSearchText, { color: currentTheme.colors.white }]}>
-              {search}
-            </Text>
+        {recentSearches.map((search, index) => {
+          const isFirst = index === 0;
+          const isLast = index === recentSearches.length - 1;
+
+          if (isTVDevice) {
+            return (
+              <Focusable
+                key={index}
+                style={styles.recentSearchItem}
+                onPress={() => {
+                  setQuery(search);
+                }}
+                borderRadius={8}
+                focusScale={1.02}
+                animateBackground={false}
+                showFocusBorder={true}
+                blockUp={isFirst}
+                blockDown={isLast}
+                autoFocus={isFirst}
+              >
+                {(focused) => (
+                  <>
+                    <MaterialIcons
+                      name="history"
+                      size={20}
+                      color={focused ? currentTheme.colors.white : currentTheme.colors.lightGray}
+                      style={styles.recentSearchIcon}
+                    />
+                    <Text style={[styles.recentSearchText, { color: currentTheme.colors.white }]}>
+                      {search}
+                    </Text>
+                  </>
+                )}
+              </Focusable>
+            );
+          }
+
+          return (
             <TouchableOpacity
+              key={index}
+              style={styles.recentSearchItem}
               onPress={() => {
-                const newRecentSearches = [...recentSearches];
-                newRecentSearches.splice(index, 1);
-                setRecentSearches(newRecentSearches);
-                mmkvStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+                setQuery(search);
+                Keyboard.dismiss();
               }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={styles.recentSearchDeleteButton}
             >
-              <MaterialIcons name="close" size={16} color={currentTheme.colors.lightGray} />
+              <MaterialIcons
+                name="history"
+                size={20}
+                color={currentTheme.colors.lightGray}
+                style={styles.recentSearchIcon}
+              />
+              <Text style={[styles.recentSearchText, { color: currentTheme.colors.white }]}>
+                {search}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const newRecentSearches = [...recentSearches];
+                  newRecentSearches.splice(index, 1);
+                  setRecentSearches(newRecentSearches);
+                  mmkvStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.recentSearchDeleteButton}
+              >
+                <MaterialIcons name="close" size={16} color={currentTheme.colors.lightGray} />
+              </TouchableOpacity>
             </TouchableOpacity>
-          </TouchableOpacity>
-        ))}
+          );
+        })}
       </View>
     );
   };
 
-  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme }: {
+  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme, isTVDevice, isFirst, isLast }: {
     item: StreamingContent;
     index: number;
     navigation: any;
     setSelectedItem: (item: StreamingContent) => void;
     setMenuVisible: (visible: boolean) => void;
     currentTheme: any;
+    isTVDevice?: boolean;
+    isFirst?: boolean;
+    isLast?: boolean;
   }) => {
     const [inLibrary, setInLibrary] = React.useState(!!item.inLibrary);
     const [watched, setWatched] = React.useState(false);
@@ -650,25 +694,11 @@ const SearchScreen = () => {
       return () => unsubscribe();
     }, [item.id, item.type]);
 
-    return (
-      <TouchableOpacity
-        style={[styles.horizontalItem, { width: itemWidth }]}
-        onPress={() => {
-          navigation.navigate('Metadata', { id: item.id, type: item.type });
-        }}
-        onLongPress={() => {
-          setSelectedItem(item);
-          setMenuVisible(true);
-          // Do NOT toggle refreshFlag here
-        }}
-        delayLongPress={300}
-        activeOpacity={0.7}
-      >
+    const posterContent = (
+      <>
         <View style={[styles.horizontalItemPosterContainer, {
           width: itemWidth,
-          height: undefined, // Let aspect ratio control height or keep fixed height with width? 
-          // Actually, since we derived width from fixed height, we can keep height fixed or use aspect.
-          // Using aspect ratio is safer if baseHeight changes.
+          height: undefined,
           aspectRatio: aspectRatio,
           backgroundColor: currentTheme.colors.darkBackground,
           borderColor: 'rgba(255,255,255,0.05)'
@@ -678,7 +708,6 @@ const SearchScreen = () => {
             style={styles.horizontalItemPoster}
             resizeMode={FastImage.resizeMode.cover}
           />
-          {/* Bookmark and watched icons top right, bookmark to the left of watched */}
           {inLibrary && (
             <View style={[styles.libraryBadge, { position: 'absolute', top: 8, right: 36, backgroundColor: 'transparent', zIndex: 2 }]}>
               <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
@@ -716,6 +745,96 @@ const SearchScreen = () => {
             {item.year}
           </Text>
         )}
+      </>
+    );
+
+    if (isTVDevice) {
+      return (
+        <View style={[styles.horizontalItem, { width: itemWidth, overflow: 'visible', paddingTop: 4 }]}>
+          <Focusable
+            onPress={() => {
+              navigation.navigate('Metadata', { id: item.id, type: item.type });
+            }}
+            onLongPress={() => {
+              setSelectedItem(item);
+              setMenuVisible(true);
+            }}
+            style={{ width: itemWidth, aspectRatio: aspectRatio }}
+            borderRadius={16}
+            focusScale={1.05}
+            animateBackground={false}
+            showFocusBorder={true}
+            blockRight={isLast}
+          >
+            <View style={[styles.horizontalItemPosterContainer, {
+              width: itemWidth,
+              height: undefined,
+              aspectRatio: aspectRatio,
+              backgroundColor: currentTheme.colors.darkBackground,
+              borderColor: 'rgba(255,255,255,0.05)'
+            }]}>
+              <FastImage
+                source={{ uri: item.poster || PLACEHOLDER_POSTER }}
+                style={styles.horizontalItemPoster}
+                resizeMode={FastImage.resizeMode.cover}
+              />
+              {inLibrary && (
+                <View style={[styles.libraryBadge, { position: 'absolute', top: 8, right: 36, backgroundColor: 'transparent', zIndex: 2 }]}>
+                  <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
+                </View>
+              )}
+              {watched && (
+                <View style={[styles.watchedIndicator, { position: 'absolute', top: 8, right: 8, backgroundColor: 'transparent', zIndex: 2 }]}>
+                  <MaterialIcons name="check-circle" size={20} color={currentTheme.colors.success || '#4CAF50'} />
+                </View>
+              )}
+              {item.imdbRating && (
+                <View style={styles.ratingContainer}>
+                  <MaterialIcons name="star" size={12} color="#FFC107" />
+                  <Text style={[styles.ratingText, { color: currentTheme.colors.white }]}>
+                    {item.imdbRating}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Focusable>
+          <Text
+            style={[
+              styles.horizontalItemTitle,
+              {
+                color: currentTheme.colors.white,
+                fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 14,
+                lineHeight: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 18,
+                marginTop: 8,
+              }
+            ]}
+            numberOfLines={2}
+          >
+            {item.name}
+          </Text>
+          {item.year && (
+            <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray, fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 12 }]}>
+              {item.year}
+            </Text>
+          )}
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={[styles.horizontalItem, { width: itemWidth }]}
+        onPress={() => {
+          navigation.navigate('Metadata', { id: item.id, type: item.type });
+        }}
+        onLongPress={() => {
+          setSelectedItem(item);
+          setMenuVisible(true);
+        }}
+        delayLongPress={300}
+        activeOpacity={0.7}
+      >
+        {posterContent}
       </TouchableOpacity>
     );
   };
@@ -783,11 +902,15 @@ const SearchScreen = () => {
                   setSelectedItem={setSelectedItem}
                   setMenuVisible={setMenuVisible}
                   currentTheme={currentTheme}
+                  isTVDevice={isTVDevice}
+                  isFirst={index === 0}
+                  isLast={index === movieResults.length - 1}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-movie-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
+              scrollEnabled={!isTVDevice}
               contentContainerStyle={styles.horizontalListContent}
             />
           </View>
@@ -817,11 +940,15 @@ const SearchScreen = () => {
                   setSelectedItem={setSelectedItem}
                   setMenuVisible={setMenuVisible}
                   currentTheme={currentTheme}
+                  isTVDevice={isTVDevice}
+                  isFirst={index === 0}
+                  isLast={index === seriesResults.length - 1}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-series-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
+              scrollEnabled={!isTVDevice}
               contentContainerStyle={styles.horizontalListContent}
             />
           </View>
@@ -851,11 +978,15 @@ const SearchScreen = () => {
                   setSelectedItem={setSelectedItem}
                   setMenuVisible={setMenuVisible}
                   currentTheme={currentTheme}
+                  isTVDevice={isTVDevice}
+                  isFirst={index === 0}
+                  isLast={index === otherResults.length - 1}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-${item.type}-${item.id}`}
               horizontal
               showsHorizontalScrollIndicator={false}
+              scrollEnabled={!isTVDevice}
               contentContainerStyle={styles.horizontalListContent}
             />
           </View>
@@ -912,18 +1043,20 @@ const SearchScreen = () => {
                 backgroundColor: currentTheme.colors.elevation2,
                 borderColor: 'rgba(255,255,255,0.1)',
                 borderWidth: 1,
-              }
+              },
+              isTVDevice && { height: 56, borderRadius: 16 }
             ]}>
               <MaterialIcons
                 name="search"
-                size={24}
+                size={isTVDevice ? 28 : 24}
                 color={currentTheme.colors.lightGray}
                 style={styles.searchIcon}
               />
               <TextInput
                 style={[
                   styles.searchInput,
-                  { color: currentTheme.colors.white }
+                  { color: currentTheme.colors.white },
+                  isTVDevice && { fontSize: 18 }
                 ]}
                 placeholder="Search movies, shows..."
                 placeholderTextColor={currentTheme.colors.lightGray}
@@ -932,8 +1065,9 @@ const SearchScreen = () => {
                 returnKeyType="search"
                 keyboardAppearance="dark"
                 ref={inputRef}
+                autoFocus={isTVDevice}
               />
-              {query.length > 0 && (
+              {query.length > 0 && !isTVDevice && (
                 <TouchableOpacity
                   onPress={handleClearSearch}
                   style={styles.clearButton}
@@ -945,6 +1079,22 @@ const SearchScreen = () => {
                     color={currentTheme.colors.lightGray}
                   />
                 </TouchableOpacity>
+              )}
+              {query.length > 0 && isTVDevice && (
+                <Focusable
+                  onPress={handleClearSearch}
+                  style={[styles.clearButton, { padding: 8 }]}
+                  borderRadius={20}
+                  focusScale={1.1}
+                  animateBackground={false}
+                  showFocusBorder={true}
+                >
+                  <MaterialIcons
+                    name="close"
+                    size={24}
+                    color={currentTheme.colors.lightGray}
+                  />
+                </Focusable>
               )}
             </View>
           </View>
