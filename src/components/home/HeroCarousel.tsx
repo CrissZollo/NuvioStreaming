@@ -28,6 +28,7 @@ import { StreamingContent } from '../../services/catalogService';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../../hooks/useSettings';
+import { useIsTV } from '../../contexts/TVContext';
 
 interface HeroCarouselProps {
   items: StreamingContent[];
@@ -43,6 +44,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isTVDevice = useIsTV();
 
   // Responsive sizing computed per-render so rotation updates layout
   const isTablet = useMemo(
@@ -51,25 +53,42 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   );
 
   // Keep height based on baseline phone width; widen only on tablets
+  // For TV: use narrower width to keep vertical poster shape
   const baseCardWidthForHeight = useMemo(
-    () => Math.min(windowWidth * 0.8, 480),
-    [windowWidth]
+    () => isTVDevice ? Math.min(windowWidth * 0.18, 260) : Math.min(windowWidth * 0.8, 480),
+    [windowWidth, isTVDevice]
   );
 
   const cardWidth = useMemo(
-    () => (isTablet ? Math.max(560, windowWidth - 2 * Math.round(0.1 * windowWidth)) : Math.min(windowWidth * 0.8, 480)),
-    [isTablet, windowWidth]
+    () => {
+      if (isTVDevice) {
+        // TV: narrower cards to keep vertical poster shape - around 18% of screen width
+        return Math.min(windowWidth * 0.18, 260);
+      }
+      return isTablet ? Math.max(560, windowWidth - 2 * Math.round(0.1 * windowWidth)) : Math.min(windowWidth * 0.8, 480);
+    },
+    [isTablet, windowWidth, isTVDevice]
   );
 
   const cardHeight = useMemo(
-    () => Math.round(baseCardWidthForHeight * 9 / 16) + 310,
-    [baseCardWidthForHeight]
+    () => {
+      if (isTVDevice) {
+        // TV: vertical poster aspect ratio (3:4.5 roughly) - taller than wide
+        return Math.round(baseCardWidthForHeight * 1.5) + 60;
+      }
+      return Math.round(baseCardWidthForHeight * 9 / 16) + 310;
+    },
+    [baseCardWidthForHeight, isTVDevice]
   );
 
   const interval = useMemo(() => cardWidth + 16, [cardWidth]);
 
   // Reduce top padding on phones while keeping tablets unchanged
-  const effectiveTopOffset = useMemo(() => (isTablet ? TOP_TABS_OFFSET : 8), [isTablet]);
+  // TV: minimal top offset since no status bar
+  const effectiveTopOffset = useMemo(() => {
+    if (isTVDevice) return 0;
+    return isTablet ? TOP_TABS_OFFSET : 8;
+  }, [isTablet, isTVDevice]);
 
   const data = useMemo(() => (items && items.length ? items.slice(0, 10) : []), [items]);
   const loopingEnabled = data.length > 1;
@@ -408,6 +427,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
               cardWidth={cardWidth}
               cardHeight={cardHeight}
               isTablet={isTablet}
+              isTVDevice={isTVDevice}
             />
           ))}
         </Animated.ScrollView>
@@ -607,9 +627,10 @@ interface CarouselCardProps {
   cardWidth: number;
   cardHeight: number;
   isTablet: boolean;
+  isTVDevice?: boolean;
 }
 
-const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet }) => {
+const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet, isTVDevice = false }) => {
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
 
@@ -877,7 +898,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     {/* Overlay removed for performance - readability via text shadows */}
                   </View>
                   {item.logo && !logoFailed ? (
-                    <View style={styles.logoOverlay as ViewStyle} pointerEvents="none">
+                    <View style={[styles.logoOverlay as ViewStyle, isTVDevice && { paddingBottom: 20 }]} pointerEvents="none">
                       <Animated.View style={logoAnimatedStyle}>
                         <FastImage
                           source={{
@@ -885,7 +906,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                             priority: FastImage.priority.high,
                             cache: FastImage.cacheControl.immutable
                           }}
-                          style={[styles.logo as any, { width: Math.round(cardWidth * 0.72) }]}
+                          style={[styles.logo as any, { width: Math.round(cardWidth * (isTVDevice ? 0.65 : 0.72)), height: isTVDevice ? 40 : 64 }]}
                           resizeMode={FastImage.resizeMode.contain}
                           onLoad={() => setLogoLoaded(true)}
                           onError={onLogoError}
@@ -893,19 +914,19 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                       </Animated.View>
                     </View>
                   ) : (
-                    <View style={styles.titleOverlay as ViewStyle} pointerEvents="none">
+                    <View style={[styles.titleOverlay as ViewStyle, isTVDevice && { paddingBottom: 28 }]} pointerEvents="none">
                       <View>
-                        <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
+                        <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center', fontSize: isTVDevice ? 14 : 18 }]} numberOfLines={1}>
                           {item.name}
                         </Text>
                       </View>
                     </View>
                   )}
                   {item.genres && (
-                    <View style={styles.genresOverlay as ViewStyle} pointerEvents="none">
+                    <View style={[styles.genresOverlay as ViewStyle, isTVDevice && { paddingBottom: 6 }]} pointerEvents="none">
                       <View>
                         <Animated.Text
-                          style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, overlayAnimatedStyle]}
+                          style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center', fontSize: isTVDevice ? 11 : 13 }, overlayAnimatedStyle]}
                           numberOfLines={1}
                         >
                           {item.genres.slice(0, 3).join(' • ')}

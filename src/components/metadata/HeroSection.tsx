@@ -57,7 +57,7 @@ import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerService from '../../services/trailerService';
 import TrailerPlayer from '../video/TrailerPlayer';
-import { HERO_HEIGHT, SCREEN_WIDTH as width, IS_TABLET as isTablet } from '../../constants/dimensions';
+import { HERO_HEIGHT, SCREEN_WIDTH as width, IS_TABLET as isTablet, IS_TV_DEVICE as isTVConstant } from '../../constants/dimensions';
 
 const { height } = Dimensions.get('window');
 
@@ -2017,13 +2017,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 400,
+    height: isTVConstant ? 250 : 400,
     zIndex: 1,
   },
   heroContent: {
-    padding: isTablet ? 32 : 16,
-    paddingTop: isTablet ? 16 : 8,
-    paddingBottom: isTablet ? 16 : 8,
+    padding: isTablet ? 32 : (isTVConstant ? 12 : 16),
+    paddingTop: isTablet ? 16 : (isTVConstant ? 4 : 8),
+    paddingBottom: isTablet ? 16 : (isTVConstant ? 6 : 8),
     position: 'relative',
     zIndex: 2,
   },
@@ -2047,15 +2047,15 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   titleLogo: {
-    width: width * 0.75,
-    height: 90,
+    width: isTVConstant ? width * 0.4 : width * 0.75,
+    height: isTVConstant ? 70 : 90,
     alignSelf: 'center',
     textAlign: 'center',
   },
   heroTitle: {
-    fontSize: 26,
+    fontSize: isTVConstant ? 22 : 26,
     fontWeight: '900',
-    marginBottom: 8,
+    marginBottom: isTVConstant ? 4 : 8,
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -2067,8 +2067,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 14,
+    marginTop: isTVConstant ? 2 : 6,
+    marginBottom: isTVConstant ? 8 : 14,
     gap: 0,
     maxWidth: isTablet ? 600 : '100%',
     alignSelf: 'center',
@@ -2095,7 +2095,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'column',
-    gap: 12,
+    gap: isTVConstant ? 8 : 12,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
@@ -2161,9 +2161,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    borderRadius: 26,
+    paddingVertical: isTVConstant ? 9 : 11,
+    paddingHorizontal: isTVConstant ? 14 : 16,
+    borderRadius: isTVConstant ? 22 : 26,
   },
   playButton: {
     backgroundColor: '#fff',
@@ -2179,9 +2179,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   iconButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: isTVConstant ? 42 : 50,
+    height: isTVConstant ? 42 : 50,
+    borderRadius: isTVConstant ? 21 : 25,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center',
@@ -2189,9 +2189,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   traktButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: isTVConstant ? 42 : 50,
+    height: isTVConstant ? 42 : 50,
+    borderRadius: isTVConstant ? 21 : 25,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center',
