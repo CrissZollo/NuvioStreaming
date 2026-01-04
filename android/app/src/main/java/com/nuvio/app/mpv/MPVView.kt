@@ -94,7 +94,10 @@ class MPVView @JvmOverloads constructor(
     private fun initOptions() {
         Log.d(TAG, "========== INITIALIZING MPV OPTIONS ==========")
 
-        // MINIMAL CONFIG - trying to identify the root cause
+        // Detect if running on Android TV
+        val uiModeManager = context.getSystemService(android.content.Context.UI_MODE_SERVICE) as android.app.UiModeManager
+        val isTV = uiModeManager.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+        Log.d(TAG, "Device type: ${if (isTV) "Android TV" else "Mobile/Tablet"}")
 
         // Video output - required for Android
         MPVLib.setOptionString("vo", "gpu")
@@ -102,23 +105,52 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("opengl-es", "yes")
         Log.d(TAG, "Video output: vo=gpu, gpu-context=android")
 
-        // Hardware decoding - auto for best compatibility
-        MPVLib.setOptionString("hwdec", "auto")
-        Log.d(TAG, "Hardware decoding: hwdec=auto")
+        // Hardware decoding configuration
+        // - mediacodec: Direct hardware decoding (best performance, but some devices have issues)
+        // - mediacodec-copy: Hardware decode + copy to CPU (more compatible, slightly slower)
+        // - auto: Let MPV decide (may fall back to software on some devices)
+        if (isTV) {
+            // For Android TV (Nvidia Shield, Fire TV, etc.):
+            // Use mediacodec for direct hardware decoding - best performance
+            // Fall back to mediacodec-copy if direct fails
+            MPVLib.setOptionString("hwdec", "mediacodec,mediacodec-copy,auto")
+            Log.d(TAG, "Hardware decoding (TV): hwdec=mediacodec,mediacodec-copy,auto")
 
-        // Audio output
+            // GPU shader optimizations for TV - prefer performance over quality
+            MPVLib.setOptionString("profile", "fast")
+            MPVLib.setOptionString("gpu-dumb-mode", "yes")
+            Log.d(TAG, "GPU optimizations: profile=fast, gpu-dumb-mode=yes")
+
+            // Reduce demuxer overhead for smoother playback
+            MPVLib.setOptionString("demuxer-max-bytes", "50MiB")
+            MPVLib.setOptionString("demuxer-max-back-bytes", "25MiB")
+            Log.d(TAG, "Demuxer buffers: max=50MiB, back=25MiB")
+        } else {
+            // For mobile/tablet: Use auto with mediacodec-copy fallback
+            MPVLib.setOptionString("hwdec", "mediacodec-copy,auto")
+            Log.d(TAG, "Hardware decoding (Mobile): hwdec=mediacodec-copy,auto")
+        }
+
+        // Audio output - audiotrack is more reliable on Android
         MPVLib.setOptionString("ao", "audiotrack,opensles")
+        Log.d(TAG, "Audio output: ao=audiotrack,opensles")
 
-        // Basic caching
+        // Caching for network streams
         MPVLib.setOptionString("cache", "yes")
+        MPVLib.setOptionString("cache-secs", "30")
+        Log.d(TAG, "Cache: enabled, 30 seconds")
 
-        // Disable unnecessary features
+        // Disable unnecessary features that consume resources
         MPVLib.setOptionString("osc", "no")
         MPVLib.setOptionString("terminal", "no")
         MPVLib.setOptionString("input-default-bindings", "no")
+        MPVLib.setOptionString("sub-auto", "fuzzy")
 
-        // Verbose logging
-        MPVLib.setOptionString("msg-level", "all=v")
+        // Disable screenshot and other unused features
+        MPVLib.setOptionString("screenshot", "no")
+
+        // Logging (reduce in production for performance)
+        MPVLib.setOptionString("msg-level", "all=warn")
 
         Log.d(TAG, "========== MPV OPTIONS COMPLETE ==========")
     }
