@@ -116,6 +116,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
   const tvCardViewRefs = useRef<React.RefObject<View>[]>([]);
   const [tvFocusedIndex, setTvFocusedIndex] = useState(0);
   const [tvRefsReady, setTvRefsReady] = useState(false);
+  // Shared value for TV focused index - cards read this in worklets to avoid re-renders
+  const tvFocusedIndexShared = useSharedValue(0);
 
   // Debounce for TV focus events to prevent jumping on fast navigation
   const lastTVFocusTime = useRef<number>(0);
@@ -295,6 +297,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
     lastTVFocusTime.current = now;
     isScrollingRef.current = true;
 
+    // Update shared value immediately for card animations (no re-render)
+    tvFocusedIndexShared.value = logicalIndex;
+    // Update state for text display (will cause re-render but only for text, not cards)
     setTvFocusedIndex(logicalIndex);
 
     // Use instant scroll (animated: false) to prevent animation conflicts
@@ -305,7 +310,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
     setTimeout(() => {
       isScrollingRef.current = false;
     }, 50);
-  }, [scrollToLogicalIndex]);
+  }, [scrollToLogicalIndex, tvFocusedIndexShared]);
 
   const contentPadding = useMemo(() => {
     if (isTVDevice) {
@@ -515,7 +520,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
                 cardHeight={cardHeight}
                 isTablet={isTablet}
                 isTVDevice={isTVDevice}
-                tvFocusedIndex={tvFocusedIndex}
+                tvFocusedIndexShared={isTVDevice ? tvFocusedIndexShared : undefined}
               />
             );
 
@@ -776,11 +781,11 @@ interface CarouselCardProps {
   cardHeight: number;
   isTablet: boolean;
   isTVDevice?: boolean;
-  /** The currently focused card index on TV (for scaling non-focused cards down) */
-  tvFocusedIndex?: number;
+  /** Shared value for TV focused index - read in worklets to avoid re-renders */
+  tvFocusedIndexShared?: SharedValue<number>;
 }
 
-const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet, isTVDevice = false, tvFocusedIndex = 0 }) => {
+const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet, isTVDevice = false, tvFocusedIndexShared }) => {
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
 
@@ -789,16 +794,6 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   const genresOpacity = useSharedValue(0);
   const actionsOpacity = useSharedValue(0);
   const isFlipped = useSharedValue(flipped ? 1 : 0);
-
-  // TV focus animation - smooth transition when focus changes
-  const tvFocusProgress = useSharedValue(index === tvFocusedIndex ? 1 : 0);
-
-  // Animate focus changes smoothly on TV - fast for responsive feel
-  useEffect(() => {
-    if (isTVDevice) {
-      tvFocusProgress.value = withTiming(index === tvFocusedIndex ? 1 : 0, { duration: 80 });
-    }
-  }, [tvFocusedIndex, index, isTVDevice]);
 
   // Reset animations when component mounts/remounts to prevent glitching
   useEffect(() => {
@@ -887,20 +882,33 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     };
   });
 
+  // TV focus animation - use a local shared value that animates when tvFocusedIndexShared changes
+  // Initialize based on whether this card is initially focused (index 0 starts focused)
+  const tvFocusProgress = useSharedValue(index === 0 ? 1 : 0);
+
+  // Animate focus changes smoothly on TV using useAnimatedReaction
+  useAnimatedReaction(
+    () => tvFocusedIndexShared?.value ?? -1,
+    (currentFocused, previousFocused) => {
+      if (!isTVDevice || currentFocused === previousFocused) return;
+      // Animate this card's focus progress
+      const shouldBeFocused = currentFocused === index;
+      tvFocusProgress.value = withTiming(shouldBeFocused ? 1 : 0, { duration: 150 });
+    },
+    [index, isTVDevice]
+  );
+
   // On TV: focused card is full size (1.0), non-focused cards are scaled down (0.88)
-  // Uses tvFocusProgress shared value for smooth animated transitions
+  // Uses tvFocusProgress for smooth animated transitions
   // Border is included here so it scales with the card
   // On mobile: use scroll-based animation
   const cardAnimatedStyle = useAnimatedStyle(() => {
     'worklet';
     // On TV, use animated focus-based scaling for smooth transitions
-    if (isTVDevice) {
-      // Interpolate scale: unfocused = 0.88, focused = 1.0
+    if (isTVDevice && tvFocusedIndexShared) {
+      // Interpolate for smooth animation
       const scale = interpolate(tvFocusProgress.value, [0, 1], [0.88, 1]);
-      // Interpolate opacity: unfocused = 0.6, focused = 1.0
       const opacity = interpolate(tvFocusProgress.value, [0, 1], [0.6, 1]);
-      // Interpolate border: unfocused = transparent, focused = white
-      // Round to 2 decimal places to avoid invalid rgba values from floating-point precision
       const borderOpacity = Math.round(interpolate(tvFocusProgress.value, [0, 1], [0, 1]) * 100) / 100;
       return {
         transform: [{ scale }],
