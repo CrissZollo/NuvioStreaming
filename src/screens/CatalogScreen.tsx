@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,12 @@ import {
   Dimensions,
   Platform,
   InteractionManager,
-  ScrollView
+  ScrollView,
+  FlatList,
+  BackHandler
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService, CatalogExtra } from '../services/stremioService';
@@ -22,6 +24,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import FastImage from '@d11/react-native-fast-image';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from '../components/tv/Focusable';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for CatalogScreen
 let GlassViewComp: any = null;
@@ -60,12 +64,16 @@ const SPACING = {
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Dynamic column and spacing calculation based on screen width
-const calculateCatalogLayout = (screenWidth: number) => {
+const calculateCatalogLayout = (screenWidth: number, isTV: boolean = false) => {
   const MIN_ITEM_WIDTH = 120;
-  const MAX_ITEM_WIDTH = 180; // Increased for tablets
+  const MAX_ITEM_WIDTH = isTV ? 200 : 180; // Slightly larger max for TV
+
+  // TV needs more spacing for focus borders and scale effects
+  const TV_ITEM_GAP = 28; // Gap between items on TV
+
   // Increase padding and spacing on larger screens for proper breathing room
   const HORIZONTAL_PADDING = screenWidth >= 1600 ? SPACING.xl * 4 : screenWidth >= 1200 ? SPACING.xl * 3 : screenWidth >= 1000 ? SPACING.xl * 2 : SPACING.lg * 2;
-  const ITEM_SPACING = screenWidth >= 1600 ? SPACING.xl : screenWidth >= 1200 ? SPACING.lg : screenWidth >= 1000 ? SPACING.md : SPACING.sm;
+  const ITEM_SPACING = isTV ? TV_ITEM_GAP : (screenWidth >= 1600 ? SPACING.xl : screenWidth >= 1200 ? SPACING.lg : screenWidth >= 1000 ? SPACING.md : SPACING.sm);
 
   // Calculate how many columns can fit
   const availableWidth = screenWidth - HORIZONTAL_PADDING;
@@ -265,6 +273,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
 });
 
+// Constants for TV layout
+const TV_SIDE_MENU_WIDTH = 60; // Collapsed side menu width
+
 const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name: originalName, genreFilter } = route.params;
   const [items, setItems] = useState<Meta[]>([]);
@@ -276,6 +287,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
   const [actualCatalogName, setActualCatalogName] = useState<string | null>(null);
+
+  // TV navigation
+  const isTVDevice = useIsTV();
+  const listRef = useRef<FlatList>(null);
+  const backButtonRef = useRef<View>(null);
   const [screenData, setScreenData] = useState(() => {
     const { width } = Dimensions.get('window');
     return {
@@ -311,10 +327,20 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     })();
   }, []);
 
+  // Recalculate layout when TV device status is known
+  useEffect(() => {
+    const { width } = Dimensions.get('window');
+    const base = calculateCatalogLayout(width, isTVDevice);
+    setScreenData({
+      width,
+      ...base
+    });
+  }, [isTVDevice]);
+
   // Handle screen dimension changes
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      const base = calculateCatalogLayout(window.width);
+      const base = calculateCatalogLayout(window.width, isTVDevice);
       setScreenData(prev => ({
         width: window.width,
         ...base
@@ -322,7 +348,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     });
 
     return () => subscription?.remove();
-  }, []);
+  }, [isTVDevice]);
 
   const { getCustomName, isLoadingCustomNames } = useCustomCatalogNames();
 
@@ -751,27 +777,34 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     return poster;
   }, []);
 
+  // Calculate the full cell width for FlashList (item + spacing)
+  const cellWidth = React.useMemo((): number => {
+    const itemSpacing: number = (screenData as any).itemSpacing ?? SPACING.sm;
+    // Each cell needs to include half spacing on each side for proper distribution
+    return effectiveItemWidth + itemSpacing;
+  }, [effectiveItemWidth, screenData]);
+
   const renderItem = useCallback(({ item, index }: { item: Meta; index: number }) => {
+    // Use spacing from calculated layout (already accounts for TV)
+    const itemSpacing = (screenData as any).itemSpacing ?? SPACING.sm;
+    const TV_FOCUS_PADDING = 4; // Small padding to prevent border clipping
+
     // Calculate if this is the last item in a row
     const isLastInRow = (index + 1) % effectiveNumColumns === 0;
-    // For proper spacing
-    const rightMargin = isLastInRow ? 0 : ((screenData as any).itemSpacing ?? SPACING.sm);
+    const isFirstInRow = index % effectiveNumColumns === 0;
 
     // Calculate aspect ratio based on posterShape
     const shape = item.posterShape || 'poster';
     const aspectRatio = shape === 'landscape' ? 16 / 9 : (shape === 'square' ? 1 : 2 / 3);
 
-    return (
-      <TouchableOpacity
+    const content = (
+      <View
         style={[
           styles.item,
           {
-            marginRight: rightMargin,
-            width: effectiveItemWidth
+            width: effectiveItemWidth,
           }
         ]}
-        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
-        activeOpacity={0.7}
       >
         <FastImage
           source={{ uri: optimizePosterUrl(item.poster) }}
@@ -837,9 +870,94 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             {item.name}
           </Text>
         )}
+      </View>
+    );
+
+    // On TV, wrap with Focusable for D-pad navigation
+    // Use a container that takes up the full cell width with padding for spacing
+    if (isTVDevice) {
+      const halfSpacing = itemSpacing / 2;
+      // Create TV-specific content without the marginBottom from styles.item
+      const tvContent = (
+        <View
+          style={[
+            styles.item,
+            {
+              width: effectiveItemWidth,
+              marginBottom: 0, // Remove margin - wrapper handles spacing
+            }
+          ]}
+        >
+          <FastImage
+            source={{ uri: optimizePosterUrl(item.poster) }}
+            style={[styles.poster, { aspectRatio }]}
+            resizeMode={FastImage.resizeMode.cover}
+          />
+
+          {type === 'movie' && nowPlayingMovies.has(item.id) && (
+            <View style={styles.badgeContainer}>
+              <MaterialIcons
+                name="theaters"
+                size={12}
+                color={colors.white}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.badgeText}>In Theaters</Text>
+            </View>
+          )}
+
+          {showTitles && (
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '500',
+                color: colors.mediumGray,
+                marginTop: 6,
+                textAlign: 'center',
+                paddingHorizontal: 4,
+              }}
+              numberOfLines={2}
+            >
+              {item.name}
+            </Text>
+          )}
+        </View>
+      );
+
+      return (
+        <View style={{
+          width: cellWidth,
+          paddingHorizontal: halfSpacing,
+          paddingBottom: itemSpacing,
+          paddingTop: TV_FOCUS_PADDING,
+          alignItems: 'center', // Center the focusable within the cell
+        }}>
+          <Focusable
+            onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
+            style={{
+              borderRadius: 12,
+            }}
+            focusScale={1.03}
+            showFocusBorder={true}
+            borderRadius={12}
+            autoFocus={index === 0}
+          >
+            {tvContent}
+          </Focusable>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
+        activeOpacity={0.7}
+        style={{ marginBottom: SPACING.lg }}
+      >
+        {content}
       </TouchableOpacity>
     );
-  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth, screenData, type, nowPlayingMovies, colors.white, colors.mediumGray, optimizePosterUrl, addonId, isDarkMode, showTitles]);
+  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth, screenData, type, nowPlayingMovies, colors.white, colors.mediumGray, optimizePosterUrl, addonId, isDarkMode, showTitles, isTVDevice, cellWidth]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -880,18 +998,96 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
   const isScreenLoading = loading || isLoadingCustomNames;
 
+  // Handle hardware back button on TV
+  useFocusEffect(
+    useCallback(() => {
+      if (!isTVDevice) return;
+
+      const onBackPress = () => {
+        navigation.goBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress
+      );
+
+      return () => subscription.remove();
+    }, [isTVDevice, navigation])
+  );
+
+  // TV-specific back button component - moved before early returns so it can be used in all states
+  const BackButton = useCallback(() => {
+    if (isTVDevice) {
+      return (
+        <Focusable
+          viewRef={backButtonRef}
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          focusScale={1.1}
+          showFocusBorder={true}
+          borderRadius={8}
+        >
+          <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+          <Text style={styles.backText}>Back</Text>
+        </Focusable>
+      );
+    }
+    return (
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+        <Text style={styles.backText}>Back</Text>
+      </TouchableOpacity>
+    );
+  }, [isTVDevice, navigation, styles.backButton, styles.backText, colors.white]);
+
+  // TV-specific filter chip component - moved before early returns
+  const FilterChip = useCallback(({
+    label,
+    isActive,
+    onPress
+  }: {
+    label: string;
+    isActive: boolean;
+    onPress: () => void;
+  }) => {
+    if (isTVDevice) {
+      return (
+        <Focusable
+          onPress={onPress}
+          style={[styles.filterChip, isActive && styles.filterChipActive]}
+          focusScale={1.1}
+          showFocusBorder={true}
+          borderRadius={16}
+        >
+          <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+            {label}
+          </Text>
+        </Focusable>
+      );
+    }
+    return (
+      <TouchableOpacity
+        style={[styles.filterChip, isActive && styles.filterChipActive]}
+        onPress={onPress}
+      >
+        <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  }, [isTVDevice, styles.filterChip, styles.filterChipActive, styles.filterChipText, styles.filterChipTextActive]);
+
   if (isScreenLoading && items.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, isTVDevice && { paddingLeft: TV_SIDE_MENU_WIDTH }]}>
         <StatusBar barStyle="light-content" />
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
+          <BackButton />
         </View>
         <Text style={styles.headerTitle}>{displayName || originalName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
         {renderLoadingState()}
@@ -901,16 +1097,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
   if (error && items.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, isTVDevice && { paddingLeft: TV_SIDE_MENU_WIDTH }]}>
         <StatusBar barStyle="light-content" />
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
+          <BackButton />
         </View>
         <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
         {renderErrorState()}
@@ -919,16 +1109,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, isTVDevice && { paddingLeft: TV_SIDE_MENU_WIDTH }]}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
+        <BackButton />
       </View>
       <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
 
@@ -943,18 +1127,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             {catalogExtras.map(extra => (
               <React.Fragment key={extra.name}>
                 {/* All option - clears filter */}
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    (extra.name === 'genre' ? !activeGenreFilter : !selectedFilters[extra.name]) && styles.filterChipActive
-                  ]}
+                <FilterChip
+                  label="All"
+                  isActive={extra.name === 'genre' ? !activeGenreFilter : !selectedFilters[extra.name]}
                   onPress={() => handleFilterChange(extra.name, undefined)}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    (extra.name === 'genre' ? !activeGenreFilter : !selectedFilters[extra.name]) && styles.filterChipTextActive
-                  ]}>All</Text>
-                </TouchableOpacity>
+                />
 
                 {/* Filter options from catalog extra */}
                 {extra.options?.map(option => {
@@ -962,15 +1139,12 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
                     ? activeGenreFilter === option
                     : selectedFilters[extra.name] === option;
                   return (
-                    <TouchableOpacity
+                    <FilterChip
                       key={option}
-                      style={[styles.filterChip, isActive && styles.filterChipActive]}
+                      label={option}
+                      isActive={isActive}
                       onPress={() => handleFilterChange(extra.name, option)}
-                    >
-                      <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
-                        {option}
-                      </Text>
-                    </TouchableOpacity>
+                    />
                   );
                 })}
               </React.Fragment>
@@ -985,8 +1159,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           renderItem={renderItem}
           keyExtractor={(item) => `${item.id}-${item.type}`}
           numColumns={effectiveNumColumns}
-          key={effectiveNumColumns}
-          ItemSeparatorComponent={() => <View style={{ height: ((screenData as any).itemSpacing ?? SPACING.sm) }} />}
+          key={`${effectiveNumColumns}-${isTVDevice}`}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

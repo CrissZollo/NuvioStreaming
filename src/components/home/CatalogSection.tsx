@@ -181,9 +181,13 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
               styles.viewAllButton,
               {
                 paddingVertical: 6,
-                paddingHorizontal: 10,
+                paddingHorizontal: 12,
+                backgroundColor: 'rgba(255,255,255,0.15)',
               }
             ]}
+            focusStyle={{
+              backgroundColor: '#FFFFFF',
+            }}
             borderRadius={16}
             focusScale={1.05}
           >
@@ -192,15 +196,16 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
                 <Text style={[
                   styles.viewAllText,
                   {
-                    color: focused ? '#0A0A0A' : currentTheme.colors.textMuted,
-                    fontSize: 13,
+                    color: focused ? '#0A0A0A' : '#FFFFFF',
+                    fontSize: 14,
+                    fontWeight: '600',
                     marginRight: 4,
                   }
                 ]}>View All</Text>
                 <MaterialIcons
                   name="chevron-right"
                   size={18}
-                  color={focused ? '#0A0A0A' : currentTheme.colors.textMuted}
+                  color={focused ? '#0A0A0A' : '#FFFFFF'}
                 />
               </>
             )}
