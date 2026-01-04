@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, memo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, ScrollView, StyleProp, Platform, Image, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, ScrollView, StyleProp, Platform, Image, useWindowDimensions, findNodeHandle } from 'react-native';
 import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS, SharedValue, interpolate, Extrapolation } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -29,6 +29,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../../hooks/useSettings';
 import { useIsTV } from '../../contexts/TVContext';
+import { Focusable, FocusableRef } from '../tv/Focusable';
 
 interface HeroCarouselProps {
   items: StreamingContent[];
@@ -91,8 +92,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   }, [isTablet, isTVDevice]);
 
   const data = useMemo(() => (items && items.length ? items.slice(0, 10) : []), [items]);
-  const loopingEnabled = data.length > 1;
-  // Duplicate head/tail for seamless looping
+  // Disable looping on TV to prevent focus jumping issues with duplicated items
+  const loopingEnabled = data.length > 1 && !isTVDevice;
+  // Duplicate head/tail for seamless looping (only on non-TV)
   const loopData = useMemo(() => {
     if (!loopingEnabled) return data;
     const head = data[0];
@@ -107,6 +109,23 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const toggleFlipById = useCallback((id: string) => {
     setFlippedMap((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
+
+  // TV navigation - store View refs for each card for directional focus wrap-around
+  const tvCardViewRefs = useRef<React.RefObject<View>[]>([]);
+  const [tvFocusedIndex, setTvFocusedIndex] = useState(0);
+  const [tvRefsReady, setTvRefsReady] = useState(false);
+
+  // Initialize refs array when data changes
+  useEffect(() => {
+    // Create stable ref objects for each card
+    tvCardViewRefs.current = data.map(() => React.createRef<View>());
+    setTvRefsReady(false);
+    // Mark refs ready after a short delay to allow all Focusables to mount
+    const timer = setTimeout(() => {
+      setTvRefsReady(true);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [data.length]);
 
   // Note: do not early-return before hooks. Loading UI is returned later.
 
@@ -244,6 +263,31 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     const target = loopingEnabled ? (logicalIndex + 1) * interval : logicalIndex * interval;
     scrollViewRef.current?.scrollTo({ x: target, y: 0, animated });
   }, [interval, loopingEnabled]);
+
+  // Smooth scroll using Reanimated for TV wrap-around
+  const smoothScrollToIndex = useCallback((logicalIndex: number, duration: number = 300) => {
+    const target = logicalIndex * interval;
+    scrollX.value = withTiming(target, { duration, easing: Easing.out(Easing.cubic) });
+    scrollViewRef.current?.scrollTo({ x: target, y: 0, animated: true });
+  }, [interval, scrollX]);
+
+  // Handle TV card focus - scroll to the focused card with smooth wrap-around
+  const handleTVCardFocus = useCallback((logicalIndex: number) => {
+    const prevIndex = tvFocusedIndex;
+    setTvFocusedIndex(logicalIndex);
+
+    // Check if this is a wrap-around transition (jumping across the whole list)
+    const isWrapFromLastToFirst = prevIndex === data.length - 1 && logicalIndex === 0;
+    const isWrapFromFirstToLast = prevIndex === 0 && logicalIndex === data.length - 1;
+
+    if (isTVDevice && (isWrapFromLastToFirst || isWrapFromFirstToLast)) {
+      // For wrap-around, use a slightly longer animation to feel smoother
+      smoothScrollToIndex(logicalIndex, 400);
+    } else {
+      // Normal single-step navigation
+      scrollToLogicalIndex(logicalIndex, true);
+    }
+  }, [scrollToLogicalIndex, smoothScrollToIndex, tvFocusedIndex, data.length, isTVDevice]);
 
   const contentPadding = useMemo(() => ({ paddingHorizontal: (windowWidth - cardWidth) / 2 }), [windowWidth, cardWidth]);
 
@@ -383,15 +427,16 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           ref={scrollViewRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          snapToInterval={interval}
-          decelerationRate="fast"
+          snapToInterval={isTVDevice ? undefined : interval}
+          decelerationRate={isTVDevice ? 'normal' : 'fast'}
           contentContainerStyle={contentPadding}
           onScroll={scrollHandler}
           scrollEventThrottle={32}
-          disableIntervalMomentum
+          disableIntervalMomentum={!isTVDevice}
           pagingEnabled={false}
           bounces={false}
           overScrollMode="never"
+          scrollEnabled={!isTVDevice}
           style={{ opacity: isScrollReady ? 1 : 0 }}
           contentOffset={{ x: loopingEnabled ? interval : 0, y: 0 }}
           onMomentumScrollEnd={(e) => {
@@ -410,26 +455,69 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
             }
           }}
         >
-          {(loopingEnabled ? loopData : data).map((item, index) => (
-            /* TEST 5: ORIGINAL CARD WITHOUT LINEAR GRADIENT */
-            <CarouselCard
-              key={`${item.id}-${index}-${loopingEnabled ? 'loop' : 'base'}`}
-              item={item}
-              colors={currentTheme.colors}
-              logoFailed={failedLogoIds.has(item.id)}
-              onLogoError={() => setFailedLogoIds((prev) => new Set(prev).add(item.id))}
-              onPressInfo={() => handleNavigateToMetadata(item.id, item.type)}
-              scrollX={scrollX}
-              index={index}
-              flipped={!!flippedMap[item.id]}
-              onToggleFlip={() => toggleFlipById(item.id)}
-              interval={interval}
-              cardWidth={cardWidth}
-              cardHeight={cardHeight}
-              isTablet={isTablet}
-              isTVDevice={isTVDevice}
-            />
-          ))}
+          {(loopingEnabled ? loopData : data).map((item, index) => {
+            // Calculate logical index (for non-looping or for the real items in looping)
+            let logicalIndex = index;
+            if (loopingEnabled) {
+              // In loopData: [tail, ...data, head], so real items are at indices 1 to data.length
+              logicalIndex = index - 1;
+              if (logicalIndex < 0) logicalIndex = data.length - 1; // tail clone maps to last
+              if (logicalIndex >= data.length) logicalIndex = 0; // head clone maps to first
+            }
+
+            const card = (
+              <CarouselCard
+                key={`${item.id}-${index}-${loopingEnabled ? 'loop' : 'base'}`}
+                item={item}
+                colors={currentTheme.colors}
+                logoFailed={failedLogoIds.has(item.id)}
+                onLogoError={() => setFailedLogoIds((prev) => new Set(prev).add(item.id))}
+                onPressInfo={() => handleNavigateToMetadata(item.id, item.type)}
+                scrollX={scrollX}
+                index={index}
+                flipped={!!flippedMap[item.id]}
+                onToggleFlip={() => toggleFlipById(item.id)}
+                interval={interval}
+                cardWidth={cardWidth}
+                cardHeight={cardHeight}
+                isTablet={isTablet}
+                isTVDevice={isTVDevice}
+              />
+            );
+
+            // Wrap with Focusable for TV navigation - scroll centers on focused card
+            if (isTVDevice) {
+              // Calculate wrap-around indices for circular navigation
+              const prevIndex = logicalIndex === 0 ? data.length - 1 : logicalIndex - 1;
+              const nextIndex = logicalIndex === data.length - 1 ? 0 : logicalIndex + 1;
+
+              // Get refs for directional focus (only after refs are ready)
+              const currentViewRef = tvCardViewRefs.current[logicalIndex];
+              const leftRef = tvRefsReady ? tvCardViewRefs.current[prevIndex] : undefined;
+              const rightRef = tvRefsReady ? tvCardViewRefs.current[nextIndex] : undefined;
+
+              return (
+                <Focusable
+                  key={`tv-${item.id}-${index}-${tvRefsReady ? 'ready' : 'init'}`}
+                  viewRef={currentViewRef}
+                  onPress={() => handleNavigateToMetadata(item.id, item.type)}
+                  onFocus={() => handleTVCardFocus(logicalIndex)}
+                  style={{ width: cardWidth + 16 }}
+                  focusScale={1.02}
+                  borderRadius={16}
+                  showFocusBorder={true}
+                  animateBackground={false}
+                  scrollOnFocus={false}
+                  nextFocusLeft={leftRef}
+                  nextFocusRight={rightRef}
+                >
+                  {card}
+                </Focusable>
+              );
+            }
+
+            return card;
+          })}
         </Animated.ScrollView>
       </Animated.View>
       {/* Pagination below the card row (library-based, worklet-driven) */}
