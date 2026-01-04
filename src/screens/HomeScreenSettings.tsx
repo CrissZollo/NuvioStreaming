@@ -51,6 +51,9 @@ interface SettingItemProps {
   onPress?: () => void;
   isDarkMode: boolean;
   colors: any;
+  isTV?: boolean;
+  onToggle?: () => void;
+  toggleValue?: boolean;
 }
 
 const SettingItem: React.FC<SettingItemProps> = ({
@@ -61,16 +64,103 @@ const SettingItem: React.FC<SettingItemProps> = ({
   isLast = false,
   onPress,
   isDarkMode,
-  colors
+  colors,
+  isTV = false,
+  onToggle,
+  toggleValue
 }) => {
   const isTabletDevice = Platform.OS !== 'web' && (Dimensions.get('window').width >= 768);
 
+  // For TV with toggle, wrap entire row in Focusable
+  if (isTV && onToggle !== undefined) {
+    return (
+      <Focusable
+        onPress={onToggle}
+        style={[
+          styles.settingItem,
+          !isLast && styles.settingItemBorder,
+          { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+        ]}
+        borderRadius={8}
+        focusScale={1}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <>
+            <View style={styles.settingIconContainer}>
+              <MaterialIcons name={icon} size={22} color={focused ? '#000' : colors.primary} />
+            </View>
+            <View style={styles.settingContent}>
+              <View style={styles.settingTitleRow}>
+                <Text style={[styles.settingTitle, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>
+                  {title}
+                </Text>
+                {description && (
+                  <Text style={[styles.settingDescription, { color: focused ? '#333' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark) }]}>
+                    {description}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <View style={styles.settingControl}>
+              <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (toggleValue ? '#333' : '#666') : (toggleValue ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')), position: 'relative' as const }}>
+                <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(toggleValue ? { right: 0 } : { left: 0 }) }} />
+              </View>
+            </View>
+          </>
+        )}
+      </Focusable>
+    );
+  }
+
+  // For TV with navigation (onPress), wrap in Focusable
+  if (isTV && onPress) {
+    return (
+      <Focusable
+        onPress={onPress}
+        style={[
+          styles.settingItem,
+          !isLast && styles.settingItemBorder,
+          { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+        ]}
+        borderRadius={8}
+        focusScale={1}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <>
+            <View style={styles.settingIconContainer}>
+              <MaterialIcons name={icon} size={22} color={focused ? '#000' : colors.primary} />
+            </View>
+            <View style={styles.settingContent}>
+              <View style={styles.settingTitleRow}>
+                <Text style={[styles.settingTitle, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>
+                  {title}
+                </Text>
+                {description && (
+                  <Text style={[styles.settingDescription, { color: focused ? '#333' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark) }]}>
+                    {description}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <View style={styles.settingControl}>
+              <MaterialIcons name="chevron-right" size={24} color={focused ? '#000' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark)} />
+            </View>
+          </>
+        )}
+      </Focusable>
+    );
+  }
+
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       activeOpacity={onPress ? 0.7 : 1}
       onPress={onPress}
       style={[
-        styles.settingItem, 
+        styles.settingItem,
         !isLast && styles.settingItemBorder,
         { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
       ]}
@@ -390,10 +480,13 @@ const HomeScreenSettings: React.FC = () => {
             icon="movie-filter"
             isDarkMode={isDarkMode}
             colors={colors}
+            isTV={isTV}
+            onToggle={() => handleUpdateSetting('showHeroSection', !settings.showHeroSection)}
+            toggleValue={settings.showHeroSection}
             renderControl={() => (
-              <CustomSwitch 
-                value={settings.showHeroSection} 
-                onValueChange={(value) => handleUpdateSetting('showHeroSection', value)} 
+              <CustomSwitch
+                value={settings.showHeroSection}
+                onValueChange={(value) => handleUpdateSetting('showHeroSection', value)}
               />
             )}
           />
@@ -404,6 +497,7 @@ const HomeScreenSettings: React.FC = () => {
               icon="list"
               isDarkMode={isDarkMode}
               colors={colors}
+              isTV={isTV}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('HeroCatalogs')}
               isLast={true}
@@ -430,14 +524,32 @@ const HomeScreenSettings: React.FC = () => {
             <View style={styles.segmentCard}>
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Featured Source</Text>
               <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Using Catalogs</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('HeroCatalogs')}
-                style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
-                activeOpacity={0.8}
-              >
-                <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
-                <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
-              </TouchableOpacity>
+              {isTV ? (
+                <Focusable
+                  onPress={() => navigation.navigate('HeroCatalogs')}
+                  style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
+                  borderRadius={8}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <>
+                      <Text style={{ color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark), fontWeight: '600' }}>Manage selected catalogs</Text>
+                      <MaterialIcons name="chevron-right" size={20} color={focused ? '#000' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark)} />
+                    </>
+                  )}
+                </Focusable>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('HeroCatalogs')}
+                  style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
+                  <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
+                </TouchableOpacity>
+              )}
             </View>
 
             {settings.heroStyle === 'carousel' && (
@@ -448,8 +560,11 @@ const HomeScreenSettings: React.FC = () => {
                   icon="wallpaper"
                   isDarkMode={isDarkMode}
                   colors={colors}
+                  isTV={isTV}
+                  onToggle={() => handleUpdateSetting('enableHomeHeroBackground', !settings.enableHomeHeroBackground)}
+                  toggleValue={settings.enableHomeHeroBackground}
                   renderControl={() => (
-                    <CustomSwitch 
+                    <CustomSwitch
                       value={settings.enableHomeHeroBackground}
                       onValueChange={(value) => handleUpdateSetting('enableHomeHeroBackground', value)}
                     />
@@ -463,13 +578,33 @@ const HomeScreenSettings: React.FC = () => {
 
         <SettingsCard isDarkMode={isDarkMode} colors={colors}>
           <Text style={[styles.cardHeader, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Posters</Text>
-          <View style={styles.settingsRowInline}>
-            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Show Titles</Text>
-            <CustomSwitch 
-              value={settings.showPosterTitles}
-              onValueChange={(value) => handleUpdateSetting('showPosterTitles', value)}
-            />
-          </View>
+          {isTV ? (
+            <Focusable
+              onPress={() => handleUpdateSetting('showPosterTitles', !settings.showPosterTitles)}
+              style={styles.settingsRowInline}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <>
+                  <Text style={[styles.rowLabel, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>Show Titles</Text>
+                  <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (settings.showPosterTitles ? '#333' : '#666') : (settings.showPosterTitles ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')), position: 'relative' as const }}>
+                    <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(settings.showPosterTitles ? { right: 0 } : { left: 0 }) }} />
+                  </View>
+                </>
+              )}
+            </Focusable>
+          ) : (
+            <View style={styles.settingsRowInline}>
+              <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Show Titles</Text>
+              <CustomSwitch
+                value={settings.showPosterTitles}
+                onValueChange={(value) => handleUpdateSetting('showPosterTitles', value)}
+              />
+            </View>
+          )}
           <View style={styles.settingsRow}>
             <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Poster Size</Text>
             <SegmentedControl

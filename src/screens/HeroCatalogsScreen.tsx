@@ -20,6 +20,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../styles/colors';
 import { catalogService, StreamingAddon } from '../services/catalogService';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from '../components/tv/Focusable';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -35,6 +37,7 @@ const HeroCatalogsScreen: React.FC = () => {
   const systemColorScheme = useColorScheme();
   const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
   const navigation = useNavigation();
+  const isTV = useIsTV();
   // Custom alert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -171,13 +174,32 @@ const HeroCatalogsScreen: React.FC = () => {
     ]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <MaterialIcons 
-            name="arrow-back" 
-            size={24} 
-            color={isDarkMode ? colors.highEmphasis : colors.textDark} 
-          />
-        </TouchableOpacity>
+        {isTV ? (
+          <Focusable
+            onPress={handleBack}
+            style={styles.backButton}
+            borderRadius={8}
+            focusScale={1}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <MaterialIcons
+                name="arrow-back"
+                size={24}
+                color={focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark)}
+              />
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <MaterialIcons
+              name="arrow-back"
+              size={24}
+              color={isDarkMode ? colors.highEmphasis : colors.textDark}
+            />
+          </TouchableOpacity>
+        )}
         <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
           Hero Section Catalogs
         </Text>
@@ -208,25 +230,73 @@ const HeroCatalogsScreen: React.FC = () => {
       ) : (
         <>
           <View style={styles.actionBar}>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]} 
-              onPress={handleSelectAll}
-            >
-              <Text style={[styles.actionButtonText, { color: colors.primary }]}>Select All</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]} 
-              onPress={handleSelectNone}
-            >
-              <Text style={[styles.actionButtonText, { color: colors.primary }]}>Clear All</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.saveButton, { backgroundColor: colors.primary }]} 
-              onPress={handleSave}
-            >
-              <MaterialIcons name="save" size={16} color={colors.white} style={styles.saveIcon} />
-              <Text style={styles.saveButtonText}>Save</Text>
-            </TouchableOpacity>
+            {isTV ? (
+              <Focusable
+                onPress={handleSelectAll}
+                style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <Text style={[styles.actionButtonText, { color: focused ? '#000' : colors.primary }]}>Select All</Text>
+                )}
+              </Focusable>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]}
+                onPress={handleSelectAll}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.primary }]}>Select All</Text>
+              </TouchableOpacity>
+            )}
+            {isTV ? (
+              <Focusable
+                onPress={handleSelectNone}
+                style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <Text style={[styles.actionButtonText, { color: focused ? '#000' : colors.primary }]}>Clear All</Text>
+                )}
+              </Focusable>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]}
+                onPress={handleSelectNone}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.primary }]}>Clear All</Text>
+              </TouchableOpacity>
+            )}
+            {isTV ? (
+              <Focusable
+                onPress={handleSave}
+                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <>
+                    <MaterialIcons name="save" size={16} color={focused ? '#000' : colors.white} style={styles.saveIcon} />
+                    <Text style={[styles.saveButtonText, focused && { color: '#000' }]}>Save</Text>
+                  </>
+                )}
+              </Focusable>
+            ) : (
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={handleSave}
+              >
+                <MaterialIcons name="save" size={16} color={colors.white} style={styles.saveIcon} />
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.infoCard}>
@@ -252,8 +322,40 @@ const HeroCatalogsScreen: React.FC = () => {
                   {addonCatalogs.map(catalog => {
                     const [addonId, type, catalogId] = catalog.id.split(':');
                     const displayName = getCustomName(addonId, type, catalogId, catalog.name);
-                    
-                    return (
+                    const isSelected = selectedCatalogs.includes(catalog.id);
+
+                    return isTV ? (
+                      <Focusable
+                        key={catalog.id}
+                        onPress={() => toggleCatalog(catalog.id)}
+                        style={[
+                          styles.catalogItem,
+                          { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+                        ]}
+                        borderRadius={8}
+                        focusScale={1}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                      >
+                        {(focused) => (
+                          <>
+                            <View style={styles.catalogInfo}>
+                              <Text style={[styles.catalogName, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>
+                                {displayName}
+                              </Text>
+                              <Text style={[styles.catalogType, { color: focused ? '#333' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark) }]}>
+                                {catalog.type === 'movie' ? 'Movies' : 'TV Shows'}
+                              </Text>
+                            </View>
+                            <MaterialIcons
+                              name={isSelected ? "check-box" : "check-box-outline-blank"}
+                              size={24}
+                              color={focused ? '#000' : (isSelected ? colors.primary : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark))}
+                            />
+                          </>
+                        )}
+                      </Focusable>
+                    ) : (
                       <TouchableOpacity
                         key={catalog.id}
                         style={[
@@ -271,9 +373,9 @@ const HeroCatalogsScreen: React.FC = () => {
                           </Text>
                         </View>
                         <MaterialIcons
-                          name={selectedCatalogs.includes(catalog.id) ? "check-box" : "check-box-outline-blank"}
+                          name={isSelected ? "check-box" : "check-box-outline-blank"}
                           size={24}
-                          color={selectedCatalogs.includes(catalog.id) ? colors.primary : isDarkMode ? colors.mediumEmphasis : colors.textMutedDark}
+                          color={isSelected ? colors.primary : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark)}
                         />
                       </TouchableOpacity>
                     );

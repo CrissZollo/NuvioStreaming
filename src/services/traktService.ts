@@ -753,6 +753,102 @@ export class TraktService {
   }
 
   /**
+   * Start device code flow for TV authentication
+   * Returns the device code info needed to display QR code and poll for auth
+   */
+  public async getDeviceCode(): Promise<{
+    device_code: string;
+    user_code: string;
+    verification_url: string;
+    expires_in: number;
+    interval: number;
+  } | null> {
+    await this.ensureInitialized();
+
+    try {
+      const response = await fetch(`${TRAKT_API_URL}/oauth/device/code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: TRAKT_CLIENT_ID
+        })
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        logger.error('[TraktService] Device code error response:', errorBody);
+        throw new Error(`Failed to get device code: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return {
+        device_code: data.device_code,
+        user_code: data.user_code,
+        verification_url: data.verification_url,
+        expires_in: data.expires_in,
+        interval: data.interval
+      };
+    } catch (error) {
+      logger.error('[TraktService] Failed to get device code:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Poll for device code authorization
+   * Returns 'pending' if still waiting, 'success' if authorized, 'expired' if code expired, 'error' on failure
+   */
+  public async pollDeviceCode(deviceCode: string): Promise<'pending' | 'success' | 'expired' | 'error'> {
+    await this.ensureInitialized();
+
+    try {
+      const response = await fetch(`${TRAKT_API_URL}/oauth/device/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          code: deviceCode,
+          client_id: TRAKT_CLIENT_ID,
+          client_secret: TRAKT_CLIENT_SECRET
+        })
+      });
+
+      if (response.status === 200) {
+        // Success - user authorized
+        const data = await response.json();
+        await this.saveTokens(data.access_token, data.refresh_token, data.expires_in);
+        return 'success';
+      } else if (response.status === 400) {
+        // Pending - user hasn't authorized yet
+        return 'pending';
+      } else if (response.status === 404) {
+        // Invalid device code
+        return 'error';
+      } else if (response.status === 409) {
+        // Code already used
+        return 'error';
+      } else if (response.status === 410) {
+        // Code expired
+        return 'expired';
+      } else if (response.status === 418) {
+        // User denied
+        return 'error';
+      } else if (response.status === 429) {
+        // Polling too fast - treat as pending
+        return 'pending';
+      } else {
+        return 'error';
+      }
+    } catch (error) {
+      logger.error('[TraktService] Failed to poll device code:', error);
+      return 'error';
+    }
+  }
+
+  /**
    * Exchange the authorization code for an access token
    */
   public async exchangeCodeForToken(code: string, codeVerifier: string): Promise<boolean> {

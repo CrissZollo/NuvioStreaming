@@ -586,8 +586,8 @@ const CatalogSettingsScreen = () => {
       <Text style={styles.headerTitle}>Catalogs</Text>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Layout (Mobile only) */}
-        {Platform.OS && (
+        {/* Layout (Mobile only - hidden on TV) */}
+        {!isTV && (
           <View style={styles.addonSection}>
             <Text style={styles.addonTitle}>LAYOUT CATALOGSCREEN (PHONE)</Text>
             <View style={styles.card}>
@@ -645,40 +645,18 @@ const CatalogSettingsScreen = () => {
                   <Text style={styles.catalogName}>Show Poster Titles</Text>
                   <Text style={styles.catalogType}>Display title text below each poster</Text>
                 </View>
-                {isTV ? (
-                  <Focusable
-                    onPress={async () => {
-                      try {
-                        await mmkvStorage.setItem('catalog_show_titles', !showTitles ? 'true' : 'false');
-                        setShowTitles(!showTitles);
-                      } catch { }
-                    }}
-                    style={{ width: 51, height: 26, justifyContent: 'center' }}
-                    borderRadius={13}
-                    focusScale={1.1}
-                    animateBackground={true}
-                    showFocusBorder={true}
-                  >
-                    {(focused) => (
-                      <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (showTitles ? '#333' : '#666') : (showTitles ? colors.primary : '#505050'), position: 'relative' as const }}>
-                        <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(showTitles ? { right: 0 } : { left: 0 }) }} />
-                      </View>
-                    )}
-                  </Focusable>
-                ) : (
-                  <Switch
-                    value={showTitles}
-                    onValueChange={async (value) => {
-                      try {
-                        await mmkvStorage.setItem('catalog_show_titles', value ? 'true' : 'false');
-                        setShowTitles(value);
-                      } catch { }
-                    }}
-                    trackColor={{ false: '#505050', true: colors.primary }}
-                    thumbColor={Platform.OS === 'android' ? colors.white : undefined}
-                    ios_backgroundColor="#505050"
-                  />
-                )}
+                <Switch
+                  value={showTitles}
+                  onValueChange={async (value) => {
+                    try {
+                      await mmkvStorage.setItem('catalog_show_titles', value ? 'true' : 'false');
+                      setShowTitles(value);
+                    } catch { }
+                  }}
+                  trackColor={{ false: '#505050', true: colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? colors.white : undefined}
+                  ios_backgroundColor="#505050"
+                />
               </View>
             </View>
           </View>
@@ -746,33 +724,31 @@ const CatalogSettingsScreen = () => {
                   )}
                   {group.catalogs.map((setting, index) => (
                     isTV ? (
-                      <View
+                      <Focusable
                         key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}
+                        onPress={() => toggleCatalog(addonId, index)}
                         style={styles.catalogItem}
+                        borderRadius={8}
+                        focusScale={1}
+                        animateBackground={true}
+                        showFocusBorder={true}
                       >
-                        <View style={styles.catalogInfo}>
-                          <Text style={styles.catalogName}>
-                            {setting.customName || setting.name}
-                          </Text>
-                          <Text style={styles.catalogType}>
-                            {setting.type.charAt(0).toUpperCase() + setting.type.slice(1)}
-                          </Text>
-                        </View>
-                        <Focusable
-                          onPress={() => toggleCatalog(addonId, index)}
-                          style={{ width: 51, height: 26, justifyContent: 'center' }}
-                          borderRadius={13}
-                          focusScale={1.1}
-                          animateBackground={true}
-                          showFocusBorder={true}
-                        >
-                          {(focused) => (
+                        {(focused) => (
+                          <>
+                            <View style={styles.catalogInfo}>
+                              <Text style={[styles.catalogName, focused && { color: '#000' }]}>
+                                {setting.customName || setting.name}
+                              </Text>
+                              <Text style={[styles.catalogType, focused && { color: '#333' }]}>
+                                {setting.type.charAt(0).toUpperCase() + setting.type.slice(1)}
+                              </Text>
+                            </View>
                             <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (setting.enabled ? '#333' : '#666') : (setting.enabled ? colors.primary : '#505050'), position: 'relative' as const }}>
                               <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(setting.enabled ? { right: 0 } : { left: 0 }) }} />
                             </View>
-                          )}
-                        </Focusable>
-                      </View>
+                          </>
+                        )}
+                      </Focusable>
                     ) : (
                       <Pressable
                         key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}

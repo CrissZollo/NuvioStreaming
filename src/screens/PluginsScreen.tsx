@@ -1481,37 +1481,45 @@ const PluginsScreen: React.FC = () => {
           styles={styles}
           isTV={isTV}
         >
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Enable Plugins</Text>
-              <Text style={styles.settingDescription}>
-                Allow the app to use installed plugins for finding streams
-              </Text>
-            </View>
-            {isTV ? (
-              <Focusable
-                onPress={() => handleToggleLocalScrapers(!settings.enableLocalScrapers)}
-                style={{ width: 51, height: 26, justifyContent: 'center' }}
-                borderRadius={13}
-                focusScale={1.1}
-                animateBackground={true}
-                showFocusBorder={true}
-              >
-                {(focused) => (
+          {isTV ? (
+            <Focusable
+              onPress={() => handleToggleLocalScrapers(!settings.enableLocalScrapers)}
+              style={styles.settingRow}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <>
+                  <View style={styles.settingInfo}>
+                    <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Enable Plugins</Text>
+                    <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                      Allow the app to use installed plugins for finding streams
+                    </Text>
+                  </View>
                   <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (settings.enableLocalScrapers ? '#333' : '#666') : (settings.enableLocalScrapers ? colors.primary : colors.elevation3), position: 'relative' as const }}>
                     <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (settings.enableLocalScrapers ? colors.white : '#f4f3f4'), ...(settings.enableLocalScrapers ? { right: 0 } : { left: 0 }) }} />
                   </View>
-                )}
-              </Focusable>
-            ) : (
+                </>
+              )}
+            </Focusable>
+          ) : (
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Enable Plugins</Text>
+                <Text style={styles.settingDescription}>
+                  Allow the app to use installed plugins for finding streams
+                </Text>
+              </View>
               <Switch
                 value={settings.enableLocalScrapers}
                 onValueChange={handleToggleLocalScrapers}
                 trackColor={{ false: colors.elevation3, true: colors.primary }}
                 thumbColor={settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
               />
-            )}
-          </View>
+            </View>
+          )}
         </CollapsibleSection>
 
         {/* Repository Configuration */}
@@ -2009,36 +2017,44 @@ const PluginsScreen: React.FC = () => {
           styles={styles}
           isTV={isTV}
         >
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Enable URL Validation</Text>
-              <Text style={styles.settingDescription}>
-                Validate streaming URLs before returning them (may slow down results but improves reliability)
-              </Text>
-            </View>
-            {isTV ? (
-              <Focusable
-                onPress={() => {
-                  if (settings.enableLocalScrapers) {
-                    handleToggleUrlValidation(!settings.enableScraperUrlValidation);
-                  }
-                }}
-                style={{ width: 51, height: 26, justifyContent: 'center', opacity: !settings.enableLocalScrapers ? 0.5 : 1 }}
-                borderRadius={13}
-                focusScale={1.1}
-                animateBackground={true}
-                showFocusBorder={true}
-              >
-                {(focused) => {
-                  const isOn = settings.enableScraperUrlValidation && settings.enableLocalScrapers;
-                  return (
+          {isTV ? (
+            <Focusable
+              onPress={() => {
+                if (settings.enableLocalScrapers) {
+                  handleToggleUrlValidation(!settings.enableScraperUrlValidation);
+                }
+              }}
+              style={[styles.settingRow, !settings.enableLocalScrapers && { opacity: 0.5 }]}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => {
+                const isOn = settings.enableScraperUrlValidation && settings.enableLocalScrapers;
+                return (
+                  <>
+                    <View style={styles.settingInfo}>
+                      <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Enable URL Validation</Text>
+                      <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                        Validate streaming URLs before returning them (may slow down results but improves reliability)
+                      </Text>
+                    </View>
                     <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
                       <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
                     </View>
-                  );
-                }}
-              </Focusable>
-            ) : (
+                  </>
+                );
+              }}
+            </Focusable>
+          ) : (
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Enable URL Validation</Text>
+                <Text style={styles.settingDescription}>
+                  Validate streaming URLs before returning them (may slow down results but improves reliability)
+                </Text>
+              </View>
               <Switch
                 value={settings.enableScraperUrlValidation && settings.enableLocalScrapers}
                 onValueChange={handleToggleUrlValidation}
@@ -2046,41 +2062,49 @@ const PluginsScreen: React.FC = () => {
                 thumbColor={settings.enableScraperUrlValidation && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
                 disabled={!settings.enableLocalScrapers}
               />
-            )}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Group Plugin Streams</Text>
-              <Text style={styles.settingDescription}>
-                When enabled, all plugin streams are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
-              </Text>
             </View>
-            {isTV ? (
-              <Focusable
-                onPress={() => {
-                  const newValue = settings.streamDisplayMode !== 'grouped';
-                  updateSetting('streamDisplayMode', newValue ? 'grouped' : 'separate');
-                  if (!newValue && settings.streamSortMode === 'quality-then-scraper') {
-                    updateSetting('streamSortMode', 'scraper-then-quality');
-                  }
-                }}
-                style={{ width: 51, height: 26, justifyContent: 'center' }}
-                borderRadius={13}
-                focusScale={1.1}
-                animateBackground={true}
-                showFocusBorder={true}
-              >
-                {(focused) => {
-                  const isOn = settings.streamDisplayMode === 'grouped';
-                  return (
+          )}
+
+          {isTV ? (
+            <Focusable
+              onPress={() => {
+                const newValue = settings.streamDisplayMode !== 'grouped';
+                updateSetting('streamDisplayMode', newValue ? 'grouped' : 'separate');
+                if (!newValue && settings.streamSortMode === 'quality-then-scraper') {
+                  updateSetting('streamSortMode', 'scraper-then-quality');
+                }
+              }}
+              style={[styles.settingRow, !settings.enableLocalScrapers && { opacity: 0.5 }]}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => {
+                const isOn = settings.streamDisplayMode === 'grouped';
+                return (
+                  <>
+                    <View style={styles.settingInfo}>
+                      <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Group Plugin Streams</Text>
+                      <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                        When enabled, all plugin streams are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
+                      </Text>
+                    </View>
                     <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
                       <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
                     </View>
-                  );
-                }}
-              </Focusable>
-            ) : (
+                  </>
+                );
+              }}
+            </Focusable>
+          ) : (
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Group Plugin Streams</Text>
+                <Text style={styles.settingDescription}>
+                  When enabled, all plugin streams are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
+                </Text>
+              </View>
               <Switch
                 value={settings.streamDisplayMode === 'grouped'}
                 onValueChange={(value) => {
@@ -2094,40 +2118,48 @@ const PluginsScreen: React.FC = () => {
                 thumbColor={settings.streamDisplayMode === 'grouped' ? colors.white : '#f4f3f4'}
                 disabled={!settings.enableLocalScrapers}
               />
-            )}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Sort by Quality First</Text>
-              <Text style={styles.settingDescription}>
-                When enabled, streams are sorted by quality first, then by scraper. When disabled, streams are sorted by scraper first, then by quality. Only available when grouping is enabled.
-              </Text>
             </View>
-            {isTV ? (
-              <Focusable
-                onPress={() => {
-                  if (settings.enableLocalScrapers && settings.streamDisplayMode === 'grouped') {
-                    const newValue = settings.streamSortMode !== 'quality-then-scraper';
-                    updateSetting('streamSortMode', newValue ? 'quality-then-scraper' : 'scraper-then-quality');
-                  }
-                }}
-                style={{ width: 51, height: 26, justifyContent: 'center', opacity: (!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped') ? 0.5 : 1 }}
-                borderRadius={13}
-                focusScale={1.1}
-                animateBackground={true}
-                showFocusBorder={true}
-              >
-                {(focused) => {
-                  const isOn = settings.streamSortMode === 'quality-then-scraper';
-                  return (
+          )}
+
+          {isTV ? (
+            <Focusable
+              onPress={() => {
+                if (settings.enableLocalScrapers && settings.streamDisplayMode === 'grouped') {
+                  const newValue = settings.streamSortMode !== 'quality-then-scraper';
+                  updateSetting('streamSortMode', newValue ? 'quality-then-scraper' : 'scraper-then-quality');
+                }
+              }}
+              style={[styles.settingRow, (!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped') && { opacity: 0.5 }]}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => {
+                const isOn = settings.streamSortMode === 'quality-then-scraper';
+                return (
+                  <>
+                    <View style={styles.settingInfo}>
+                      <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Sort by Quality First</Text>
+                      <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                        When enabled, streams are sorted by quality first, then by scraper. When disabled, streams are sorted by scraper first, then by quality. Only available when grouping is enabled.
+                      </Text>
+                    </View>
                     <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
                       <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
                     </View>
-                  );
-                }}
-              </Focusable>
-            ) : (
+                  </>
+                );
+              }}
+            </Focusable>
+          ) : (
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Sort by Quality First</Text>
+                <Text style={styles.settingDescription}>
+                  When enabled, streams are sorted by quality first, then by scraper. When disabled, streams are sorted by scraper first, then by quality. Only available when grouping is enabled.
+                </Text>
+              </View>
               <Switch
                 value={settings.streamSortMode === 'quality-then-scraper'}
                 onValueChange={(value) => updateSetting('streamSortMode', value ? 'quality-then-scraper' : 'scraper-then-quality')}
@@ -2135,39 +2167,47 @@ const PluginsScreen: React.FC = () => {
                 thumbColor={settings.streamSortMode === 'quality-then-scraper' ? colors.white : '#f4f3f4'}
                 disabled={!settings.enableLocalScrapers || settings.streamDisplayMode !== 'grouped'}
               />
-            )}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Show Scraper Logos</Text>
-              <Text style={styles.settingDescription}>
-                Display scraper logos next to streaming links on the streams screen.
-              </Text>
             </View>
-            {isTV ? (
-              <Focusable
-                onPress={() => {
-                  if (settings.enableLocalScrapers) {
-                    updateSetting('showScraperLogos', !settings.showScraperLogos);
-                  }
-                }}
-                style={{ width: 51, height: 26, justifyContent: 'center', opacity: !settings.enableLocalScrapers ? 0.5 : 1 }}
-                borderRadius={13}
-                focusScale={1.1}
-                animateBackground={true}
-                showFocusBorder={true}
-              >
-                {(focused) => {
-                  const isOn = settings.showScraperLogos && settings.enableLocalScrapers;
-                  return (
+          )}
+
+          {isTV ? (
+            <Focusable
+              onPress={() => {
+                if (settings.enableLocalScrapers) {
+                  updateSetting('showScraperLogos', !settings.showScraperLogos);
+                }
+              }}
+              style={[styles.settingRow, !settings.enableLocalScrapers && { opacity: 0.5 }]}
+              borderRadius={8}
+              focusScale={1}
+              animateBackground={true}
+              showFocusBorder={true}
+            >
+              {(focused) => {
+                const isOn = settings.showScraperLogos && settings.enableLocalScrapers;
+                return (
+                  <>
+                    <View style={styles.settingInfo}>
+                      <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Show Scraper Logos</Text>
+                      <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                        Display scraper logos next to streaming links on the streams screen.
+                      </Text>
+                    </View>
                     <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
                       <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
                     </View>
-                  );
-                }}
-              </Focusable>
-            ) : (
+                  </>
+                );
+              }}
+            </Focusable>
+          ) : (
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Show Scraper Logos</Text>
+                <Text style={styles.settingDescription}>
+                  Display scraper logos next to streaming links on the streams screen.
+                </Text>
+              </View>
               <Switch
                 value={settings.showScraperLogos && settings.enableLocalScrapers}
                 onValueChange={(value) => updateSetting('showScraperLogos', value)}
@@ -2175,8 +2215,8 @@ const PluginsScreen: React.FC = () => {
                 thumbColor={settings.showScraperLogos && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
                 disabled={!settings.enableLocalScrapers}
               />
-            )}
-          </View>
+            </View>
+          )}
         </CollapsibleSection>
 
         {/* Quality Filtering */}

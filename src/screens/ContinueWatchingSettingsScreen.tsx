@@ -120,35 +120,65 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
     )
   );
 
-  const SettingItem = ({ 
-    title, 
-    description, 
-    value, 
-    onValueChange, 
-    isLast = false 
-  }: { 
-    title: string; 
-    description: string; 
-    value: boolean; 
+  const SettingItem = ({
+    title,
+    description,
+    value,
+    onValueChange,
+    isLast = false
+  }: {
+    title: string;
+    description: string;
+    value: boolean;
     onValueChange: (value: boolean) => void;
     isLast?: boolean;
   }) => (
-    <View style={[
-      styles.settingItem,
-      { 
-        borderBottomColor: isLast ? 'transparent' : colors.border,
-      }
-    ]}>
-      <View style={styles.settingContent}>
-        <Text style={[styles.settingTitle, { color: colors.highEmphasis }]}>
-          {title}
-        </Text>
-        <Text style={[styles.settingDescription, { color: colors.mediumEmphasis }]}>
-          {description}
-        </Text>
+    isTV ? (
+      <Focusable
+        onPress={() => onValueChange(!value)}
+        style={[
+          styles.settingItem,
+          { borderBottomColor: isLast ? 'transparent' : colors.border }
+        ]}
+        borderRadius={8}
+        focusScale={1}
+        animateBackground={true}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <>
+            <View style={styles.settingContent}>
+              <Text style={[styles.settingTitle, { color: focused ? '#000' : colors.highEmphasis }]}>
+                {title}
+              </Text>
+              <Text style={[styles.settingDescription, { color: focused ? '#333' : colors.mediumEmphasis }]}>
+                {description}
+              </Text>
+            </View>
+            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (value ? '#333' : '#666') : (value ? colors.primary : colors.elevation2), position: 'relative' as const }}>
+              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (value ? colors.white : colors.mediumEmphasis), ...(value ? { right: 0 } : { left: 0 }) }} />
+            </View>
+          </>
+        )}
+      </Focusable>
+    ) : (
+      <View style={[
+        styles.settingItem,
+        {
+          borderBottomColor: isLast ? 'transparent' : colors.border,
+        }
+      ]}>
+        <View style={styles.settingContent}>
+          <Text style={[styles.settingTitle, { color: colors.highEmphasis }]}>
+            {title}
+          </Text>
+          <Text style={[styles.settingDescription, { color: colors.mediumEmphasis }]}>
+            {description}
+          </Text>
+        </View>
+        <CustomSwitch value={value} onValueChange={onValueChange} />
       </View>
-      <CustomSwitch value={value} onValueChange={onValueChange} />
-    </View>
+    )
   );
 
 

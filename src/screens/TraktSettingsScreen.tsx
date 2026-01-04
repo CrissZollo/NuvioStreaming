@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,16 +11,20 @@ import {
   Platform,
   Linking,
   Switch,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { makeRedirectUri, useAuthRequest, ResponseType, Prompt, CodeChallengeMethod } from 'expo-auth-session';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FastImage from '@d11/react-native-fast-image';
+import QRCode from 'react-native-qrcode-svg';
 import { traktService, TraktUser } from '../services/traktService';
 import { useSettings } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from '../components/tv/Focusable';
 import { useTraktIntegration } from '../hooks/useTraktIntegration';
 import { useTraktAutosyncSettings } from '../hooks/useTraktAutosyncSettings';
 import { colors } from '../styles';
@@ -53,6 +57,7 @@ const TraktSettingsScreen: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userProfile, setUserProfile] = useState<TraktUser | null>(null);
   const { currentTheme } = useTheme();
+  const isTV = useIsTV();
   
   const {
     settings: autosyncSettings,
@@ -74,6 +79,18 @@ const TraktSettingsScreen: React.FC = () => {
   const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
     { label: 'OK', onPress: () => setAlertVisible(false) },
   ]);
+
+  // TV Device Code Auth State
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [deviceCode, setDeviceCode] = useState<string | null>(null);
+  const [userCode, setUserCode] = useState<string | null>(null);
+  const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [deviceCodeExpiry, setDeviceCodeExpiry] = useState<number>(0);
+  const [pollInterval, setPollInterval] = useState<number>(5);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const expiryRef = useRef<NodeJS.Timeout | null>(null);
 
   const openAlert = (
     title: string,
@@ -185,6 +202,91 @@ const TraktSettingsScreen: React.FC = () => {
     promptAsync(); // Trigger the authentication flow
   };
 
+  // TV Device Code Flow
+  const startDeviceCodeFlow = async () => {
+    try {
+      const codeData = await traktService.getDeviceCode();
+      if (!codeData) {
+        openAlert('Error', 'Failed to start authentication. Please try again.');
+        return;
+      }
+
+      setDeviceCode(codeData.device_code);
+      setUserCode(codeData.user_code);
+      setVerificationUrl(codeData.verification_url);
+      // Create URL with user code for QR scanning
+      setQrCodeUrl(`${codeData.verification_url}/${codeData.user_code}`);
+      setDeviceCodeExpiry(codeData.expires_in);
+      setPollInterval(codeData.interval);
+      setShowQRModal(true);
+      setIsPolling(true);
+
+      // Start polling for authorization
+      startPolling(codeData.device_code, codeData.interval);
+
+      // Set expiry timeout
+      expiryRef.current = setTimeout(() => {
+        stopPolling();
+        setShowQRModal(false);
+        openAlert('Code Expired', 'The authentication code has expired. Please try again.');
+      }, codeData.expires_in * 1000);
+
+    } catch (error) {
+      logger.error('[TraktSettingsScreen] Device code flow error:', error);
+      openAlert('Error', 'Failed to start authentication. Please try again.');
+    }
+  };
+
+  const startPolling = (code: string, interval: number) => {
+    pollingRef.current = setInterval(async () => {
+      const result = await traktService.pollDeviceCode(code);
+
+      if (result === 'success') {
+        stopPolling();
+        setShowQRModal(false);
+        await checkAuthStatus();
+        openAlert(
+          'Successfully Connected',
+          'Your Trakt account has been connected successfully.',
+          [{ label: 'OK', onPress: () => {} }]
+        );
+      } else if (result === 'expired') {
+        stopPolling();
+        setShowQRModal(false);
+        openAlert('Code Expired', 'The authentication code has expired. Please try again.');
+      } else if (result === 'error') {
+        stopPolling();
+        setShowQRModal(false);
+        openAlert('Authentication Failed', 'Failed to authenticate with Trakt. Please try again.');
+      }
+      // 'pending' continues polling
+    }, interval * 1000);
+  };
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    if (expiryRef.current) {
+      clearTimeout(expiryRef.current);
+      expiryRef.current = null;
+    }
+    setIsPolling(false);
+  };
+
+  const handleCancelQRAuth = () => {
+    stopPolling();
+    setShowQRModal(false);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, []);
+
   const handleSignOut = async () => {
     openAlert(
       'Sign Out',
@@ -220,20 +322,44 @@ const TraktSettingsScreen: React.FC = () => {
     ]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <MaterialIcons 
-            name="arrow-back" 
-            size={24} 
-            color={isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark} 
-          />
-          <Text style={[styles.backText, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
-            Settings
-          </Text>
-        </TouchableOpacity>
-        
+        {isTV ? (
+          <Focusable
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            borderRadius={8}
+            focusScale={1}
+            animateBackground={true}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons
+                  name="arrow-back"
+                  size={24}
+                  color={focused ? '#000' : (isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark)}
+                />
+                <Text style={[styles.backText, { color: focused ? '#000' : (isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark) }]}>
+                  Settings
+                </Text>
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <MaterialIcons
+              name="arrow-back"
+              size={24}
+              color={isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark}
+            />
+            <Text style={[styles.backText, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
+              Settings
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}
         </View>
@@ -302,16 +428,35 @@ const TraktSettingsScreen: React.FC = () => {
                 </Text>
               </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.signOutButton,
-                  { backgroundColor: currentTheme.colors.error }
-                ]}
-                onPress={handleSignOut}
-              >
-                <Text style={styles.buttonText}>Sign Out</Text>
-              </TouchableOpacity>
+              {isTV ? (
+                <Focusable
+                  onPress={handleSignOut}
+                  style={[
+                    styles.button,
+                    styles.signOutButton,
+                    { backgroundColor: currentTheme.colors.error }
+                  ]}
+                  borderRadius={8}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <Text style={[styles.buttonText, focused && { color: '#000' }]}>Sign Out</Text>
+                  )}
+                </Focusable>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.signOutButton,
+                    { backgroundColor: currentTheme.colors.error }
+                  ]}
+                  onPress={handleSignOut}
+                >
+                  <Text style={styles.buttonText}>Sign Out</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={styles.signInContainer}>
@@ -332,22 +477,46 @@ const TraktSettingsScreen: React.FC = () => {
               ]}>
                 Sync your watch history, watchlist, and collection with Trakt.tv
               </Text>
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  { backgroundColor: isDarkMode ? currentTheme.colors.primary : currentTheme.colors.primary }
-                ]}
-                onPress={handleSignIn}
-                disabled={!request || isExchangingCode} // Disable while waiting for response or exchanging code
-              >
-                {isExchangingCode ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.buttonText}>
-                    Sign In with Trakt
-                  </Text>
-                )}
-              </TouchableOpacity>
+              {isTV ? (
+                <Focusable
+                  onPress={startDeviceCodeFlow}
+                  style={[
+                    styles.button,
+                    { backgroundColor: currentTheme.colors.primary, opacity: isPolling ? 0.6 : 1 }
+                  ]}
+                  borderRadius={8}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    isPolling ? (
+                      <ActivityIndicator size="small" color={focused ? '#000' : 'white'} />
+                    ) : (
+                      <Text style={[styles.buttonText, focused && { color: '#000' }]}>
+                        Sign In with Trakt
+                      </Text>
+                    )
+                  )}
+                </Focusable>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    { backgroundColor: currentTheme.colors.primary }
+                  ]}
+                  onPress={handleSignIn}
+                  disabled={!request || isExchangingCode}
+                >
+                  {isExchangingCode ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.buttonText}>
+                      Sign In with Trakt
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -375,35 +544,70 @@ const TraktSettingsScreen: React.FC = () => {
                   When connected to Trakt, Continue Watching is sourced from Trakt. Account sync for watch progress is disabled to avoid conflicts.
                 </Text>
               </View>
-              <View style={styles.settingItem}>
-                <View style={styles.settingContent}>
-                  <View style={styles.settingTextContainer}>
-                    <Text style={[
-                      styles.settingLabel,
-                      { color: currentTheme.colors.highEmphasis }
-                    ]}>
-                      Auto-sync playback progress
-                    </Text>
-                    <Text style={[
-                      styles.settingDescription,
-                      { color: currentTheme.colors.mediumEmphasis }
-                    ]}>
-                      Automatically sync watch progress to Trakt
-                    </Text>
-                  </View>
-                  <View style={styles.settingToggleContainer}>
-                    <Switch
-                      value={autosyncSettings.enabled}
-                      onValueChange={setAutosyncEnabled}
-                      trackColor={{
-                        false: currentTheme.colors.border,
-                        true: currentTheme.colors.primary + '80'
-                      }}
-                      thumbColor={autosyncSettings.enabled ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
-                    />
+              {isTV ? (
+                <Focusable
+                  onPress={() => setAutosyncEnabled(!autosyncSettings.enabled)}
+                  style={styles.settingItem}
+                  borderRadius={8}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <View style={styles.settingContent}>
+                      <View style={styles.settingTextContainer}>
+                        <Text style={[
+                          styles.settingLabel,
+                          { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                        ]}>
+                          Auto-sync playback progress
+                        </Text>
+                        <Text style={[
+                          styles.settingDescription,
+                          { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                        ]}>
+                          Automatically sync watch progress to Trakt
+                        </Text>
+                      </View>
+                      <View style={styles.settingToggleContainer}>
+                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (autosyncSettings.enabled ? '#333' : '#666') : (autosyncSettings.enabled ? currentTheme.colors.primary : currentTheme.colors.border), position: 'relative' as const }}>
+                          <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (autosyncSettings.enabled ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis), ...(autosyncSettings.enabled ? { right: 0 } : { left: 0 }) }} />
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </Focusable>
+              ) : (
+                <View style={styles.settingItem}>
+                  <View style={styles.settingContent}>
+                    <View style={styles.settingTextContainer}>
+                      <Text style={[
+                        styles.settingLabel,
+                        { color: currentTheme.colors.highEmphasis }
+                      ]}>
+                        Auto-sync playback progress
+                      </Text>
+                      <Text style={[
+                        styles.settingDescription,
+                        { color: currentTheme.colors.mediumEmphasis }
+                      ]}>
+                        Automatically sync watch progress to Trakt
+                      </Text>
+                    </View>
+                    <View style={styles.settingToggleContainer}>
+                      <Switch
+                        value={autosyncSettings.enabled}
+                        onValueChange={setAutosyncEnabled}
+                        trackColor={{
+                          false: currentTheme.colors.border,
+                          true: currentTheme.colors.primary + '80'
+                        }}
+                        thumbColor={autosyncSettings.enabled ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
+                      />
+                    </View>
                   </View>
                 </View>
-              </View>
+              )}
               <View style={styles.settingItem}>
                 <View style={styles.settingContent}>
                   <View style={styles.settingTextContainer}>
@@ -422,37 +626,76 @@ const TraktSettingsScreen: React.FC = () => {
                   </View>
                 </View>
               </View>
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  {
-                    backgroundColor: currentTheme.colors.card,
-                    opacity: isSyncing ? 0.6 : 1
-                  }
-                ]}
-                disabled={isSyncing}
-                onPress={async () => {
-                  const success = await performManualSync();
-                  openAlert(
-                    'Sync Complete',
-                    success ? 'Successfully synced your watch progress with Trakt.' : 'Sync failed. Please try again.'
-                  );
-                }}
-              >
-                {isSyncing ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={currentTheme.colors.primary}
-                  />
-                ) : (
-                  <Text style={[
-                    styles.buttonText,
-                    { color: currentTheme.colors.primary }
-                  ]}>
-                    Sync Now
-                  </Text>
-                )}
-              </TouchableOpacity>
+              {isTV ? (
+                <Focusable
+                  onPress={async () => {
+                    const success = await performManualSync();
+                    openAlert(
+                      'Sync Complete',
+                      success ? 'Successfully synced your watch progress with Trakt.' : 'Sync failed. Please try again.'
+                    );
+                  }}
+                  style={[
+                    styles.button,
+                    {
+                      backgroundColor: currentTheme.colors.card,
+                      opacity: isSyncing ? 0.6 : 1
+                    }
+                  ]}
+                  borderRadius={8}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    isSyncing ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={focused ? '#000' : currentTheme.colors.primary}
+                      />
+                    ) : (
+                      <Text style={[
+                        styles.buttonText,
+                        { color: focused ? '#000' : currentTheme.colors.primary }
+                      ]}>
+                        Sync Now
+                      </Text>
+                    )
+                  )}
+                </Focusable>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    {
+                      backgroundColor: currentTheme.colors.card,
+                      opacity: isSyncing ? 0.6 : 1
+                    }
+                  ]}
+                  disabled={isSyncing}
+                  onPress={async () => {
+                    const success = await performManualSync();
+                    openAlert(
+                      'Sync Complete',
+                      success ? 'Successfully synced your watch progress with Trakt.' : 'Sync failed. Please try again.'
+                    );
+                  }}
+                >
+                  {isSyncing ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={currentTheme.colors.primary}
+                    />
+                  ) : (
+                    <Text style={[
+                      styles.buttonText,
+                      { color: currentTheme.colors.primary }
+                    ]}>
+                      Sync Now
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
 
               {/* Display Settings Section */}
               <Text style={[
@@ -462,35 +705,70 @@ const TraktSettingsScreen: React.FC = () => {
                 Display Settings
               </Text>
 
-              <View style={styles.settingItem}>
-                <View style={styles.settingContent}>
-                  <View style={styles.settingTextContainer}>
-                    <Text style={[
-                      styles.settingLabel,
-                      { color: currentTheme.colors.highEmphasis }
-                    ]}>
-                      Show Trakt Comments
-                    </Text>
-                    <Text style={[
-                      styles.settingDescription,
-                      { color: currentTheme.colors.mediumEmphasis }
-                    ]}>
-                      Display Trakt comments in metadata screens when available
-                    </Text>
-                  </View>
-                  <View style={styles.settingToggleContainer}>
-                    <Switch
-                      value={settings.showTraktComments}
-                      onValueChange={(value) => updateSetting('showTraktComments', value)}
-                      trackColor={{
-                        false: currentTheme.colors.border,
-                        true: currentTheme.colors.primary + '80'
-                      }}
-                      thumbColor={settings.showTraktComments ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
-                    />
+              {isTV ? (
+                <Focusable
+                  onPress={() => updateSetting('showTraktComments', !settings.showTraktComments)}
+                  style={styles.settingItem}
+                  borderRadius={8}
+                  focusScale={1}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <View style={styles.settingContent}>
+                      <View style={styles.settingTextContainer}>
+                        <Text style={[
+                          styles.settingLabel,
+                          { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                        ]}>
+                          Show Trakt Comments
+                        </Text>
+                        <Text style={[
+                          styles.settingDescription,
+                          { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                        ]}>
+                          Display Trakt comments in metadata screens when available
+                        </Text>
+                      </View>
+                      <View style={styles.settingToggleContainer}>
+                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (settings.showTraktComments ? '#333' : '#666') : (settings.showTraktComments ? currentTheme.colors.primary : currentTheme.colors.border), position: 'relative' as const }}>
+                          <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (settings.showTraktComments ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis), ...(settings.showTraktComments ? { right: 0 } : { left: 0 }) }} />
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                </Focusable>
+              ) : (
+                <View style={styles.settingItem}>
+                  <View style={styles.settingContent}>
+                    <View style={styles.settingTextContainer}>
+                      <Text style={[
+                        styles.settingLabel,
+                        { color: currentTheme.colors.highEmphasis }
+                      ]}>
+                        Show Trakt Comments
+                      </Text>
+                      <Text style={[
+                        styles.settingDescription,
+                        { color: currentTheme.colors.mediumEmphasis }
+                      ]}>
+                        Display Trakt comments in metadata screens when available
+                      </Text>
+                    </View>
+                    <View style={styles.settingToggleContainer}>
+                      <Switch
+                        value={settings.showTraktComments}
+                        onValueChange={(value) => updateSetting('showTraktComments', value)}
+                        trackColor={{
+                          false: currentTheme.colors.border,
+                          true: currentTheme.colors.primary + '80'
+                        }}
+                        thumbColor={settings.showTraktComments ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
+                      />
+                    </View>
                   </View>
                 </View>
-              </View>
+              )}
 
 
             </View>
@@ -505,6 +783,84 @@ const TraktSettingsScreen: React.FC = () => {
         onClose={() => setAlertVisible(false)}
         actions={alertActions}
       />
+
+      {/* QR Code Modal for TV Authentication */}
+      <Modal
+        visible={showQRModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelQRAuth}
+      >
+        <View style={styles.qrModalOverlay}>
+          <View style={[styles.qrModalContent, { backgroundColor: currentTheme.colors.elevation2 }]}>
+            {/* Left Side - QR Code */}
+            <View style={styles.qrModalLeft}>
+              <Text style={[styles.qrModalDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                Scan with your phone
+              </Text>
+
+              {qrCodeUrl && (
+                <View style={styles.qrCodeContainer}>
+                  <QRCode
+                    value={qrCodeUrl}
+                    size={180}
+                    backgroundColor="white"
+                    color="black"
+                  />
+                </View>
+              )}
+
+              <Text style={[styles.qrModalOr, { color: currentTheme.colors.mediumEmphasis }]}>
+                Or visit
+              </Text>
+              <Text style={[styles.qrModalUrl, { color: currentTheme.colors.primary }]}>
+                {verificationUrl}
+              </Text>
+            </View>
+
+            {/* Divider */}
+            <View style={[styles.qrModalDivider, { backgroundColor: currentTheme.colors.border }]} />
+
+            {/* Right Side - Code and Actions */}
+            <View style={styles.qrModalRight}>
+              <TraktIcon width={50} height={50} style={{ marginBottom: 12 }} />
+              <Text style={[styles.qrModalTitle, { color: currentTheme.colors.highEmphasis }]}>
+                Sign In with Trakt
+              </Text>
+
+              <Text style={[styles.qrModalCodeLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                Enter this code:
+              </Text>
+              <Text style={[styles.qrModalCode, { color: currentTheme.colors.highEmphasis }]}>
+                {userCode}
+              </Text>
+
+              <View style={styles.qrModalPolling}>
+                <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+                <Text style={[styles.qrModalPollingText, { color: currentTheme.colors.mediumEmphasis }]}>
+                  Waiting for authorization...
+                </Text>
+              </View>
+
+              <Focusable
+                onPress={handleCancelQRAuth}
+                style={[styles.qrModalCancelButton, { backgroundColor: currentTheme.colors.elevation3 }]}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+                autoFocus
+              >
+                {(focused) => (
+                  <Text style={[styles.qrModalCancelText, { color: focused ? '#000' : currentTheme.colors.highEmphasis }]}>
+                    Cancel
+                  </Text>
+                )}
+              </Focusable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -703,6 +1059,89 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  // QR Modal Styles
+  qrModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrModalContent: {
+    borderRadius: 16,
+    padding: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: 700,
+    width: '85%',
+  },
+  qrModalLeft: {
+    flex: 1,
+    alignItems: 'center',
+    paddingRight: 24,
+  },
+  qrModalDivider: {
+    width: 1,
+    height: '80%',
+    opacity: 0.3,
+  },
+  qrModalRight: {
+    flex: 1,
+    alignItems: 'center',
+    paddingLeft: 24,
+  },
+  qrModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  qrModalDescription: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  qrCodeContainer: {
+    padding: 12,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  qrModalOr: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  qrModalUrl: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  qrModalCodeLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  qrModalCode: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    letterSpacing: 4,
+    marginBottom: 24,
+  },
+  qrModalPolling: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  qrModalPollingText: {
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  qrModalCancelButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+  },
+  qrModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
