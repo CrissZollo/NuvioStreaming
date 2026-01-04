@@ -9,6 +9,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { getTrackDisplayName, DEBUG_MODE } from '../utils/playerUtils';
 import { logger } from '../../../utils/logger';
+import { useIsTV } from '../../../contexts/TVContext';
+import { Focusable } from '../../tv/Focusable';
 
 interface AudioTrackModalProps {
   showAudioModal: boolean;
@@ -26,9 +28,10 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   selectAudioTrack,
 }) => {
   const { width, height } = useWindowDimensions();
+  const isTVDevice = useIsTV();
 
   // Size constants matching SubtitleModal aesthetics
-  const menuWidth = Math.min(width * 0.9, 420);
+  const menuWidth = isTVDevice ? Math.min(width * 0.5, 500) : Math.min(width * 0.9, 420);
   const menuMaxHeight = height * 0.9;
 
   const handleClose = () => setShowAudioModal(false);
@@ -75,35 +78,67 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
           >
             <View style={{ gap: 8 }}>
-              {ksAudioTracks.map((track) => {
+              {ksAudioTracks.map((track, index) => {
                 const isSelected = selectedAudioTrack === track.id;
 
-                return (
-                  <TouchableOpacity
-                    key={track.id}
-                    onPress={() => {
-                      selectAudioTrack(track.id);
-                      setTimeout(handleClose, 200);
-                    }}
-                    style={{
-                      padding: 10,
-                      borderRadius: 12,
-                      backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', // Matches SubtitleModal item colors
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
+                const handleSelect = () => {
+                  selectAudioTrack(track.id);
+                  setTimeout(handleClose, 200);
+                };
+
+                const trackContent = (focused?: boolean) => (
+                  <>
                     <View style={{ flex: 1 }}>
                       <Text style={{
-                        color: isSelected ? 'black' : 'white',
-                        fontWeight: isSelected ? '700' : '400',
-                        fontSize: 15
+                        color: (isSelected || focused) ? 'black' : 'white',
+                        fontWeight: (isSelected || focused) ? '700' : '400',
+                        fontSize: isTVDevice ? 18 : 15
                       }}>
                         {getTrackDisplayName(track)}
                       </Text>
                     </View>
                     {isSelected && <MaterialIcons name="check" size={18} color="black" />}
+                  </>
+                );
+
+                if (isTVDevice) {
+                  return (
+                    <Focusable
+                      key={track.id}
+                      onPress={handleSelect}
+                      autoFocus={index === 0}
+                      style={{
+                        padding: 14,
+                        borderRadius: 12,
+                        backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                      borderRadius={12}
+                      focusScale={1.02}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => trackContent(focused)}
+                    </Focusable>
+                  );
+                }
+
+                return (
+                  <TouchableOpacity
+                    key={track.id}
+                    onPress={handleSelect}
+                    style={{
+                      padding: 10,
+                      borderRadius: 12,
+                      backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {trackContent()}
                   </TouchableOpacity>
                 );
               })}

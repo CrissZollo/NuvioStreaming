@@ -97,6 +97,14 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
     visibleRef.current = visible;
   }, [visible]);
 
+  // Store callbacks in refs to avoid stale closures and dependency issues
+  const onHideControlsRef = useRef(onHideControls);
+  const onShowControlsRef = useRef(onShowControls);
+  useEffect(() => {
+    onHideControlsRef.current = onHideControls;
+    onShowControlsRef.current = onShowControls;
+  }, [onHideControls, onShowControls]);
+
   // Track if we just hid controls via back button to prevent immediate re-show
   const justHiddenRef = useRef(false);
   const justHiddenTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -114,6 +122,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
 
   // Refs for focus navigation
   const timelineRef = useRef<FocusableRef>(null);
+  const closeRef = useRef<FocusableRef>(null);
   const subtitlesRef = useRef<FocusableRef>(null);
   const audioRef = useRef<FocusableRef>(null);
   const episodesRef = useRef<FocusableRef>(null);
@@ -129,13 +138,22 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
       clearTimeout(autoHideTimerRef.current);
       autoHideTimerRef.current = null;
     }
-    // Use ref to get current visible state
-    if (visibleRef.current && onHideControls) {
+    // Use refs to get current state and avoid stale closures
+    if (visibleRef.current) {
       autoHideTimerRef.current = setTimeout(() => {
-        onHideControls();
+        // Set justHiddenRef to prevent immediate re-show from focus events
+        justHiddenRef.current = true;
+        if (justHiddenTimerRef.current) {
+          clearTimeout(justHiddenTimerRef.current);
+        }
+        justHiddenTimerRef.current = setTimeout(() => {
+          justHiddenRef.current = false;
+        }, 500);
+
+        onHideControlsRef.current?.();
       }, AUTO_HIDE_DELAY);
     }
-  }, [onHideControls]);
+  }, []); // No dependencies - uses refs
 
   // Commit the accumulated seek offset (uses ref to avoid stale closure)
   const commitSeek = useCallback(() => {
@@ -189,7 +207,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
       const isVisible = visibleRef.current;
       if (!isVisible) {
         if (!justHiddenRef.current) {
-          onShowControls();
+          onShowControlsRef.current?.();
         }
       } else {
         if (timelineFocused) {
@@ -202,7 +220,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
       const isVisible = visibleRef.current;
       if (!isVisible) {
         if (!justHiddenRef.current) {
-          onShowControls();
+          onShowControlsRef.current?.();
         }
       } else {
         if (timelineFocused) {
@@ -215,7 +233,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
       const isVisible = visibleRef.current;
       if (!isVisible) {
         if (!justHiddenRef.current) {
-          onShowControls();
+          onShowControlsRef.current?.();
         }
       } else {
         resetAutoHideTimer();
@@ -225,7 +243,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
       const isVisible = visibleRef.current;
       if (!isVisible) {
         if (!justHiddenRef.current) {
-          onShowControls();
+          onShowControlsRef.current?.();
         }
       } else {
         resetAutoHideTimer();
@@ -251,7 +269,16 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
       }
       // Start new auto-hide timer
       autoHideTimerRef.current = setTimeout(() => {
-        onHideControls?.();
+        // Set justHiddenRef to prevent immediate re-show from focus events
+        justHiddenRef.current = true;
+        if (justHiddenTimerRef.current) {
+          clearTimeout(justHiddenTimerRef.current);
+        }
+        justHiddenTimerRef.current = setTimeout(() => {
+          justHiddenRef.current = false;
+        }, 500);
+
+        onHideControlsRef.current?.();
       }, AUTO_HIDE_DELAY);
     } else {
       // Controls hidden - clear timer
@@ -265,7 +292,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
         clearTimeout(autoHideTimerRef.current);
       }
     };
-  }, [visible, onHideControls]);
+  }, [visible]); // Only depend on visible - use ref for callback
 
   // Animate controls visibility
   useEffect(() => {
@@ -294,10 +321,10 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
           justHiddenRef.current = false;
         }, 500);
 
-        onHideControls?.();
+        onHideControlsRef.current?.();
         return true;
       } else {
-        // If controls are hidden, exit player
+        // If controls are hidden, exit the player
         onClose();
         return true;
       }
@@ -305,19 +332,18 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
 
     return () => {
       backHandler.remove();
-      if (justHiddenTimerRef.current) {
-        clearTimeout(justHiddenTimerRef.current);
-      }
+      // Don't clear justHiddenTimerRef here - let it complete naturally
+      // to ensure justHiddenRef gets reset even if component re-renders
     };
-  }, [onHideControls, onClose]);
+  }, []); // No dependencies - uses refs for callbacks
 
   // Handle interaction to show controls (D-pad navigation when hidden)
   const handleOverlayInteraction = useCallback(() => {
     // Don't show controls if we just hid them via back button
-    if (!visible && !justHiddenRef.current) {
-      onShowControls();
+    if (!visibleRef.current && !justHiddenRef.current) {
+      onShowControlsRef.current?.();
     }
-  }, [visible, onShowControls]);
+  }, []); // No dependencies - uses refs
 
   // Handle timeline press - toggle playback
   const handleTimelinePress = useCallback(() => {
@@ -475,7 +501,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
               style={styles.bottomButton}
               borderRadius={8}
               focusScale={1.05}
-              animateBackground={false}
+              animateBackground={true}
               showFocusBorder={true}
               nextFocusUp={timelineRef.current?.getViewRef()}
             >
@@ -505,7 +531,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
               style={styles.bottomButton}
               borderRadius={8}
               focusScale={1.05}
-              animateBackground={false}
+              animateBackground={true}
               showFocusBorder={true}
               nextFocusUp={timelineRef.current?.getViewRef()}
             >
@@ -535,7 +561,7 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
               style={styles.bottomButton}
               borderRadius={8}
               focusScale={1.05}
-              animateBackground={false}
+              animateBackground={true}
               showFocusBorder={true}
               nextFocusUp={timelineRef.current?.getViewRef()}
             >
@@ -556,6 +582,34 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
               )}
             </Focusable>
           )}
+
+          <Focusable
+            ref={closeRef}
+            onPress={onClose}
+            onFocus={resetAutoHideTimer}
+            style={styles.bottomButton}
+            borderRadius={8}
+            focusScale={1.05}
+            animateBackground={true}
+            showFocusBorder={true}
+            nextFocusUp={timelineRef.current?.getViewRef()}
+          >
+            {(focused) => (
+              <>
+                <MaterialIcons
+                  name="close"
+                  size={12}
+                  color={focused ? '#000' : 'white'}
+                />
+                <Text style={[
+                  styles.bottomButtonText,
+                  focused && styles.bottomButtonTextFocused
+                ]}>
+                  Exit
+                </Text>
+              </>
+            )}
+          </Focusable>
         </View>
       </LinearGradient>
     </Animated.View>

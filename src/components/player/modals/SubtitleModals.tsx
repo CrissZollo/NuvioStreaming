@@ -11,6 +11,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
 import { getTrackDisplayName, formatLanguage } from '../utils/playerUtils';
+import { useIsTV } from '../../../contexts/TVContext';
+import { Focusable } from '../../tv/Focusable';
 
 interface SubtitleModalsProps {
   showSubtitleModal: boolean;
@@ -58,11 +60,33 @@ interface SubtitleModalsProps {
   setSubtitleOffsetSec: (n: number) => void;
 }
 
-const MorphingTab = ({ label, isSelected, onPress }: any) => {
+const MorphingTab = ({ label, isSelected, onPress, isTVDevice, autoFocus }: any) => {
   const animatedStyle = useAnimatedStyle(() => ({
     borderRadius: withTiming(isSelected ? 10 : 40, { duration: 250 }),
     backgroundColor: withTiming(isSelected ? 'white' : 'rgba(255,255,255,0.06)', { duration: 250 }),
   }));
+
+  if (isTVDevice) {
+    return (
+      <Focusable
+        onPress={onPress}
+        autoFocus={autoFocus}
+        style={{ flex: 1 }}
+        borderRadius={10}
+        focusScale={1.05}
+        animateBackground={false}
+        showFocusBorder={true}
+      >
+        {(focused) => (
+          <Animated.View style={[{ paddingVertical: 10, alignItems: 'center', justifyContent: 'center' }, animatedStyle]}>
+            <Text style={{ color: (isSelected || focused) ? 'black' : 'white', fontWeight: (isSelected || focused) ? '700' : '400', fontSize: 15 }}>
+              {label}
+            </Text>
+          </Animated.View>
+        )}
+      </Focusable>
+    );
+  }
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={{ flex: 1 }}>
@@ -88,6 +112,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier, subtitleOffsetSec, setSubtitleOffsetSec,
 }) => {
   const { width, height } = useWindowDimensions();
+  const isTVDevice = useIsTV();
   const isIos = Platform.OS === 'ios';
   const isLandscape = width > height;
   const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
@@ -100,7 +125,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   const controlBtn = { size: isCompact ? 28 : 32, radius: isCompact ? 14 : 16 };
   const previewHeight = isCompact ? 90 : (isIos && isLandscape ? 100 : 120);
 
-  const menuWidth = Math.min(width * 0.9, 420);
+  const menuWidth = isTVDevice ? Math.min(width * 0.5, 550) : Math.min(width * 0.9, 420);
   const menuMaxHeight = height * 0.95;
 
   React.useEffect(() => {
@@ -139,56 +164,147 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
           </View>
 
           {/* Tab Bar */}
-          <View style={{ flexDirection: 'row', gap: 15, paddingHorizontal: 70, marginBottom: 20 }}>
-            <MorphingTab label="Built-in" isSelected={activeTab === 'built-in'} onPress={() => setActiveTab('built-in')} />
-            <MorphingTab label="Addons" isSelected={activeTab === 'addon'} onPress={() => setActiveTab('addon')} />
-            <MorphingTab label="Style" isSelected={activeTab === 'appearance'} onPress={() => setActiveTab('appearance')} />
+          <View style={{ flexDirection: 'row', gap: 15, paddingHorizontal: isTVDevice ? 40 : 70, marginBottom: 20 }}>
+            <MorphingTab label="Built-in" isSelected={activeTab === 'built-in'} onPress={() => setActiveTab('built-in')} isTVDevice={isTVDevice} autoFocus={activeTab === 'built-in'} />
+            <MorphingTab label="Addons" isSelected={activeTab === 'addon'} onPress={() => setActiveTab('addon')} isTVDevice={isTVDevice} />
+            <MorphingTab label="Style" isSelected={activeTab === 'appearance'} onPress={() => setActiveTab('appearance')} isTVDevice={isTVDevice} />
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
               {activeTab === 'built-in' && (
                 <View style={{ gap: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => { selectTextTrack(-1); setSelectedOnlineSubtitleId(null); }}
-                    style={{ padding: 10, borderRadius: 12, backgroundColor: selectedTextTrack === -1 ? 'white' : 'rgba(242, 184, 181)' }}
-                  >
-                    <Text style={{ color: selectedTextTrack === -1 ? 'black' : 'rgba(96, 20, 16)', fontWeight: '600' }}>None</Text>
-                  </TouchableOpacity>
-                  {ksTextTracks.map((track) => (
-                    <TouchableOpacity
-                      key={track.id}
-                      onPress={() => { selectTextTrack(track.id); setSelectedOnlineSubtitleId(null); }}
-                      style={{ padding: 10, borderRadius: 12, backgroundColor: selectedTextTrack === track.id ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                  {isTVDevice ? (
+                    <Focusable
+                      onPress={() => { selectTextTrack(-1); setSelectedOnlineSubtitleId(null); }}
+                      autoFocus={true}
+                      style={{ padding: 14, borderRadius: 12, backgroundColor: selectedTextTrack === -1 ? 'white' : 'rgba(242, 184, 181)' }}
+                      borderRadius={12}
+                      focusScale={1.02}
+                      animateBackground={true}
+                      showFocusBorder={true}
                     >
-                      <Text style={{ color: selectedTextTrack === track.id ? 'black' : 'white' }}>{getTrackDisplayName(track)}</Text>
-                      {selectedTextTrack === track.id && <MaterialIcons name="check" size={18} color="black" />}
+                      {(focused) => (
+                        <Text style={{ color: (selectedTextTrack === -1 || focused) ? 'black' : 'rgba(96, 20, 16)', fontWeight: '600', fontSize: 16 }}>None</Text>
+                      )}
+                    </Focusable>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => { selectTextTrack(-1); setSelectedOnlineSubtitleId(null); }}
+                      style={{ padding: 10, borderRadius: 12, backgroundColor: selectedTextTrack === -1 ? 'white' : 'rgba(242, 184, 181)' }}
+                    >
+                      <Text style={{ color: selectedTextTrack === -1 ? 'black' : 'rgba(96, 20, 16)', fontWeight: '600' }}>None</Text>
                     </TouchableOpacity>
-                  ))}
+                  )}
+                  {ksTextTracks.map((track, index) => {
+                    const isSelected = selectedTextTrack === track.id;
+                    const handleSelect = () => { selectTextTrack(track.id); setSelectedOnlineSubtitleId(null); };
+
+                    if (isTVDevice) {
+                      return (
+                        <Focusable
+                          key={track.id}
+                          onPress={handleSelect}
+                          style={{ padding: 14, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                          borderRadius={12}
+                          focusScale={1.02}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => (
+                            <>
+                              <Text style={{ color: (isSelected || focused) ? 'black' : 'white', fontWeight: (isSelected || focused) ? '700' : '400', fontSize: 16 }}>{getTrackDisplayName(track)}</Text>
+                              {isSelected && <MaterialIcons name="check" size={18} color="black" />}
+                            </>
+                          )}
+                        </Focusable>
+                      );
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={track.id}
+                        onPress={handleSelect}
+                        style={{ padding: 10, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                      >
+                        <Text style={{ color: isSelected ? 'black' : 'white' }}>{getTrackDisplayName(track)}</Text>
+                        {isSelected && <MaterialIcons name="check" size={18} color="black" />}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
 
               {activeTab === 'addon' && (
                 <View style={{ gap: 8 }}>
                   {availableSubtitles.length === 0 ? (
-                    <TouchableOpacity onPress={fetchAvailableSubtitles} style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
-                      <MaterialIcons name="cloud-download" size={32} color="white" />
-                      <Text style={{ color: 'white', marginTop: 10 }}>Search Online Subtitles</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    availableSubtitles.map((sub) => (
-                      <TouchableOpacity
-                        key={sub.id}
-                        onPress={() => { setSelectedOnlineSubtitleId(sub.id); loadWyzieSubtitle(sub); }}
-                        style={{ padding: 5,paddingLeft: 8, paddingRight: 10, borderRadius: 12, backgroundColor: selectedOnlineSubtitleId === sub.id ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', textAlignVertical: 'center' }}
+                    isTVDevice ? (
+                      <Focusable
+                        onPress={fetchAvailableSubtitles}
+                        autoFocus={true}
+                        style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}
+                        borderRadius={12}
+                        focusScale={1.02}
+                        animateBackground={false}
+                        showFocusBorder={true}
                       >
-                        <View>
-                          <Text style={{ marginLeft: 5, color: selectedOnlineSubtitleId === sub.id ? 'black' : 'white', fontWeight: '600' }}>{sub.display}</Text>
-                          <Text style={{ marginLeft: 5, color: selectedOnlineSubtitleId === sub.id ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 11, paddingBottom: 3 }}>{formatLanguage(sub.language)}</Text>
-                        </View>
-                        {selectedOnlineSubtitleId === sub.id && <MaterialIcons name="check" size={18} color="black" />}
+                        {() => (
+                          <>
+                            <MaterialIcons name="cloud-download" size={32} color="white" />
+                            <Text style={{ color: 'white', marginTop: 10 }}>Search Online Subtitles</Text>
+                          </>
+                        )}
+                      </Focusable>
+                    ) : (
+                      <TouchableOpacity onPress={fetchAvailableSubtitles} style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
+                        <MaterialIcons name="cloud-download" size={32} color="white" />
+                        <Text style={{ color: 'white', marginTop: 10 }}>Search Online Subtitles</Text>
                       </TouchableOpacity>
-                    ))
+                    )
+                  ) : (
+                    availableSubtitles.map((sub, index) => {
+                      const isSelected = selectedOnlineSubtitleId === sub.id;
+                      const handleSelect = () => { setSelectedOnlineSubtitleId(sub.id); loadWyzieSubtitle(sub); };
+
+                      if (isTVDevice) {
+                        return (
+                          <Focusable
+                            key={sub.id}
+                            onPress={handleSelect}
+                            autoFocus={index === 0}
+                            style={{ padding: 8, paddingLeft: 12, paddingRight: 14, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                            borderRadius={12}
+                            focusScale={1.02}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                          >
+                            {(focused) => (
+                              <>
+                                <View>
+                                  <Text style={{ marginLeft: 5, color: (isSelected || focused) ? 'black' : 'white', fontWeight: '600', fontSize: 16 }}>{sub.display}</Text>
+                                  <Text style={{ marginLeft: 5, color: (isSelected || focused) ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 12, paddingBottom: 3 }}>{formatLanguage(sub.language)}</Text>
+                                </View>
+                                {isSelected && <MaterialIcons name="check" size={18} color="black" />}
+                              </>
+                            )}
+                          </Focusable>
+                        );
+                      }
+
+                      return (
+                        <TouchableOpacity
+                          key={sub.id}
+                          onPress={handleSelect}
+                          style={{ padding: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                        >
+                          <View>
+                            <Text style={{ marginLeft: 5, color: isSelected ? 'black' : 'white', fontWeight: '600' }}>{sub.display}</Text>
+                            <Text style={{ marginLeft: 5, color: isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 11, paddingBottom: 3 }}>{formatLanguage(sub.language)}</Text>
+                          </View>
+                          {isSelected && <MaterialIcons name="check" size={18} color="black" />}
+                        </TouchableOpacity>
+                      );
+                    })
                   )}
                 </View>
               )}
