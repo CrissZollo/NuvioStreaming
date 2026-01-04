@@ -65,8 +65,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
   const cardWidth = useMemo(
     () => {
       if (isTVDevice) {
-        // TV: narrower cards to keep vertical poster shape - around 18% of screen width
-        return Math.min(windowWidth * 0.18, 260);
+        // TV: bigger cards - around 22% of screen width for larger hero section
+        return Math.min(windowWidth * 0.22, 320);
       }
       return isTablet ? Math.max(560, windowWidth - 2 * Math.round(0.1 * windowWidth)) : Math.min(windowWidth * 0.8, 480);
     },
@@ -76,12 +76,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
   const cardHeight = useMemo(
     () => {
       if (isTVDevice) {
-        // TV: vertical poster aspect ratio (3:4.5 roughly) - taller than wide
-        return Math.round(baseCardWidthForHeight * 1.5) + 60;
+        // TV: standard movie poster aspect ratio (2:3) to show full poster without cropping
+        return Math.round(cardWidth * 1.5);
       }
       return Math.round(baseCardWidthForHeight * 9 / 16) + 310;
     },
-    [baseCardWidthForHeight, isTVDevice]
+    [baseCardWidthForHeight, cardWidth, isTVDevice]
   );
 
   const interval = useMemo(() => cardWidth + 16, [cardWidth]);
@@ -119,7 +119,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
 
   // Debounce for TV focus events to prevent jumping on fast navigation
   const lastTVFocusTime = useRef<number>(0);
-  const TV_FOCUS_DEBOUNCE_MS = 150; // Minimum ms between focus events
+  const TV_FOCUS_DEBOUNCE_MS = 50; // Minimum ms between focus events - kept low for responsive feel
   const isScrollingRef = useRef(false); // Track if a scroll is in progress
 
   // Initialize refs array when data changes
@@ -307,7 +307,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
     }, 50);
   }, [scrollToLogicalIndex]);
 
-  const contentPadding = useMemo(() => ({ paddingHorizontal: (windowWidth - cardWidth) / 2 }), [windowWidth, cardWidth]);
+  const contentPadding = useMemo(() => {
+    if (isTVDevice) {
+      // TV: The content area already has paddingLeft: 60 from TVSideRail
+      // So we're working within (windowWidth - 60) visible width
+      // To center the card: padding = (visibleWidth - cardWidth) / 2
+      const visibleWidth = windowWidth - 60;
+      const horizontalPadding = (visibleWidth - cardWidth) / 2;
+      return {
+        paddingLeft: horizontalPadding,
+        paddingRight: horizontalPadding
+      };
+    }
+    // Mobile/tablet: center in full screen width
+    const horizontalPadding = (windowWidth - cardWidth) / 2;
+    return { paddingHorizontal: horizontalPadding };
+  }, [windowWidth, cardWidth, isTVDevice]);
 
   const handleNavigateToMetadata = useCallback((id: string, type: any) => {
     navigation.navigate('Metadata', { id, type });
@@ -492,7 +507,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
                 onLogoError={() => setFailedLogoIds((prev) => new Set(prev).add(item.id))}
                 onPressInfo={() => handleNavigateToMetadata(item.id, item.type)}
                 scrollX={scrollX}
-                index={index}
+                index={isTVDevice ? logicalIndex : index}
                 flipped={!!flippedMap[item.id]}
                 onToggleFlip={() => toggleFlipById(item.id)}
                 interval={interval}
@@ -500,6 +515,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
                 cardHeight={cardHeight}
                 isTablet={isTablet}
                 isTVDevice={isTVDevice}
+                tvFocusedIndex={tvFocusedIndex}
               />
             );
 
@@ -515,22 +531,23 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
               const rightRef = tvRefsReady ? tvCardViewRefs.current[nextIndex] : undefined;
 
               return (
-                <Focusable
-                  key={`tv-${item.id}-${index}-${tvRefsReady ? 'ready' : 'init'}`}
-                  viewRef={currentViewRef}
-                  onPress={() => handleNavigateToMetadata(item.id, item.type)}
-                  onFocus={() => handleTVCardFocus(logicalIndex)}
-                  style={{ width: cardWidth + 16 }}
-                  focusScale={1.02}
-                  borderRadius={16}
-                  showFocusBorder={true}
-                  animateBackground={false}
-                  nextFocusLeft={leftRef}
-                  nextFocusRight={rightRef}
-                  nextFocusDown={continueWatchingFirstRef}
-                >
-                  {card}
-                </Focusable>
+                <View key={`tv-${item.id}-${index}-${tvRefsReady ? 'ready' : 'init'}`} style={{ width: cardWidth + 16, alignItems: 'center', justifyContent: 'center' }}>
+                  <Focusable
+                    viewRef={currentViewRef}
+                    onPress={() => handleNavigateToMetadata(item.id, item.type)}
+                    onFocus={() => handleTVCardFocus(logicalIndex)}
+                    style={{ width: cardWidth, height: cardHeight }}
+                    focusScale={1.0}
+                    borderRadius={16}
+                    showFocusBorder={false}
+                    animateBackground={false}
+                    nextFocusLeft={leftRef}
+                    nextFocusRight={rightRef}
+                    nextFocusDown={continueWatchingFirstRef}
+                  >
+                    {card}
+                  </Focusable>
+                </View>
               );
             }
 
@@ -538,27 +555,52 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
           })}
         </Animated.ScrollView>
       </Animated.View>
+      {/* TV: Show media type and genres below the focused item */}
+      {isTVDevice && data[tvFocusedIndex] && (
+        <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 2 }}>
+          <Text style={{
+            color: currentTheme.colors.white,
+            fontSize: 13,
+            fontWeight: '600',
+            textTransform: 'uppercase',
+            letterSpacing: 1.5,
+            marginBottom: 4,
+          }}>
+            {data[tvFocusedIndex].type === 'series' ? 'TV Show' : 'Movie'}
+          </Text>
+          {data[tvFocusedIndex].genres && data[tvFocusedIndex].genres.length > 0 && (
+            <Text style={{
+              color: currentTheme.colors.textMuted,
+              fontSize: 12,
+              fontWeight: '500',
+              letterSpacing: 0.5,
+            }}>
+              {data[tvFocusedIndex].genres.slice(0, 3).join('  •  ')}
+            </Text>
+          )}
+        </View>
+      )}
       {/* Pagination below the card row (library-based, worklet-driven) */}
-      <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 6, position: 'relative', zIndex: 1 }} pointerEvents="auto">
+      <View style={{ alignItems: 'center', paddingTop: isTVDevice ? 6 : 8, paddingBottom: 6, position: 'relative', zIndex: 1 }} pointerEvents={isTVDevice ? 'none' : 'auto'}>
         <Pagination.Basic
           progress={paginationProgress}
           data={data}
-          size={10}
+          size={isTVDevice ? 8 : 10}
           dotStyle={{
-            width: 8,
-            height: 8,
+            width: isTVDevice ? 6 : 8,
+            height: isTVDevice ? 6 : 8,
             borderRadius: 999,
             backgroundColor: currentTheme.colors.elevation3,
           }}
           activeDotStyle={{
-            width: 10,
-            height: 10,
+            width: isTVDevice ? 8 : 10,
+            height: isTVDevice ? 8 : 10,
             borderRadius: 999,
             backgroundColor: currentTheme.colors.white,
           }}
-          containerStyle={{ gap: 8 }}
+          containerStyle={{ gap: isTVDevice ? 6 : 8 }}
           horizontal
-          onPress={(index: number) => {
+          onPress={isTVDevice ? undefined : (index: number) => {
             scrollToLogicalIndex(index, true);
           }}
         />
@@ -734,9 +776,11 @@ interface CarouselCardProps {
   cardHeight: number;
   isTablet: boolean;
   isTVDevice?: boolean;
+  /** The currently focused card index on TV (for scaling non-focused cards down) */
+  tvFocusedIndex?: number;
 }
 
-const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet, isTVDevice = false }) => {
+const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet, isTVDevice = false, tvFocusedIndex = 0 }) => {
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
 
@@ -745,6 +789,16 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   const genresOpacity = useSharedValue(0);
   const actionsOpacity = useSharedValue(0);
   const isFlipped = useSharedValue(flipped ? 1 : 0);
+
+  // TV focus animation - smooth transition when focus changes
+  const tvFocusProgress = useSharedValue(index === tvFocusedIndex ? 1 : 0);
+
+  // Animate focus changes smoothly on TV - fast for responsive feel
+  useEffect(() => {
+    if (isTVDevice) {
+      tvFocusProgress.value = withTiming(index === tvFocusedIndex ? 1 : 0, { duration: 80 });
+    }
+  }, [tvFocusedIndex, index, isTVDevice]);
 
   // Reset animations when component mounts/remounts to prevent glitching
   useEffect(() => {
@@ -833,15 +887,26 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     };
   });
 
-  // ULTRA-OPTIMIZED: On TV, use static styles for performance (no scroll-based animation)
+  // On TV: focused card is full size (1.0), non-focused cards are scaled down (0.88)
+  // Uses tvFocusProgress shared value for smooth animated transitions
+  // Border is included here so it scales with the card
+  // On mobile: use scroll-based animation
   const cardAnimatedStyle = useAnimatedStyle(() => {
     'worklet';
-    // On TV, don't animate based on scroll - use static full size/opacity
-    // The Focusable handles focus scaling
+    // On TV, use animated focus-based scaling for smooth transitions
     if (isTVDevice) {
+      // Interpolate scale: unfocused = 0.88, focused = 1.0
+      const scale = interpolate(tvFocusProgress.value, [0, 1], [0.88, 1]);
+      // Interpolate opacity: unfocused = 0.6, focused = 1.0
+      const opacity = interpolate(tvFocusProgress.value, [0, 1], [0.6, 1]);
+      // Interpolate border: unfocused = transparent, focused = white
+      // Round to 2 decimal places to avoid invalid rgba values from floating-point precision
+      const borderOpacity = Math.round(interpolate(tvFocusProgress.value, [0, 1], [0, 1]) * 100) / 100;
       return {
-        transform: [{ scale: 1 }],
-        opacity: 1,
+        transform: [{ scale }],
+        opacity,
+        borderWidth: 3,
+        borderColor: `rgba(255, 255, 255, ${borderOpacity})`,
       };
     }
 
@@ -940,7 +1005,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
             height: cardHeight,
           }
         ] as StyleProp<ViewStyle>}>
-          {isTablet ? (
+          {isTablet && !isTVDevice ? (
             <>
               <View style={styles.bannerContainer as ViewStyle}>
                 {!bannerLoaded && (
@@ -1009,7 +1074,8 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     <Animated.View style={[bannerAnimatedStyle, { flex: 1 }]}>
                       <FastImage
                         source={{
-                          uri: item.banner || item.poster,
+                          // TV: use poster to show full artwork, mobile: use banner or poster
+                          uri: isTVDevice ? (item.poster || item.banner) : (item.banner || item.poster),
                           priority: FastImage.priority.normal,
                           cache: FastImage.cacheControl.immutable
                         }}
@@ -1020,8 +1086,9 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     </Animated.View>
                     {/* Overlay removed for performance - readability via text shadows */}
                   </View>
-                  {item.logo && !logoFailed ? (
-                    <View style={[styles.logoOverlay as ViewStyle, isTVDevice && { paddingBottom: 20 }]} pointerEvents="none">
+                  {/* Hide logo/title/genres on TV to show full poster */}
+                  {!isTVDevice && (item.logo && !logoFailed ? (
+                    <View style={[styles.logoOverlay as ViewStyle]} pointerEvents="none">
                       <Animated.View style={logoAnimatedStyle}>
                         <FastImage
                           source={{
@@ -1029,7 +1096,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                             priority: FastImage.priority.high,
                             cache: FastImage.cacheControl.immutable
                           }}
-                          style={[styles.logo as any, { width: Math.round(cardWidth * (isTVDevice ? 0.65 : 0.72)), height: isTVDevice ? 40 : 64 }]}
+                          style={[styles.logo as any, { width: Math.round(cardWidth * 0.72), height: 64 }]}
                           resizeMode={FastImage.resizeMode.contain}
                           onLoad={() => setLogoLoaded(true)}
                           onError={onLogoError}
@@ -1037,19 +1104,19 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                       </Animated.View>
                     </View>
                   ) : (
-                    <View style={[styles.titleOverlay as ViewStyle, isTVDevice && { paddingBottom: 28 }]} pointerEvents="none">
+                    <View style={[styles.titleOverlay as ViewStyle]} pointerEvents="none">
                       <View>
-                        <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center', fontSize: isTVDevice ? 14 : 18 }]} numberOfLines={1}>
+                        <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center', fontSize: 18 }]} numberOfLines={1}>
                           {item.name}
                         </Text>
                       </View>
                     </View>
-                  )}
-                  {item.genres && (
-                    <View style={[styles.genresOverlay as ViewStyle, isTVDevice && { paddingBottom: 6 }]} pointerEvents="none">
+                  ))}
+                  {!isTVDevice && item.genres && (
+                    <View style={[styles.genresOverlay as ViewStyle]} pointerEvents="none">
                       <View>
                         <Animated.Text
-                          style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center', fontSize: isTVDevice ? 11 : 13 }, overlayAnimatedStyle]}
+                          style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center', fontSize: 13 }, overlayAnimatedStyle]}
                           numberOfLines={1}
                         >
                           {item.genres.slice(0, 3).join(' • ')}

@@ -270,6 +270,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         onPress={onPress}
         onLongPress={onLongPress}
         disabled={disabled}
+        android_disableSound={true}
         style={[
           style,
           animatedContainerStyle,
