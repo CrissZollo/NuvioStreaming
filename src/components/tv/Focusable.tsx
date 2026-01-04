@@ -1,4 +1,4 @@
-import React, { forwardRef, useRef, useImperativeHandle, useState, useCallback, useEffect } from 'react';
+import React, { forwardRef, useRef, useImperativeHandle, useState, useCallback, useEffect, useMemo } from 'react';
 import {
   TouchableOpacity,
   Pressable,
@@ -10,22 +10,13 @@ import {
 import Animated, {
   useAnimatedStyle,
   withTiming,
-  withSpring,
   useSharedValue,
   interpolate,
-  interpolateColor,
 } from 'react-native-reanimated';
 import { useIsTV } from '../../contexts/TVContext';
-import { useTVScroll } from '../../contexts/TVScrollContext';
 
 // Focus colors - clean white outline style
 const TV_FOCUS_BORDER_COLOR = '#FFFFFF';
-const TV_FOCUS_BG_COLOR = '#FFFFFF';
-const TV_UNFOCUSED_BG_COLOR = 'rgba(255, 255, 255, 0.1)';
-
-// Generate unique ID for each Focusable instance
-let focusableIdCounter = 0;
-const generateFocusableId = () => `focusable-${++focusableIdCounter}`;
 
 interface FocusableProps {
   /** Content to render inside the focusable container */
@@ -74,12 +65,10 @@ interface FocusableProps {
   borderRadius?: number;
   /** Scale factor when focused (default 1.05 for TV visibility) */
   focusScale?: number;
-  /** Whether to animate background color change (default true) */
+  /** Whether to animate background color change (default false for performance) */
   animateBackground?: boolean;
   /** External ref to the underlying View for directional focus linking */
   viewRef?: React.RefObject<View>;
-  /** Whether to scroll the element into view when focused (default true on TV) */
-  scrollOnFocus?: boolean;
 }
 
 export interface FocusableRef {
@@ -126,14 +115,12 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       showFocusBorder = true,
       borderRadius = 8,
       focusScale = 1.05,
-      animateBackground = true,
+      animateBackground = false, // Default to false for performance
       viewRef,
-      scrollOnFocus = true,
     },
     ref
   ) => {
     const isTV = useIsTV();
-    const tvScroll = useTVScroll();
     const innerRef = useRef<View>(null);
     // Use external viewRef if provided, otherwise use internal ref
     const actualRef = viewRef || innerRef;
@@ -142,8 +129,6 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     // Track if autoFocus has been consumed (only apply once on mount)
     const autoFocusConsumed = useRef(false);
     const [shouldAutoFocus, setShouldAutoFocus] = useState(autoFocus);
-    // Unique ID for this focusable instance
-    const focusableId = useRef(generateFocusableId()).current;
     // Store own node handle for block* props - use state to trigger re-render
     const [selfNodeHandle, setSelfNodeHandle] = useState<number | null>(null);
 
@@ -187,22 +172,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
 
     const handleFocus = useCallback(() => {
       setIsFocused(true);
-      focusProgress.value = withSpring(1, {
-        damping: 15,
-        stiffness: 150,
-        mass: 0.8,
-      });
-
-      // Scroll to center the focused element on TV
-      if (scrollOnFocus && tvScroll?.scrollToElement) {
-        // Small delay to allow layout to settle
-        setTimeout(() => {
-          tvScroll.scrollToElement(actualRef as React.RefObject<View>);
-        }, 50);
-      }
-
+      // Use fast timing instead of spring for better performance
+      focusProgress.value = withTiming(1, { duration: 100 });
       onFocus?.();
-    }, [onFocus, focusProgress, scrollOnFocus, tvScroll, actualRef]);
+    }, [onFocus, focusProgress]);
 
     const handleBlur = useCallback(() => {
       setIsFocused(false);
@@ -214,7 +187,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     useImperativeHandle(ref, () => ({
       focus: () => {
         setIsFocused(true);
-        focusProgress.value = withSpring(1, { damping: 15, stiffness: 150 });
+        focusProgress.value = withTiming(1, { duration: 100 });
         if (actualRef.current) {
           (actualRef.current as any).setNativeProps?.({
             hasTVPreferredFocus: true,
@@ -223,32 +196,19 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       },
       blur: () => {
         setIsFocused(false);
-        focusProgress.value = withTiming(0, { duration: 150 });
+        focusProgress.value = withTiming(0, { duration: 100 });
       },
       isFocused: () => isFocused,
       getViewRef: () => actualRef,
     }));
 
-    // Animated styles for focus effect - scale
+    // Animated styles for focus effect - simplified for performance
     const animatedContainerStyle = useAnimatedStyle(() => {
+      'worklet';
       const scale = interpolate(focusProgress.value, [0, 1], [1, focusScale]);
       return {
         transform: [{ scale }],
-        zIndex: focusProgress.value > 0 ? 1000 : 0, // High zIndex to appear above other sections
-        elevation: focusProgress.value > 0 ? 50 : 0, // Android elevation for proper layering
       };
-    });
-
-    // Background color animation - gray to white
-    const animatedBackgroundStyle = useAnimatedStyle(() => {
-      if (!animateBackground) return {};
-
-      const backgroundColor = interpolateColor(
-        focusProgress.value,
-        [0, 1],
-        [TV_UNFOCUSED_BG_COLOR, TV_FOCUS_BG_COLOR]
-      );
-      return { backgroundColor };
     });
 
     // Render children - support render prop for focus-aware content
@@ -296,15 +256,13 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     if (leftHandle) tvProps.nextFocusLeft = leftHandle;
     if (rightHandle) tvProps.nextFocusRight = rightHandle;
 
-    // Use border directly on the component instead of an overlay
-    const animatedBorderDirectStyle = useAnimatedStyle(() => ({
-      borderWidth: showFocusBorder ? 3 : 0,
-      borderColor: interpolateColor(
-        focusProgress.value,
-        [0, 1],
-        ['transparent', TV_FOCUS_BORDER_COLOR]
-      ),
-    }));
+    // Static focus border style - no animation for performance
+    const focusBorderStyle = useMemo(() => {
+      if (!showFocusBorder) return {};
+      return isFocused
+        ? { borderWidth: 3, borderColor: TV_FOCUS_BORDER_COLOR }
+        : { borderWidth: 3, borderColor: 'transparent' };
+    }, [isFocused, showFocusBorder]);
 
     return (
       <AnimatedPressable
@@ -315,9 +273,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         style={[
           style,
           animatedContainerStyle,
-          animateBackground && animatedBackgroundStyle,
           { borderRadius },
-          animatedBorderDirectStyle,
+          focusBorderStyle,
           isFocused && focusStyle,
         ]}
         testID={testID}

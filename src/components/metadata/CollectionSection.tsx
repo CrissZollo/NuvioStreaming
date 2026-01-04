@@ -182,7 +182,6 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
             focusScale={1.05}
             animateBackground={false}
             showFocusBorder={true}
-            scrollOnFocus={false}
           >
             {backdropImage}
           </Focusable>

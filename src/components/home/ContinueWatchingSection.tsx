@@ -8,7 +8,9 @@ import {
   AppState,
   AppStateStatus,
   ActivityIndicator,
-  Platform
+  Platform,
+  ScrollView,
+  findNodeHandle,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeIn, Layout } from 'react-native-reanimated';
@@ -27,6 +29,8 @@ import { stremioService } from '../../services/stremioService';
 import { streamCacheService } from '../../services/streamCacheService';
 import { useSettings } from '../../hooks/useSettings';
 import CustomAlert from '../../components/CustomAlert';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 
 // Define interface for continue watching items
 interface ContinueWatchingItem extends StreamingContent {
@@ -40,6 +44,16 @@ interface ContinueWatchingItem extends StreamingContent {
 // Define the ref interface
 interface ContinueWatchingRef {
   refresh: () => Promise<boolean>;
+  /** Get the first item's ref for TV navigation */
+  getFirstItemRef: () => React.RefObject<View> | null;
+}
+
+// Props for the component
+interface ContinueWatchingSectionProps {
+  /** Ref to hero section item for TV up navigation */
+  heroSectionRef?: React.RefObject<View>;
+  /** Ref that parent can use to focus the first item (passed from parent, assigned to first item) */
+  firstItemRef?: React.RefObject<View>;
 }
 
 // Enhanced responsive breakpoints for Continue Watching section
@@ -97,7 +111,8 @@ const isEpisodeReleased = (video: any): boolean => {
 };
 
 // Create a proper imperative handle with React.forwardRef and updated type
-const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
+const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWatchingSectionProps>((props, ref) => {
+  const { heroSectionRef, firstItemRef } = props;
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
@@ -107,6 +122,17 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // TV navigation
+  const isTVDevice = useIsTV();
+  const tvScrollViewRef = useRef<ScrollView>(null);
+  const tvItemViewRefs = useRef<React.RefObject<View>[]>([]);
+  const [tvRefsReady, setTvRefsReady] = useState(false);
+  const [tvFocusedIndex, setTvFocusedIndex] = useState(0);
+
+  // Debounce for TV focus events to prevent jumping on fast navigation
+  const lastTVFocusTime = useRef<number>(0);
+  const TV_FOCUS_DEBOUNCE_MS = 80; // Minimum ms between focus events
 
   // Enhanced responsive sizing for tablets and TV screens
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
@@ -189,6 +215,36 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         return 16; // phone
     }
   }, [deviceType]);
+
+  // Initialize TV refs when items change
+  useEffect(() => {
+    if (isTVDevice && continueWatchingItems.length > 0) {
+      tvItemViewRefs.current = continueWatchingItems.map(() => React.createRef<View>());
+      setTvRefsReady(false);
+      // Small delay to allow refs to be assigned before enabling directional focus
+      const timer = setTimeout(() => setTvRefsReady(true), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isTVDevice, continueWatchingItems.length]);
+
+  // Handle TV focus - scroll to focused item
+  // Includes debounce to prevent jumping on fast navigation
+  const handleTVItemFocus = useCallback((index: number) => {
+    // Debounce rapid focus events to prevent scroll conflicts
+    const now = Date.now();
+    if (now - lastTVFocusTime.current < TV_FOCUS_DEBOUNCE_MS) {
+      return; // Skip this focus event - too soon after last one
+    }
+    lastTVFocusTime.current = now;
+
+    setTvFocusedIndex(index);
+    if (tvScrollViewRef.current && isTVDevice) {
+      // Calculate scroll position to center the focused item
+      const itemTotalWidth = computedItemWidth + itemSpacing;
+      const scrollX = Math.max(0, index * itemTotalWidth - horizontalPadding);
+      tvScrollViewRef.current.scrollTo({ x: scrollX, y: 0, animated: true });
+    }
+  }, [isTVDevice, computedItemWidth, itemSpacing, horizontalPadding]);
 
   // Alert state for CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
@@ -903,6 +959,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       lastTraktSyncRef.current = 0; // Reset cooldown for manual refresh
       await loadContinueWatching(false);
       return true;
+    },
+    getFirstItemRef: () => {
+      // Return the first item's ref for TV navigation
+      if (tvItemViewRefs.current.length > 0) {
+        return tvItemViewRefs.current[0];
+      }
+      return null;
     }
   }));
 
@@ -1251,6 +1314,154 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Memoized item separator
   const ItemSeparator = useCallback(() => <View style={{ width: itemSpacing }} />, [itemSpacing]);
 
+  // TV-specific render function with Focusable wrapper
+  const renderTVItem = useCallback((item: ContinueWatchingItem, index: number) => {
+    const itemCount = continueWatchingItems.length;
+    const prevIndex = index === 0 ? itemCount - 1 : index - 1;
+    const nextIndex = index === itemCount - 1 ? 0 : index + 1;
+    // For the first item, use the passed-in firstItemRef so HeroCarousel can navigate to it
+    const currentViewRef = index === 0 && firstItemRef ? firstItemRef : tvItemViewRefs.current[index];
+    const leftRef = tvRefsReady ? tvItemViewRefs.current[prevIndex] : undefined;
+    const rightRef = tvRefsReady ? tvItemViewRefs.current[nextIndex] : undefined;
+
+    const card = (
+      <View
+        style={[
+          styles.wideContentItem,
+          {
+            backgroundColor: currentTheme.colors.elevation1,
+            borderColor: currentTheme.colors.border,
+            shadowColor: currentTheme.colors.black,
+            width: computedItemWidth,
+            height: computedItemHeight
+          }
+        ]}
+      >
+        {/* Poster Image */}
+        <View style={[
+          styles.posterContainer,
+          { width: 100 }
+        ]}>
+          <FastImage
+            source={{
+              uri: item.poster || 'https://via.placeholder.com/300x450',
+              priority: FastImage.priority.high,
+              cache: FastImage.cacheControl.immutable
+            }}
+            style={styles.continueWatchingPoster}
+            resizeMode={FastImage.resizeMode.cover}
+          />
+          {deletingItemId === item.id && (
+            <View style={styles.deletingOverlay}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+            </View>
+          )}
+        </View>
+
+        {/* Content Details */}
+        <View style={[styles.contentDetails, { padding: 16 }]}>
+          <View style={styles.titleRow}>
+            {(() => {
+              const isUpNext = item.type === 'series' && item.progress === 0;
+              return (
+                <View style={styles.titleRow}>
+                  <Text
+                    style={[
+                      styles.contentTitle,
+                      { color: currentTheme.colors.highEmphasis, fontSize: 20 }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+                  {isUpNext && (
+                    <View style={[
+                      styles.progressBadge,
+                      { backgroundColor: currentTheme.colors.primary, paddingHorizontal: 12, paddingVertical: 6 }
+                    ]}>
+                      <Text style={[styles.progressText, { fontSize: 14 }]}>Up Next</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+          </View>
+
+          {/* Episode Info or Year */}
+          {item.type === 'series' && item.season && item.episode ? (
+            <View style={styles.episodeRow}>
+              <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis, fontSize: 16 }]}>
+                Season {item.season}
+              </Text>
+              {item.episodeTitle && (
+                <Text
+                  style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis, fontSize: 15 }]}
+                  numberOfLines={1}
+                >
+                  {item.episodeTitle}
+                </Text>
+              )}
+            </View>
+          ) : (
+            <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis, fontSize: 16 }]}>
+              {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
+            </Text>
+          )}
+
+          {/* Progress Bar */}
+          {item.progress > 0 && (
+            <View style={styles.wideProgressContainer}>
+              <View style={[styles.wideProgressTrack, { height: 6 }]}>
+                <View
+                  style={[
+                    styles.wideProgressBar,
+                    { width: `${item.progress}%`, backgroundColor: currentTheme.colors.primary }
+                  ]}
+                />
+              </View>
+              <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted, fontSize: 14 }]}>
+                {Math.round(item.progress)}% watched
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+
+    return (
+      <Focusable
+        key={`tv-cw-${item.id}-${index}-${tvRefsReady ? 'ready' : 'init'}`}
+        viewRef={currentViewRef}
+        onPress={() => handleContentPress(item)}
+        onLongPress={() => handleLongPress(item)}
+        onFocus={() => handleTVItemFocus(index)}
+        style={{ marginRight: index < itemCount - 1 ? itemSpacing : 0 }}
+        focusScale={1.03}
+        borderRadius={14}
+        showFocusBorder={true}
+        animateBackground={false}
+        nextFocusLeft={leftRef}
+        nextFocusRight={rightRef}
+        nextFocusUp={heroSectionRef}
+      >
+        {card}
+      </Focusable>
+    );
+  }, [
+    continueWatchingItems.length,
+    tvRefsReady,
+    currentTheme.colors,
+    computedItemWidth,
+    computedItemHeight,
+    deletingItemId,
+    handleContentPress,
+    handleLongPress,
+    handleTVItemFocus,
+    itemSpacing,
+    heroSectionRef,
+    firstItemRef,
+  ]);
+
   // If no continue watching items, don't render anything
   if (continueWatchingItems.length === 0) {
     return null;
@@ -1280,24 +1491,42 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         </View>
       </View>
 
-      <FlashList
-        data={continueWatchingItems}
-        renderItem={renderContinueWatchingItem}
-        keyExtractor={keyExtractor}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.wideList,
-          {
-            paddingLeft: horizontalPadding,
-            paddingRight: horizontalPadding
-          }
-        ]}
-        ItemSeparatorComponent={ItemSeparator}
-        onEndReachedThreshold={0.7}
-        onEndReached={() => { }}
-        removeClippedSubviews={true}
-      />
+      {isTVDevice ? (
+        <ScrollView
+          ref={tvScrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={false}
+          contentContainerStyle={[
+            styles.wideList,
+            {
+              paddingLeft: horizontalPadding,
+              paddingRight: horizontalPadding
+            }
+          ]}
+        >
+          {continueWatchingItems.map((item, index) => renderTVItem(item, index))}
+        </ScrollView>
+      ) : (
+        <FlashList
+          data={continueWatchingItems}
+          renderItem={renderContinueWatchingItem}
+          keyExtractor={keyExtractor}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.wideList,
+            {
+              paddingLeft: horizontalPadding,
+              paddingRight: horizontalPadding
+            }
+          ]}
+          ItemSeparatorComponent={ItemSeparator}
+          onEndReachedThreshold={0.7}
+          onEndReached={() => { }}
+          removeClippedSubviews={true}
+        />
+      )}
 
       <CustomAlert
         visible={alertVisible}

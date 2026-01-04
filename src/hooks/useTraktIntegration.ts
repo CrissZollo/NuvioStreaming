@@ -45,7 +45,6 @@ export function useTraktIntegration() {
         logger.log(`[useTraktIntegration] User profile: ${profile.username}`);
         setUserProfile(profile);
       } else {
-        logger.log('[useTraktIntegration] User is not authenticated');
         setUserProfile(null);
       }
 
@@ -409,7 +408,6 @@ export function useTraktIntegration() {
     // getTraktPlaybackProgress call logging removed
 
     if (!isAuthenticated) {
-      logger.log('[useTraktIntegration] getTraktPlaybackProgress: Not authenticated');
       return [];
     }
 
@@ -654,7 +652,6 @@ export function useTraktIntegration() {
   const forceSyncTraktProgress = useCallback(async (): Promise<boolean> => {
     logger.log('[useTraktIntegration] Manual force sync triggered');
     if (!isAuthenticated) {
-      logger.log('[useTraktIntegration] Cannot force sync - not authenticated');
       return false;
     }
     return await fetchAndMergeTraktProgress();

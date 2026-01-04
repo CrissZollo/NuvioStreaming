@@ -538,7 +538,6 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
               borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
               focusScale={1.05}
               animateBackground={false}
-              scrollOnFocus={false}
             >
               <Text
                 style={[
@@ -676,7 +675,6 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                   focusScale={1.02}
                   animateBackground={true}
                   autoFocus={index === 0}
-                  scrollOnFocus={false}
                 >
                   {(focused) => (
                     <View style={styles.dropdownItemContent}>
@@ -806,7 +804,6 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                       borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
                       focusScale={1.05}
                       animateBackground={false}
-                      scrollOnFocus={false}
                     >
                       {cardContent}
                     </Focusable>

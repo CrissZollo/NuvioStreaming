@@ -83,6 +83,7 @@ interface Category {
 
 interface ContinueWatchingRef {
   refresh: () => Promise<boolean>;
+  getFirstItemRef: () => React.RefObject<View> | null;
 }
 
 type HomeScreenListItem =
@@ -127,6 +128,10 @@ const HomeScreen = () => {
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
+
+  // TV navigation: stable ref for the first continue watching item (for hero -> continue watching navigation)
+  // This ref is passed to ContinueWatchingSection which will assign its first item's ref to it
+  const continueWatchingFirstRef = useRef<View>(null);
 
   // FlashList ref for TV scroll-to-center on focus
   const flashListRef = useRef<any>(null);
@@ -706,6 +711,7 @@ const HomeScreen = () => {
         <HeroCarousel
           items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
           loading={featuredLoading}
+          continueWatchingFirstRef={continueWatchingFirstRef}
         />
       );
     } else {
@@ -735,7 +741,12 @@ const HomeScreen = () => {
   }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
-  const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
+  const memoizedContinueWatchingSection = useMemo(() => (
+    <ContinueWatchingSection
+      ref={continueWatchingRef}
+      firstItemRef={isTVDevice ? continueWatchingFirstRef : undefined}
+    />
+  ), [isTVDevice]);
   const memoizedHeader = useMemo(() => (
     <>
       {showHeroSection ? memoizedFeaturedContent : null}

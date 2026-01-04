@@ -97,31 +97,55 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const isTVDevice = useIsTV();
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [isWatched, setIsWatched] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
+  // On TV, defer subscriptions to reduce initial render overhead
+  // Only subscribe after a delay to allow smooth scrolling first
   useEffect(() => {
-    // Subscribe to library updates and update local state if this item's status changes
+    if (isTVDevice) {
+      // On TV, delay subscription setup for performance
+      const timer = setTimeout(() => {
+        const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
+          const found = items.find((libItem) => libItem.id === item.id && libItem.type === item.type);
+          const newInLibrary = !!found;
+          setInLibrary(prev => prev !== newInLibrary ? newInLibrary : prev);
+        });
+        return () => unsubscribe();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    // Mobile: immediate subscription
     const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
       const found = items.find((libItem) => libItem.id === item.id && libItem.type === item.type);
       const newInLibrary = !!found;
-      // Only update state if the value actually changed to prevent unnecessary re-renders
       setInLibrary(prev => prev !== newInLibrary ? newInLibrary : prev);
     });
     return () => unsubscribe();
-  }, [item.id, item.type]);
+  }, [item.id, item.type, isTVDevice]);
 
-  // Load watched state from AsyncStorage when item changes
+  // Load watched state - defer on TV for performance
   useEffect(() => {
     const updateWatched = () => {
       mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then((val: string | null) => setIsWatched(val === 'true'));
     };
+
+    if (isTVDevice) {
+      // On TV, delay to reduce initial overhead
+      const timer = setTimeout(updateWatched, 300);
+      const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
+      return () => {
+        clearTimeout(timer);
+        sub.remove();
+      };
+    }
+
     updateWatched();
     const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
     return () => sub.remove();
-  }, [item.id, item.type]);
-
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [isWatched, setIsWatched] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  }, [item.id, item.type, isTVDevice]);
 
   // Trakt integration
   const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();

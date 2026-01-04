@@ -266,7 +266,6 @@ export const CastSection: React.FC<CastSectionProps> = ({
                     focusScale={1.05}
                     animateBackground={false}
                     showFocusBorder={true}
-                    scrollOnFocus={false}
                   >
                     {item.profile_path ? (
                       <FastImage

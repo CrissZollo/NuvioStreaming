@@ -41,6 +41,9 @@ interface TVContentRowProps {
  * TV-optimized horizontal content row with D-Pad navigation
  * Supports focus memory and auto-scrolling to focused item
  */
+// Debounce constant for TV focus events
+const TV_FOCUS_DEBOUNCE_MS = 80;
+
 export const TVContentRow: React.FC<TVContentRowProps> = memo(({
   title,
   items,
@@ -57,8 +60,18 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
   const focusedIndexRef = useRef(0);
   const { saveFocus, getLastFocused } = useFocusMemory();
 
+  // Debounce for TV focus events to prevent jumping on fast navigation
+  const lastFocusTime = useRef<number>(0);
+
   const handleItemFocus = useCallback(
     (index: number) => {
+      // Debounce rapid focus events to prevent scroll conflicts
+      const now = Date.now();
+      if (now - lastFocusTime.current < TV_FOCUS_DEBOUNCE_MS) {
+        return; // Skip this focus event - too soon after last one
+      }
+      lastFocusTime.current = now;
+
       focusedIndexRef.current = index;
       saveFocus(rowIndex, index);
       onRowFocus?.(rowIndex);

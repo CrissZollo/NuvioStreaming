@@ -513,7 +513,6 @@ const CompactCommentCard: React.FC<{
           borderRadius={isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12}
           focusScale={1.05}
           animateBackground={false}
-          scrollOnFocus={false}
         >
           {cardContent}
         </Focusable>

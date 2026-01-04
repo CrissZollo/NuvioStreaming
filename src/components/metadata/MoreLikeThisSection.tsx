@@ -147,7 +147,6 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
             focusScale={1.05}
             animateBackground={false}
             showFocusBorder={true}
-            scrollOnFocus={false}
           >
             {posterImage}
           </Focusable>

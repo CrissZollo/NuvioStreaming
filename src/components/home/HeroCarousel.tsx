@@ -34,12 +34,14 @@ import { Focusable, FocusableRef } from '../tv/Focusable';
 interface HeroCarouselProps {
   items: StreamingContent[];
   loading?: boolean;
+  /** Ref to the first focusable item in Continue Watching section (for TV down navigation) */
+  continueWatchingFirstRef?: React.RefObject<View>;
 }
 
 // Offset to keep cards below a top tab navigator
 const TOP_TABS_OFFSET = Platform.OS === 'ios' ? 44 : 48;
 
-const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) => {
+const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, continueWatchingFirstRef }) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -114,6 +116,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const tvCardViewRefs = useRef<React.RefObject<View>[]>([]);
   const [tvFocusedIndex, setTvFocusedIndex] = useState(0);
   const [tvRefsReady, setTvRefsReady] = useState(false);
+
+  // Debounce for TV focus events to prevent jumping on fast navigation
+  const lastTVFocusTime = useRef<number>(0);
+  const TV_FOCUS_DEBOUNCE_MS = 150; // Minimum ms between focus events
+  const isScrollingRef = useRef(false); // Track if a scroll is in progress
 
   // Initialize refs array when data changes
   useEffect(() => {
@@ -271,23 +278,34 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     scrollViewRef.current?.scrollTo({ x: target, y: 0, animated: true });
   }, [interval, scrollX]);
 
-  // Handle TV card focus - scroll to the focused card with smooth wrap-around
+  // Handle TV card focus - scroll to the focused card
+  // Uses instant scroll (no animation) to prevent conflicts during fast navigation
   const handleTVCardFocus = useCallback((logicalIndex: number) => {
-    const prevIndex = tvFocusedIndex;
+    // Debounce rapid focus events to prevent scroll conflicts
+    const now = Date.now();
+    if (now - lastTVFocusTime.current < TV_FOCUS_DEBOUNCE_MS) {
+      return; // Skip this focus event - too soon after last one
+    }
+
+    // Skip if already scrolling
+    if (isScrollingRef.current) {
+      return;
+    }
+
+    lastTVFocusTime.current = now;
+    isScrollingRef.current = true;
+
     setTvFocusedIndex(logicalIndex);
 
-    // Check if this is a wrap-around transition (jumping across the whole list)
-    const isWrapFromLastToFirst = prevIndex === data.length - 1 && logicalIndex === 0;
-    const isWrapFromFirstToLast = prevIndex === 0 && logicalIndex === data.length - 1;
+    // Use instant scroll (animated: false) to prevent animation conflicts
+    // This eliminates the "jumping back" issue when navigating quickly
+    scrollToLogicalIndex(logicalIndex, false);
 
-    if (isTVDevice && (isWrapFromLastToFirst || isWrapFromFirstToLast)) {
-      // For wrap-around, use a slightly longer animation to feel smoother
-      smoothScrollToIndex(logicalIndex, 400);
-    } else {
-      // Normal single-step navigation
-      scrollToLogicalIndex(logicalIndex, true);
-    }
-  }, [scrollToLogicalIndex, smoothScrollToIndex, tvFocusedIndex, data.length, isTVDevice]);
+    // Reset scrolling flag after a short delay
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 50);
+  }, [scrollToLogicalIndex]);
 
   const contentPadding = useMemo(() => ({ paddingHorizontal: (windowWidth - cardWidth) / 2 }), [windowWidth, cardWidth]);
 
@@ -507,9 +525,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                   borderRadius={16}
                   showFocusBorder={true}
                   animateBackground={false}
-                  scrollOnFocus={false}
                   nextFocusLeft={leftRef}
                   nextFocusRight={rightRef}
+                  nextFocusDown={continueWatchingFirstRef}
                 >
                   {card}
                 </Focusable>
@@ -788,7 +806,14 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   }, [index]);
 
   // Combined animation for genres and actions (same calculation)
+  // On TV, use static opacity for performance
   const overlayAnimatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    // On TV, always show overlay at full opacity (no scroll-based animation)
+    if (isTVDevice) {
+      return { opacity: 1 };
+    }
+
     const translateX = scrollX.value;
     const cardOffset = index * interval;
     const distance = Math.abs(translateX - cardOffset);
@@ -808,8 +833,18 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     };
   });
 
-  // ULTRA-OPTIMIZED: Only animate center card and ±1 neighbors
+  // ULTRA-OPTIMIZED: On TV, use static styles for performance (no scroll-based animation)
   const cardAnimatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    // On TV, don't animate based on scroll - use static full size/opacity
+    // The Focusable handles focus scaling
+    if (isTVDevice) {
+      return {
+        transform: [{ scale: 1 }],
+        opacity: 1,
+      };
+    }
+
     const translateX = scrollX.value;
     const cardOffset = index * interval;
     const distance = Math.abs(translateX - cardOffset);

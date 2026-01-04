@@ -570,7 +570,7 @@ class NotificationService {
       // Reduced logging verbosity
       // logger.log(`[NotificationService] Successfully synced notifications for ${syncedCount}/${allTraktShows.size} Trakt shows`);
     } catch (error) {
-      logger.error('[NotificationService] Error syncing Trakt notifications:', error);
+      // Silently ignore Trakt sync errors (e.g., not authenticated)
     }
   }
 
