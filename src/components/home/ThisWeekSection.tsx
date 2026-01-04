@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTraktContext } from '../../contexts/TraktContext';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 import { useLibrary } from '../../hooks/useLibrary';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
@@ -60,6 +62,8 @@ export const ThisWeekSection = React.memo(() => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { calendarData, loading } = useCalendarData();
+  const isTVDevice = useIsTV();
+  const flatListRef = useRef<FlatList>(null);
 
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
@@ -228,6 +232,17 @@ export const ThisWeekSection = React.memo(() => {
     navigation.navigate('Calendar' as any);
   };
 
+  // Handle focus on episode item to scroll it into view for TV
+  const handleEpisodeFocus = useCallback((index: number) => {
+    if (isTVDevice && flatListRef.current) {
+      flatListRef.current.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.1, // Align near the left
+      });
+    }
+  }, [isTVDevice]);
+
   if (thisWeekEpisodes.length === 0) {
     return null;
   }
@@ -244,6 +259,109 @@ export const ThisWeekSection = React.memo(() => {
       (item.season_poster_path ?
         tmdbService.getImageUrl(item.season_poster_path) :
         item.poster);
+
+    const cardContent = (focused?: boolean) => (
+      <View style={styles.imageContainer}>
+        <FastImage
+          source={{
+            uri: imageUrl || undefined,
+            priority: FastImage.priority.normal,
+            cache: FastImage.cacheControl.immutable
+          }}
+          style={styles.poster}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+
+        <LinearGradient
+          colors={[
+            'transparent',
+            'rgba(0,0,0,0.0)',
+            'rgba(0,0,0,0.5)',
+            'rgba(0,0,0,0.9)'
+          ]}
+          style={styles.gradient}
+          locations={[0, 0.4, 0.7, 1]}
+        >
+          <View style={styles.cardHeader}>
+            <View style={[
+              styles.statusBadge,
+              { backgroundColor: isReleased ? currentTheme.colors.primary : 'rgba(0,0,0,0.6)' }
+            ]}>
+              <Text style={styles.statusText}>
+                {isReleased ? (item.isGroup ? 'Released' : 'New') : formattedDate}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.contentArea}>
+            <Text style={[
+              styles.seriesName,
+              {
+                color: currentTheme.colors.white,
+                fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
+              }
+            ]} numberOfLines={1}>
+              {item.seriesName}
+            </Text>
+
+            <View style={styles.metaContainer}>
+              <Text style={[
+                styles.seasonBadge,
+                {
+                  color: focused ? currentTheme.colors.white : currentTheme.colors.primary,
+                  fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 12
+                }
+              ]}>
+                S{item.season} {item.isGroup ? item.episodeRange : `E${item.episode}`}
+              </Text>
+              <Text style={styles.dotSeparator}>•</Text>
+              <Text style={[
+                styles.episodeTitle,
+                {
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 12
+                }
+              ]} numberOfLines={1}>
+                {item.title}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+
+    if (isTVDevice) {
+      return (
+        <View style={[styles.episodeItemContainer, { width: computedItemWidth, height: computedItemHeight }]}>
+          {item.isGroup && (
+            <View style={[
+              styles.cardStackEffect,
+              {
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                borderColor: 'rgba(255,255,255,0.05)',
+              }
+            ]} />
+          )}
+          <Focusable
+            style={[
+              styles.episodeItem,
+              {
+                backgroundColor: currentTheme.colors.background,
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+              }
+            ]}
+            onPress={() => handleEpisodePress(item)}
+            onFocus={() => handleEpisodeFocus(index)}
+            borderRadius={16}
+            focusScale={1.05}
+            showFocusBorder={true}
+          >
+            {(focused) => cardContent(focused)}
+          </Focusable>
+        </View>
+      );
+    }
 
     return (
       <View style={[styles.episodeItemContainer, { width: computedItemWidth, height: computedItemHeight }]}>
@@ -268,73 +386,7 @@ export const ThisWeekSection = React.memo(() => {
           onPress={() => handleEpisodePress(item)}
           activeOpacity={0.7}
         >
-          <View style={styles.imageContainer}>
-            <FastImage
-              source={{
-                uri: imageUrl || undefined,
-                priority: FastImage.priority.normal,
-                cache: FastImage.cacheControl.immutable
-              }}
-              style={styles.poster}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-
-            <LinearGradient
-              colors={[
-                'transparent',
-                'rgba(0,0,0,0.0)',
-                'rgba(0,0,0,0.5)',
-                'rgba(0,0,0,0.9)'
-              ]}
-              style={styles.gradient}
-              locations={[0, 0.4, 0.7, 1]}
-            >
-              <View style={styles.cardHeader}>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: isReleased ? currentTheme.colors.primary : 'rgba(0,0,0,0.6)' }
-                ]}>
-                  <Text style={styles.statusText}>
-                    {isReleased ? (item.isGroup ? 'Released' : 'New') : formattedDate}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.contentArea}>
-                <Text style={[
-                  styles.seriesName,
-                  {
-                    color: currentTheme.colors.white,
-                    fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
-                  }
-                ]} numberOfLines={1}>
-                  {item.seriesName}
-                </Text>
-
-                <View style={styles.metaContainer}>
-                  <Text style={[
-                    styles.seasonBadge,
-                    {
-                      color: currentTheme.colors.primary,
-                      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 12
-                    }
-                  ]}>
-                    S{item.season} {item.isGroup ? item.episodeRange : `E${item.episode}`}
-                  </Text>
-                  <Text style={styles.dotSeparator}>•</Text>
-                  <Text style={[
-                    styles.episodeTitle,
-                    {
-                      color: 'rgba(255,255,255,0.7)',
-                      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 12
-                    }
-                  ]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                </View>
-              </View>
-            </LinearGradient>
-          </View>
+          {cardContent()}
         </TouchableOpacity>
       </View>
     );
@@ -363,34 +415,69 @@ export const ThisWeekSection = React.memo(() => {
             }
           ]} />
         </View>
-        <TouchableOpacity onPress={handleViewAll} style={[
-          styles.viewAllButton,
-          {
-            paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-            paddingHorizontal: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 10
-          }
-        ]}>
-          <Text style={[
-            styles.viewAllText,
+        {isTVDevice ? (
+          <Focusable
+            onPress={handleViewAll}
+            style={[
+              styles.viewAllButton,
+              {
+                paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                paddingHorizontal: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 10
+              }
+            ]}
+            borderRadius={20}
+            focusScale={1.1}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <>
+                <Text style={[
+                  styles.viewAllText,
+                  {
+                    color: focused ? currentTheme.colors.primary : currentTheme.colors.textMuted,
+                    fontSize: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 15 : 14
+                  }
+                ]}>View All</Text>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20}
+                  color={focused ? currentTheme.colors.primary : currentTheme.colors.textMuted}
+                />
+              </>
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity onPress={handleViewAll} style={[
+            styles.viewAllButton,
             {
-              color: currentTheme.colors.textMuted,
-              fontSize: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 15 : 14
+              paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+              paddingHorizontal: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 10
             }
-          ]}>View All</Text>
-          <MaterialIcons
-            name="chevron-right"
-            size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20}
-            color={currentTheme.colors.textMuted}
-          />
-        </TouchableOpacity>
+          ]}>
+            <Text style={[
+              styles.viewAllText,
+              {
+                color: currentTheme.colors.textMuted,
+                fontSize: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 15 : 14
+              }
+            ]}>View All</Text>
+            <MaterialIcons
+              name="chevron-right"
+              size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20}
+              color={currentTheme.colors.textMuted}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
+        ref={flatListRef}
         data={thisWeekEpisodes}
         keyExtractor={(item) => item.id}
         renderItem={renderEpisodeItem}
         horizontal
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={!isTVDevice}
         contentContainerStyle={[
           styles.listContent,
           {
