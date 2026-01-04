@@ -1,4 +1,6 @@
 import { Platform } from 'react-native';
+import { mmkvStorage } from './mmkvStorage';
+import { isAndroidTV } from '../utils/tvDetection';
 
 export interface GithubReleaseInfo {
   tag_name: string;
@@ -8,11 +10,59 @@ export interface GithubReleaseInfo {
   published_at?: string;
 }
 
-const GITHUB_LATEST_RELEASE_URL = 'https://api.github.com/repos/tapframe/NuvioStreaming/releases/latest';
+// GitHub release sources
+export const GITHUB_RELEASE_SOURCES = {
+  tapframe: {
+    label: 'Official (tapframe)',
+    apiUrl: 'https://api.github.com/repos/tapframe/NuvioStreaming/releases/latest',
+    releasesUrl: 'https://github.com/tapframe/NuvioStreaming/releases',
+    contributorsUrl: 'https://api.github.com/repos/tapframe/NuvioStreaming/contributors',
+    allReleasesApiUrl: 'https://api.github.com/repos/tapframe/NuvioStreaming/releases',
+  },
+  crisszollo: {
+    label: 'TV Fork (CrissZollo)',
+    apiUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreaming/releases/latest',
+    releasesUrl: 'https://github.com/CrissZollo/NuvioStreaming/releases',
+    contributorsUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreaming/contributors',
+    allReleasesApiUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreaming/releases',
+  },
+} as const;
 
-export async function fetchLatestGithubRelease(): Promise<GithubReleaseInfo | null> {
+export type GithubReleaseSourceKey = keyof typeof GITHUB_RELEASE_SOURCES;
+
+const GITHUB_SOURCE_STORAGE_KEY = '@github_release_source';
+
+export async function getGithubReleaseSource(): Promise<GithubReleaseSourceKey> {
   try {
-    const res = await fetch(GITHUB_LATEST_RELEASE_URL, {
+    const stored = await mmkvStorage.getItem(GITHUB_SOURCE_STORAGE_KEY);
+    if (stored && (stored === 'tapframe' || stored === 'crisszollo')) {
+      return stored;
+    }
+  } catch {}
+  // Return platform-specific default: CrissZollo for TV, tapframe for others
+  return isAndroidTV() ? 'crisszollo' : 'tapframe';
+}
+
+export async function getStoredGithubReleaseSource(): Promise<GithubReleaseSourceKey | null> {
+  try {
+    const stored = await mmkvStorage.getItem(GITHUB_SOURCE_STORAGE_KEY);
+    if (stored && (stored === 'tapframe' || stored === 'crisszollo')) {
+      return stored;
+    }
+  } catch {}
+  return null;
+}
+
+export async function setGithubReleaseSource(source: GithubReleaseSourceKey): Promise<void> {
+  await mmkvStorage.setItem(GITHUB_SOURCE_STORAGE_KEY, source);
+}
+
+export async function fetchLatestGithubRelease(sourceOverride?: GithubReleaseSourceKey): Promise<GithubReleaseInfo | null> {
+  try {
+    const source = sourceOverride || await getGithubReleaseSource();
+    const { apiUrl } = GITHUB_RELEASE_SOURCES[source];
+
+    const res = await fetch(apiUrl, {
       headers: {
         'Accept': 'application/vnd.github+json',
         // Identify app a bit; avoid user agent blocks
@@ -59,9 +109,12 @@ export function isAnyUpgrade(current: string, latest: string): boolean {
   return b[2] > a[2];
 }
 
-export async function fetchTotalDownloads(): Promise<number | null> {
+export async function fetchTotalDownloads(sourceOverride?: GithubReleaseSourceKey): Promise<number | null> {
   try {
-    const res = await fetch('https://api.github.com/repos/tapframe/NuvioStreaming/releases', {
+    const source = sourceOverride || await getGithubReleaseSource();
+    const { allReleasesApiUrl } = GITHUB_RELEASE_SOURCES[source];
+
+    const res = await fetch(allReleasesApiUrl, {
       headers: {
         'Accept': 'application/vnd.github+json',
         'User-Agent': `Nuvio/${Platform.OS}`,
@@ -69,7 +122,7 @@ export async function fetchTotalDownloads(): Promise<number | null> {
     });
     if (!res.ok) return null;
     const releases = await res.json();
-    
+
     let total = 0;
     releases.forEach((release: any) => {
       if (release.assets && Array.isArray(release.assets)) {
@@ -78,7 +131,7 @@ export async function fetchTotalDownloads(): Promise<number | null> {
         });
       }
     });
-    
+
     return total;
   } catch {
     return null;
@@ -94,20 +147,23 @@ export interface GitHubContributor {
   type: string;
 }
 
-export async function fetchContributors(): Promise<GitHubContributor[] | null> {
+export async function fetchContributors(sourceOverride?: GithubReleaseSourceKey): Promise<GitHubContributor[] | null> {
   try {
-    const res = await fetch('https://api.github.com/repos/tapframe/NuvioStreaming/contributors', {
+    const source = sourceOverride || await getGithubReleaseSource();
+    const { contributorsUrl } = GITHUB_RELEASE_SOURCES[source];
+
+    const res = await fetch(contributorsUrl, {
       headers: {
         'Accept': 'application/vnd.github+json',
         'User-Agent': `Nuvio/${Platform.OS}`,
       },
     });
-    
+
     if (!res.ok) {
       if (__DEV__) console.error('GitHub API error:', res.status, res.statusText);
       return null;
     }
-    
+
     const contributors = await res.json();
     return contributors;
   } catch (error) {

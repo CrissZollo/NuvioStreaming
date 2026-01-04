@@ -1004,6 +1004,25 @@ const SettingsScreen: React.FC = () => {
               isTV={isTVDevice}
             />
             <SettingItem
+              title="Test Update Alert"
+              description="Simulate major update available"
+              icon="download"
+              onPress={async () => {
+                try {
+                  // Clear the dismissed version to allow the alert to show again
+                  await mmkvStorage.removeItem('@github_major_update_dismissed_version');
+                  // Ensure major alerts are enabled
+                  await mmkvStorage.setItem('@major_updates_alerts_enabled', 'true');
+                  openAlert('Success', 'Update alert reset. Restart the app to see the update notification if a newer version is available on GitHub.');
+                } catch (error) {
+                  openAlert('Error', 'Failed to reset update alert.');
+                }
+              }}
+              renderControl={ChevronRight}
+              isTablet={isTablet}
+              isTV={isTVDevice}
+            />
+            <SettingItem
               title="Clear All Data"
               icon="trash-2"
               onPress={() => {

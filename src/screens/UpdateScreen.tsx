@@ -24,7 +24,7 @@ import CustomAlert from '../components/CustomAlert';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useGithubMajorUpdate } from '../hooks/useGithubMajorUpdate';
 import { getDisplayedAppVersion } from '../utils/version';
-import { isAnyUpgrade } from '../services/githubReleaseService';
+import { isAnyUpgrade, GITHUB_RELEASE_SOURCES, GithubReleaseSourceKey, getStoredGithubReleaseSource, setGithubReleaseSource } from '../services/githubReleaseService';
 import { useIsTV } from '../contexts/TVContext';
 import { Focusable, FocusableRef } from '../components/tv/Focusable';
 
@@ -83,6 +83,8 @@ const UpdateScreen: React.FC = () => {
   const viewReleaseRef = useRef<FocusableRef>(null);
   const otaToggleRef = useRef<FocusableRef>(null);
   const majorToggleRef = useRef<FocusableRef>(null);
+  const releaseSourceTapframeRef = useRef<FocusableRef>(null);
+  const releaseSourceCrisszolloRef = useRef<FocusableRef>(null);
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -127,18 +129,33 @@ const UpdateScreen: React.FC = () => {
   const [otaAlertsEnabled, setOtaAlertsEnabled] = useState(true);
   const [majorAlertsEnabled, setMajorAlertsEnabled] = useState(true);
 
+  // GitHub release source setting
+  const [releaseSource, setReleaseSource] = useState<GithubReleaseSourceKey>(isTV ? 'crisszollo' : 'tapframe');
+
   // Load notification settings on mount
   useEffect(() => {
     (async () => {
       try {
         const otaSetting = await mmkvStorage.getItem('@ota_updates_alerts_enabled');
         const majorSetting = await mmkvStorage.getItem('@major_updates_alerts_enabled');
-        // Default to true if not set
-        setOtaAlertsEnabled(otaSetting !== 'false');
+        // OTA alerts default to false, Major alerts default to true
+        setOtaAlertsEnabled(otaSetting === 'true');
         setMajorAlertsEnabled(majorSetting !== 'false');
+
+        // Load GitHub release source - default differs by platform
+        const storedSource = await getStoredGithubReleaseSource();
+        if (storedSource) {
+          setReleaseSource(storedSource);
+        } else {
+          // No stored preference - use platform default
+          const defaultSource: GithubReleaseSourceKey = isTV ? 'crisszollo' : 'tapframe';
+          setReleaseSource(defaultSource);
+          // Store the default so it's used everywhere
+          await setGithubReleaseSource(defaultSource);
+        }
       } catch { }
     })();
-  }, []);
+  }, [isTV]);
 
   // Handle toggling OTA alerts with warning
   const handleOtaAlertsToggle = async (value: boolean) => {
@@ -162,6 +179,14 @@ const UpdateScreen: React.FC = () => {
       await mmkvStorage.setItem('@ota_updates_alerts_enabled', 'true');
       setOtaAlertsEnabled(true);
     }
+  };
+
+  // Handle changing GitHub release source
+  const handleReleaseSourceChange = async (source: GithubReleaseSourceKey) => {
+    setReleaseSource(source);
+    await setGithubReleaseSource(source);
+    // Refresh GitHub release check with new source
+    github.refresh();
   };
 
   // Handle toggling Major update alerts with warning
@@ -852,6 +877,7 @@ const UpdateScreen: React.FC = () => {
                 animateBackground={true}
                 showFocusBorder={true}
                 nextFocusUp={otaToggleRef.current?.getViewRef()}
+                nextFocusDown={releaseSourceTapframeRef.current?.getViewRef()}
               >
                 {(focused) => (
                   <>
@@ -913,6 +939,163 @@ const UpdateScreen: React.FC = () => {
                 Keeping alerts enabled ensures you receive bug fixes and can provide accurate crash reports.
               </Text>
             </View>
+          </SettingsCard>
+
+          {/* GitHub Release Source Setting */}
+          <SettingsCard title="RELEASE SOURCE" isTablet={isTablet}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
+                  GitHub Repository
+                </Text>
+                <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                  Choose which GitHub repository to check for major updates
+                </Text>
+              </View>
+            </View>
+
+            {/* Tapframe Option */}
+            {isTV ? (
+              <Focusable
+                ref={releaseSourceTapframeRef}
+                onPress={() => handleReleaseSourceChange('tapframe')}
+                style={styles.settingRow}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+                nextFocusUp={majorToggleRef.current?.getViewRef()}
+                nextFocusDown={releaseSourceCrisszolloRef.current?.getViewRef()}
+              >
+                {(focused) => (
+                  <>
+                    <View style={styles.settingInfo}>
+                      <Text style={[
+                        styles.settingLabel,
+                        { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                      ]}>
+                        {GITHUB_RELEASE_SOURCES.tapframe.label}
+                      </Text>
+                      <Text style={[
+                        styles.settingDescription,
+                        { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                      ]}>
+                        Main repository for mobile devices
+                      </Text>
+                    </View>
+                    <View style={styles.radioContainer}>
+                      <View style={[
+                        styles.radioOuter,
+                        { borderColor: focused ? '#000' : (releaseSource === 'tapframe' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis) }
+                      ]}>
+                        {releaseSource === 'tapframe' && (
+                          <View style={[
+                            styles.radioInner,
+                            { backgroundColor: focused ? '#000' : currentTheme.colors.primary }
+                          ]} />
+                        )}
+                      </View>
+                    </View>
+                  </>
+                )}
+              </Focusable>
+            ) : (
+              <TouchableOpacity
+                style={styles.settingRow}
+                onPress={() => handleReleaseSourceChange('tapframe')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
+                    {GITHUB_RELEASE_SOURCES.tapframe.label}
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Main repository for mobile devices
+                  </Text>
+                </View>
+                <View style={styles.radioContainer}>
+                  <View style={[
+                    styles.radioOuter,
+                    { borderColor: releaseSource === 'tapframe' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis }
+                  ]}>
+                    {releaseSource === 'tapframe' && (
+                      <View style={[styles.radioInner, { backgroundColor: currentTheme.colors.primary }]} />
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* CrissZollo Option */}
+            {isTV ? (
+              <Focusable
+                ref={releaseSourceCrisszolloRef}
+                onPress={() => handleReleaseSourceChange('crisszollo')}
+                style={[styles.settingRow, { borderBottomWidth: 0 }]}
+                borderRadius={8}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+                nextFocusUp={releaseSourceTapframeRef.current?.getViewRef()}
+              >
+                {(focused) => (
+                  <>
+                    <View style={styles.settingInfo}>
+                      <Text style={[
+                        styles.settingLabel,
+                        { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                      ]}>
+                        {GITHUB_RELEASE_SOURCES.crisszollo.label}
+                      </Text>
+                      <Text style={[
+                        styles.settingDescription,
+                        { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                      ]}>
+                        Optimized for Android TV devices
+                      </Text>
+                    </View>
+                    <View style={styles.radioContainer}>
+                      <View style={[
+                        styles.radioOuter,
+                        { borderColor: focused ? '#000' : (releaseSource === 'crisszollo' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis) }
+                      ]}>
+                        {releaseSource === 'crisszollo' && (
+                          <View style={[
+                            styles.radioInner,
+                            { backgroundColor: focused ? '#000' : currentTheme.colors.primary }
+                          ]} />
+                        )}
+                      </View>
+                    </View>
+                  </>
+                )}
+              </Focusable>
+            ) : (
+              <TouchableOpacity
+                style={[styles.settingRow, { borderBottomWidth: 0 }]}
+                onPress={() => handleReleaseSourceChange('crisszollo')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.settingInfo}>
+                  <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
+                    {GITHUB_RELEASE_SOURCES.crisszollo.label}
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Optimized for Android TV devices
+                  </Text>
+                </View>
+                <View style={styles.radioContainer}>
+                  <View style={[
+                    styles.radioOuter,
+                    { borderColor: releaseSource === 'crisszollo' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis }
+                  ]}>
+                    {releaseSource === 'crisszollo' && (
+                      <View style={[styles.radioInner, { backgroundColor: currentTheme.colors.primary }]} />
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
           </SettingsCard>
 
           {false && (
@@ -1351,6 +1534,27 @@ const styles = StyleSheet.create({
   },
   tvSwitchThumbOff: {
     left: 0,
+  },
+
+  // Radio button styles
+  radioContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
 });
 
