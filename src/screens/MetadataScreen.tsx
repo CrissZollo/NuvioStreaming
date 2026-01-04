@@ -1192,7 +1192,7 @@ const MetadataScreen: React.FC = () => {
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
                         <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Tagline</Text>
                         <Text style={[styles.tvDetailValue, { fontStyle: 'italic', fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                          "{metadata.movieDetails.tagline}"
+                          {`"${metadata.movieDetails.tagline}"`}
                         </Text>
                       </View>
                     )}
@@ -1277,7 +1277,7 @@ const MetadataScreen: React.FC = () => {
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
                         <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Tagline</Text>
                         <Text style={[styles.tvDetailValue, { fontStyle: 'italic', fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                          "{metadata.movieDetails.tagline}"
+                          {`"${metadata.movieDetails.tagline}"`}
                         </Text>
                       </View>
                     )}
