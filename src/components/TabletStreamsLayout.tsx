@@ -13,13 +13,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView as ExpoBlurView } from 'expo-blur';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
   withTiming,
   withDelay,
   Easing
 } from 'react-native-reanimated';
+import { useIsTV } from '../contexts/TVContext';
 
 // Lazy-safe community blur import for Android
 let AndroidBlurView: any = null;
@@ -123,7 +124,8 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
   hasStremioStreamProviders,
 }) => {
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  
+  const isTVDevice = useIsTV();
+
   // Animation values for backdrop entrance
   const backdropOpacity = useSharedValue(0);
   const backdropScale = useSharedValue(1.05);
@@ -441,7 +443,56 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
 
       {/* Right Panel: Streams List */}
       <Animated.View style={[styles.tabletRightPanel, rightPanelAnimatedStyle]}>
-        {Platform.OS === 'android' && AndroidBlurView ? (
+        {isTVDevice ? (
+          // TV: Use simple semi-transparent background instead of blur (blur doesn't work well on Android TV)
+          <View style={[
+            styles.streamsMainContent,
+            styles.tabletStreamsContent,
+            styles.tabletStreamsContentTV,
+            type === 'movie' && styles.streamsMainContentMovie
+          ]}>
+            <View style={styles.tabletBlurContent}>
+              {/* Always show filter container to prevent layout shift */}
+              <View style={[styles.filterContainer]}>
+                {!streamsEmpty && (
+                  <ProviderFilter
+                    selectedProvider={selectedProvider}
+                    providers={filterItems}
+                    onSelect={handleProviderChange}
+                    theme={currentTheme}
+                  />
+                )}
+              </View>
+
+              {/* Active Scrapers Status */}
+              {activeFetchingScrapers.length > 0 && (
+                <View style={styles.activeScrapersContainer}>
+                  <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
+                  <View style={styles.activeScrapersRow}>
+                    {activeFetchingScrapers.map((scraperName, index) => (
+                      <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Stream content area */}
+              <View collapsable={false} style={{ flex: 1 }}>
+                {/* Show autoplay loading overlay if waiting for autoplay */}
+                {isAutoplayWaiting && !autoplayTriggered && (
+                  <View style={styles.autoplayOverlay}>
+                    <View style={styles.autoplayIndicator}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={styles.autoplayText}>Starting best stream...</Text>
+                    </View>
+                  </View>
+                )}
+
+                {renderStreamContent()}
+              </View>
+            </View>
+          </View>
+        ) : Platform.OS === 'android' && AndroidBlurView ? (
           <View style={[
             styles.streamsMainContent,
             styles.tabletStreamsContent,
@@ -793,6 +844,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 24,
     margin: 12,
     overflow: 'hidden', // Ensures content respects rounded corners
+  },
+  tabletStreamsContentTV: {
+    // TV: Use solid semi-transparent background since blur doesn't work well on Android TV
+    backgroundColor: 'rgba(15, 15, 15, 0.95)',
   },
   tabletBlurContent: {
     flex: 1,
