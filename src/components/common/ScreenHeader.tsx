@@ -10,6 +10,8 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -85,6 +87,7 @@ const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 }) => {
     const { currentTheme } = useTheme();
     const insets = useSafeAreaInsets();
+    const isTVDevice = useIsTV();
 
     // Calculate header spacing
     const topSpacing =
@@ -131,17 +134,35 @@ const ScreenHeader: React.FC<ScreenHeaderProps> = ({
                     >
                         <View style={styles.headerContent}>
                             {showBackButton ? (
-                                <TouchableOpacity
-                                    style={styles.backButton}
-                                    onPress={onBackPress}
-                                    activeOpacity={0.7}
-                                >
-                                    <IconComponent
-                                        name={backIconName as any}
-                                        size={24}
-                                        color={currentTheme.colors.text}
-                                    />
-                                </TouchableOpacity>
+                                isTVDevice ? (
+                                    <Focusable
+                                        style={styles.backButton}
+                                        onPress={onBackPress}
+                                        borderRadius={8}
+                                        focusScale={1.1}
+                                        showFocusBorder={true}
+                                    >
+                                        {(focused) => (
+                                            <IconComponent
+                                                name={backIconName as any}
+                                                size={24}
+                                                color={focused ? currentTheme.colors.primary : currentTheme.colors.text}
+                                            />
+                                        )}
+                                    </Focusable>
+                                ) : (
+                                    <TouchableOpacity
+                                        style={styles.backButton}
+                                        onPress={onBackPress}
+                                        activeOpacity={0.7}
+                                    >
+                                        <IconComponent
+                                            name={backIconName as any}
+                                            size={24}
+                                            color={currentTheme.colors.text}
+                                        />
+                                    </TouchableOpacity>
+                                )
                             ) : null}
 
                             {titleComponent ? (
@@ -164,17 +185,35 @@ const ScreenHeader: React.FC<ScreenHeaderProps> = ({
                             {rightActionComponent ? (
                                 <View style={styles.rightActionContainer}>{rightActionComponent}</View>
                             ) : rightActionIcon && onRightActionPress ? (
-                                <TouchableOpacity
-                                    style={styles.rightActionButton}
-                                    onPress={onRightActionPress}
-                                    activeOpacity={0.7}
-                                >
-                                    <IconComponent
-                                        name={rightActionIcon as any}
-                                        size={24}
-                                        color={currentTheme.colors.text}
-                                    />
-                                </TouchableOpacity>
+                                isTVDevice ? (
+                                    <Focusable
+                                        style={styles.rightActionButton}
+                                        onPress={onRightActionPress}
+                                        borderRadius={8}
+                                        focusScale={1.1}
+                                        showFocusBorder={true}
+                                    >
+                                        {(focused) => (
+                                            <IconComponent
+                                                name={rightActionIcon as any}
+                                                size={24}
+                                                color={focused ? currentTheme.colors.primary : currentTheme.colors.text}
+                                            />
+                                        )}
+                                    </Focusable>
+                                ) : (
+                                    <TouchableOpacity
+                                        style={styles.rightActionButton}
+                                        onPress={onRightActionPress}
+                                        activeOpacity={0.7}
+                                    >
+                                        <IconComponent
+                                            name={rightActionIcon as any}
+                                            size={24}
+                                            color={currentTheme.colors.text}
+                                        />
+                                    </TouchableOpacity>
+                                )
                             ) : (
                                 <View style={styles.rightActionPlaceholder} />
                             )}

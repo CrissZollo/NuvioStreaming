@@ -38,6 +38,8 @@ import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { traktService, TraktService, TraktImages } from '../services/traktService';
 import { TraktLoadingSpinner } from '../components/common/TraktLoadingSpinner';
 import { useSettings } from '../hooks/useSettings';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from '../components/tv/Focusable';
 
 interface LibraryItem extends StreamingContent {
   progress?: number;
@@ -72,15 +74,25 @@ interface TraktFolder {
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
-function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: number } {
-  const horizontalPadding = 16;
-  const gutter = 12;
+function getGridLayout(screenWidth: number, isTV: boolean = false): { numColumns: number; itemWidth: number } {
+  const horizontalPadding = isTV ? 24 : 16;
+  const gutter = isTV ? 16 : 12;
   let numColumns = 3;
-  if (screenWidth >= 1200) numColumns = 5;
-  else if (screenWidth >= 1000) numColumns = 4;
-  else if (screenWidth >= 700) numColumns = 3;
-  else numColumns = 3;
-  const available = screenWidth - horizontalPadding - (numColumns - 1) * gutter;
+
+  if (isTV) {
+    // TV needs more columns for smaller posters
+    if (screenWidth >= 1920) numColumns = 8;
+    else if (screenWidth >= 1440) numColumns = 7;
+    else if (screenWidth >= 1280) numColumns = 6;
+    else numColumns = 5;
+  } else {
+    if (screenWidth >= 1200) numColumns = 5;
+    else if (screenWidth >= 1000) numColumns = 4;
+    else if (screenWidth >= 700) numColumns = 3;
+    else numColumns = 3;
+  }
+
+  const available = screenWidth - horizontalPadding * 2 - (numColumns - 1) * gutter;
   const itemWidth = Math.floor(available / numColumns);
   return { numColumns, itemWidth };
 }
@@ -90,13 +102,15 @@ const TraktItem = React.memo(({
   width,
   navigation,
   currentTheme,
-  showTitles
+  showTitles,
+  isTVDevice
 }: {
   item: TraktDisplayItem;
   width: number;
   navigation: any;
   currentTheme: any;
   showTitles: boolean;
+  isTVDevice?: boolean;
 }) => {
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
 
@@ -120,6 +134,40 @@ const TraktItem = React.memo(({
     }
   }, [navigation, item.imdbId, item.type]);
 
+  const posterContent = posterUrl ? (
+    <FastImage
+      source={{ uri: posterUrl }}
+      style={styles.poster}
+      resizeMode={FastImage.resizeMode.cover}
+    />
+  ) : (
+    <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
+      <ActivityIndicator color={currentTheme.colors.primary} />
+    </View>
+  );
+
+  if (isTVDevice) {
+    return (
+      <View style={[styles.itemContainer, { width, overflow: 'visible', paddingTop: 4 }]}>
+        <Focusable
+          onPress={handlePress}
+          style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}
+          borderRadius={12}
+          focusScale={1.05}
+          animateBackground={false}
+          showFocusBorder={true}
+        >
+          {posterContent}
+        </Focusable>
+        {showTitles && (
+          <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis, marginTop: 8 }]}>
+            {item.name}
+          </Text>
+        )}
+      </View>
+    );
+  }
+
   return (
     <TouchableOpacity
       style={[styles.itemContainer, { width }]}
@@ -128,17 +176,7 @@ const TraktItem = React.memo(({
     >
       <View>
         <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
-          {posterUrl ? (
-            <FastImage
-              source={{ uri: posterUrl }}
-              style={styles.poster}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-          ) : (
-            <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
-              <ActivityIndicator color={currentTheme.colors.primary} />
-            </View>
-          )}
+          {posterContent}
         </View>
         {showTitles && (
           <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
@@ -153,7 +191,8 @@ const TraktItem = React.memo(({
 const SkeletonLoader = () => {
   const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
   const { width, height } = useWindowDimensions();
-  const { numColumns, itemWidth } = getGridLayout(width);
+  const isTVDevice = useIsTV();
+  const { numColumns, itemWidth } = getGridLayout(width, isTVDevice);
   const { currentTheme } = useTheme();
 
   React.useEffect(() => {
@@ -212,8 +251,9 @@ const SkeletonLoader = () => {
 const LibraryScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
+  const isTVDevice = useIsTV();
   const { width, height } = useWindowDimensions();
-  const { numColumns, itemWidth } = useMemo(() => getGridLayout(width), [width]);
+  const { numColumns, itemWidth } = useMemo(() => getGridLayout(width, isTVDevice), [width, isTVDevice]);
   const [loading, setLoading] = useState(true);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [filter, setFilter] = useState<'trakt' | 'movies' | 'series'>('movies');
@@ -385,112 +425,218 @@ const LibraryScreen = () => {
     return folders.filter(folder => folder.itemCount > 0);
   }, [traktAuthenticated, watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
 
-  const renderItem = ({ item }: { item: LibraryItem }) => (
-    <TouchableOpacity
-      style={[styles.itemContainer, { width: itemWidth }]}
-      onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
-      onLongPress={() => {
-        setSelectedItem(item);
-        setMenuVisible(true);
-      }}
-      activeOpacity={0.7}
-    >
-      <View>
-        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
-          <FastImage
-            source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
-            style={styles.poster}
-            resizeMode={FastImage.resizeMode.cover}
-          />
-          {item.watched && (
-            <View style={styles.watchedIndicator}>
-              <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success || '#4CAF50'} />
-            </View>
-          )}
-          {item.progress !== undefined && item.progress < 1 && (
-            <View style={styles.progressBarContainer}>
-              <View
-                style={[
-                  styles.progressBar,
-                  { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
-                ]}
-              />
-            </View>
-          )}
-        </View>
-        {settings.showPosterTitles && (
-          <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
-            {item.name}
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderTraktCollectionFolder = ({ folder }: { folder: TraktFolder }) => (
-    <TouchableOpacity
-      style={[styles.itemContainer, { width: itemWidth }]}
-      onPress={() => {
-        setSelectedTraktFolder(folder.id);
-        loadAllCollections();
-      }}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
-        <View style={styles.folderGradient}>
-          <MaterialIcons
-            name={folder.icon}
-            size={48}
-            color={currentTheme.colors.white}
-            style={{ marginBottom: 8 }}
-          />
-          <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
-            {folder.name}
-          </Text>
-          <Text style={styles.folderCount}>
-            {folder.itemCount} items
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderTraktFolder = () => (
-    <TouchableOpacity
-      style={[styles.itemContainer, { width: itemWidth }]}
-      onPress={() => {
-        if (!traktAuthenticated) {
-          navigation.navigate('TraktSettings');
-        } else {
-          setShowTraktContent(true);
-          setSelectedTraktFolder(null);
-          loadAllCollections();
-        }
-      }}
-      activeOpacity={0.7}
-    >
-      <View>
-        <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
-          <View style={styles.folderGradient}>
-            <TraktIcon width={48} height={48} style={{ marginBottom: 8 }} />
-            <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
-              Trakt
-            </Text>
-            {traktAuthenticated && traktFolders.length > 0 && (
-              <Text style={styles.folderCount}>
-                {traktFolders.length} items
-              </Text>
-            )}
+  const renderItem = ({ item, index }: { item: LibraryItem; index?: number }) => {
+    const posterContent = (
+      <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
+        <FastImage
+          source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+          style={styles.poster}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+        {item.watched && (
+          <View style={styles.watchedIndicator}>
+            <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success || '#4CAF50'} />
           </View>
+        )}
+        {item.progress !== undefined && item.progress < 1 && (
+          <View style={styles.progressBarContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
+              ]}
+            />
+          </View>
+        )}
+      </View>
+    );
+
+    if (isTVDevice) {
+      return (
+        <View style={[styles.itemContainer, { width: itemWidth, overflow: 'visible', paddingTop: 4 }]}>
+          <Focusable
+            onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+            onLongPress={() => {
+              setSelectedItem(item);
+              setMenuVisible(true);
+            }}
+            style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}
+            borderRadius={12}
+            focusScale={1.05}
+            animateBackground={false}
+            showFocusBorder={true}
+          >
+            <FastImage
+              source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+              style={styles.poster}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+            {item.watched && (
+              <View style={styles.watchedIndicator}>
+                <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success || '#4CAF50'} />
+              </View>
+            )}
+            {item.progress !== undefined && item.progress < 1 && (
+              <View style={styles.progressBarContainer}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
+                  ]}
+                />
+              </View>
+            )}
+          </Focusable>
+          {settings.showPosterTitles && (
+            <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis, marginTop: 8 }]}>
+              {item.name}
+            </Text>
+          )}
         </View>
-        {settings.showPosterTitles && (
-          <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
-            Trakt collections
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={[styles.itemContainer, { width: itemWidth }]}
+        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+        onLongPress={() => {
+          setSelectedItem(item);
+          setMenuVisible(true);
+        }}
+        activeOpacity={0.7}
+      >
+        <View>
+          {posterContent}
+          {settings.showPosterTitles && (
+            <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+              {item.name}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderTraktCollectionFolder = ({ folder }: { folder: TraktFolder }) => {
+    const handlePress = () => {
+      setSelectedTraktFolder(folder.id);
+      loadAllCollections();
+    };
+
+    const folderContent = (
+      <View style={styles.folderGradient}>
+        <MaterialIcons
+          name={folder.icon}
+          size={48}
+          color={currentTheme.colors.white}
+          style={{ marginBottom: 8 }}
+        />
+        <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
+          {folder.name}
+        </Text>
+        <Text style={styles.folderCount}>
+          {folder.itemCount} items
+        </Text>
+      </View>
+    );
+
+    if (isTVDevice) {
+      return (
+        <View style={[styles.itemContainer, { width: itemWidth, overflow: 'visible', paddingTop: 4 }]}>
+          <Focusable
+            onPress={handlePress}
+            style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}
+            borderRadius={12}
+            focusScale={1.05}
+            animateBackground={false}
+            showFocusBorder={true}
+          >
+            {folderContent}
+          </Focusable>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={[styles.itemContainer, { width: itemWidth }]}
+        onPress={handlePress}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
+          {folderContent}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderTraktFolder = () => {
+    const handlePress = () => {
+      if (!traktAuthenticated) {
+        navigation.navigate('TraktSettings');
+      } else {
+        setShowTraktContent(true);
+        setSelectedTraktFolder(null);
+        loadAllCollections();
+      }
+    };
+
+    const folderContent = (
+      <View style={styles.folderGradient}>
+        <TraktIcon width={48} height={48} style={{ marginBottom: 8 }} />
+        <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
+          Trakt
+        </Text>
+        {traktAuthenticated && traktFolders.length > 0 && (
+          <Text style={styles.folderCount}>
+            {traktFolders.length} items
           </Text>
         )}
       </View>
-    </TouchableOpacity>
-  );
+    );
+
+    if (isTVDevice) {
+      return (
+        <View style={[styles.itemContainer, { width: itemWidth, overflow: 'visible', paddingTop: 4 }]}>
+          <Focusable
+            onPress={handlePress}
+            style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}
+            borderRadius={12}
+            focusScale={1.05}
+            animateBackground={false}
+            showFocusBorder={true}
+          >
+            {folderContent}
+          </Focusable>
+          {settings.showPosterTitles && (
+            <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis, marginTop: 8 }]}>
+              Trakt collections
+            </Text>
+          )}
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={[styles.itemContainer, { width: itemWidth }]}
+        onPress={handlePress}
+        activeOpacity={0.7}
+      >
+        <View>
+          <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
+            {folderContent}
+          </View>
+          {settings.showPosterTitles && (
+            <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+              Trakt collections
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderTraktItem = useCallback(({ item }: { item: TraktDisplayItem }) => {
     return <TraktItem
@@ -499,8 +645,9 @@ const LibraryScreen = () => {
       navigation={navigation}
       currentTheme={currentTheme}
       showTitles={settings.showPosterTitles}
+      isTVDevice={isTVDevice}
     />;
-  }, [itemWidth, navigation, currentTheme, settings.showPosterTitles]);
+  }, [itemWidth, navigation, currentTheme, settings.showPosterTitles, isTVDevice]);
 
   const getTraktFolderItems = useCallback((folderId: string): TraktDisplayItem[] => {
     const items: TraktDisplayItem[] = [];
@@ -787,40 +934,36 @@ const LibraryScreen = () => {
     );
   };
 
-  const renderFilter = (filterType: 'trakt' | 'movies' | 'series', label: string, iconName: keyof typeof MaterialIcons.glyphMap) => {
+  const renderFilter = (filterType: 'trakt' | 'movies' | 'series', label: string, iconName: keyof typeof MaterialIcons.glyphMap, index: number, totalFilters: number) => {
     const isActive = filter === filterType;
+    const isFirst = index === 0;
+    const isLast = index === totalFilters - 1;
 
-    return (
-      <TouchableOpacity
-        style={[
-          styles.filterButton,
-          isActive && { backgroundColor: currentTheme.colors.primary },
-          { shadowColor: currentTheme.colors.black }
-        ]}
-        onPress={() => {
-          if (filterType === 'trakt') {
-            if (!traktAuthenticated) {
-              navigation.navigate('TraktSettings');
-            } else {
-              setShowTraktContent(true);
-              setSelectedTraktFolder(null);
-              loadAllCollections();
-            }
-            return;
-          }
-          setFilter(filterType);
-        }}
-        activeOpacity={0.7}
-      >
+    const handlePress = () => {
+      if (filterType === 'trakt') {
+        if (!traktAuthenticated) {
+          navigation.navigate('TraktSettings');
+        } else {
+          setShowTraktContent(true);
+          setSelectedTraktFolder(null);
+          loadAllCollections();
+        }
+        return;
+      }
+      setFilter(filterType);
+    };
+
+    const filterContent = (focused?: boolean) => (
+      <>
         {filterType === 'trakt' ? (
           <View style={[styles.filterIcon, { justifyContent: 'center', alignItems: 'center' }]}>
-            <TraktIcon width={18} height={18} style={{ opacity: isActive ? 1 : 0.6 }} />
+            <TraktIcon width={18} height={18} style={{ opacity: isActive || focused ? 1 : 0.6 }} />
           </View>
         ) : (
           <MaterialIcons
             name={iconName}
             size={22}
-            color={isActive ? currentTheme.colors.white : currentTheme.colors.mediumGray}
+            color={isActive || focused ? currentTheme.colors.white : currentTheme.colors.mediumGray}
             style={styles.filterIcon}
           />
         )}
@@ -828,11 +971,50 @@ const LibraryScreen = () => {
           style={[
             styles.filterText,
             { color: currentTheme.colors.mediumGray },
-            isActive && { color: currentTheme.colors.white, fontWeight: '600' }
+            (isActive || focused) && { color: currentTheme.colors.white, fontWeight: '600' }
           ]}
         >
           {label}
         </Text>
+      </>
+    );
+
+    if (isTVDevice) {
+      return (
+        <Focusable
+          key={filterType}
+          style={[
+            styles.filterButton,
+            isActive && { backgroundColor: currentTheme.colors.primary },
+            { shadowColor: currentTheme.colors.black },
+            isTVDevice && { paddingVertical: 12, paddingHorizontal: 20 }
+          ]}
+          onPress={handlePress}
+          borderRadius={24}
+          focusScale={1.05}
+          animateBackground={false}
+          showFocusBorder={true}
+          blockLeft={isFirst}
+          blockRight={isLast}
+          autoFocus={isFirst}
+        >
+          {(focused) => filterContent(focused)}
+        </Focusable>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        key={filterType}
+        style={[
+          styles.filterButton,
+          isActive && { backgroundColor: currentTheme.colors.primary },
+          { shadowColor: currentTheme.colors.black }
+        ]}
+        onPress={handlePress}
+        activeOpacity={0.7}
+      >
+        {filterContent()}
       </TouchableOpacity>
     );
   };
@@ -917,9 +1099,9 @@ const LibraryScreen = () => {
       <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
         {!showTraktContent && (
           <View style={styles.filtersContainer}>
-            {renderFilter('trakt', 'Trakt', 'pan-tool')}
-            {renderFilter('movies', 'Movies', 'movie')}
-            {renderFilter('series', 'TV Shows', 'live-tv')}
+            {renderFilter('trakt', 'Trakt', 'pan-tool', 0, 3)}
+            {renderFilter('movies', 'Movies', 'movie', 1, 3)}
+            {renderFilter('series', 'TV Shows', 'live-tv', 2, 3)}
           </View>
         )}
 

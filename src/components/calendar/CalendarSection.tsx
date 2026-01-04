@@ -1,17 +1,19 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Dimensions 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Dimensions
 } from 'react-native';
 import { InteractionManager } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useIsTV } from '../../contexts/TVContext';
+import { Focusable } from '../tv/Focusable';
 
 const { width } = Dimensions.get('window');
 const COLUMN_COUNT = 7; // 7 days in a week
@@ -36,6 +38,8 @@ interface DayItemProps {
 interface CalendarSectionProps {
   episodes?: CalendarEpisode[];
   onSelectDate?: (date: Date) => void;
+  /** Called when any calendar element receives focus (TV only) */
+  onFocus?: () => void;
 }
 
 const DayItem = ({ 
@@ -72,11 +76,13 @@ const DayItem = ({
 );
 };
 
-export const CalendarSection: React.FC<CalendarSectionProps> = ({ 
-  episodes = [], 
-  onSelectDate 
+export const CalendarSection: React.FC<CalendarSectionProps> = ({
+  episodes = [],
+  onSelectDate,
+  onFocus
 }) => {
   const { currentTheme } = useTheme();
+  const isTVDevice = useIsTV();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -127,13 +133,13 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
     const days = eachDayOfInterval({ start, end });
-    
+
     // Get the day of the week for the first day (0-6)
     const firstDayOfWeek = start.getDay();
 
     // Add empty days at the start
     const emptyDays = Array(firstDayOfWeek).fill(null);
-    
+
     // Calculate remaining days to fill the last row
     const totalDays = emptyDays.length + days.length;
     const remainingDays = 7 - (totalDays % 7);
@@ -145,18 +151,61 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     for (let i = 0; i < allDays.length; i += 7) {
       weeks.push(allDays.slice(i, i + 7));
     }
-    
+
     return weeks.map((week, weekIndex) => (
-      <View key={weekIndex} style={styles.weekRow}>
+      <View key={weekIndex} style={[styles.weekRow, isTVDevice && styles.weekRowTV]}>
         {week.map((day, dayIndex) => {
           if (!day) {
-            return <View key={`empty-${dayIndex}`} style={styles.emptyDay} />;
+            return <View key={`empty-${dayIndex}`} style={[styles.emptyDay, isTVDevice && styles.emptyDayTV]} />;
           }
 
           const isCurrentMonth = isSameMonth(day, currentDate);
           const isCurrentDay = isToday(day);
           const isSelected = selectedDate && isSameDay(day, selectedDate);
           const hasEvents = datesWithEpisodes[format(day, 'yyyy-MM-dd')] || false;
+
+          const dayContent = (focused?: boolean) => (
+            <>
+              <Text
+                style={[
+                  styles.dayText,
+                  isTVDevice && styles.dayTextTV,
+                  { color: currentTheme.colors.text },
+                  !isCurrentMonth && { color: currentTheme.colors.lightGray + '80' },
+                  isCurrentDay && [styles.todayText, { color: currentTheme.colors.primary }],
+                  isSelected && [styles.selectedDayText, { color: currentTheme.colors.text }],
+                  focused && { color: currentTheme.colors.primary }
+                ]}
+              >
+                {format(day, 'd')}
+              </Text>
+              {hasEvents && (
+                <View style={[styles.eventDot, { backgroundColor: currentTheme.colors.primary }]} />
+              )}
+            </>
+          );
+
+          if (isTVDevice) {
+            return (
+              <Focusable
+                key={day.toISOString()}
+                style={[
+                  styles.dayButton,
+                  styles.dayButtonTV,
+                  isCurrentDay && [styles.todayItem, { backgroundColor: currentTheme.colors.primary + '30', borderColor: currentTheme.colors.primary }],
+                  isSelected && [styles.selectedItem, { backgroundColor: currentTheme.colors.primary + '60', borderColor: currentTheme.colors.primary }],
+                  hasEvents && styles.dayWithEvents
+                ]}
+                onPress={() => handleDateSelect(day)}
+                onFocus={onFocus}
+                borderRadius={24}
+                focusScale={1.1}
+                showFocusBorder={true}
+              >
+                {(focused) => dayContent(focused)}
+              </Focusable>
+            );
+          }
 
           return (
             <TouchableOpacity
@@ -169,20 +218,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
               ]}
               onPress={() => handleDateSelect(day)}
             >
-              <Text
-                style={[
-                  styles.dayText,
-                  { color: currentTheme.colors.text },
-                  !isCurrentMonth && { color: currentTheme.colors.lightGray + '80' },
-                  isCurrentDay && [styles.todayText, { color: currentTheme.colors.primary }],
-                  isSelected && [styles.selectedDayText, { color: currentTheme.colors.text }]
-                ]}
-              >
-                {format(day, 'd')}
-              </Text>
-              {hasEvents && (
-                <View style={[styles.eventDot, { backgroundColor: currentTheme.colors.primary }]} />
-              )}
+              {dayContent()}
             </TouchableOpacity>
           );
         })}
@@ -192,24 +228,54 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-      <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
-        <TouchableOpacity 
-          onPress={goToPreviousMonth}
-          style={styles.headerButton}
-        >
-          <MaterialIcons name="chevron-left" size={24} color={currentTheme.colors.text} />
-        </TouchableOpacity>
-        
-        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
+      <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }, isTVDevice && styles.headerTV]}>
+        {isTVDevice ? (
+          <Focusable
+            onPress={goToPreviousMonth}
+            onFocus={onFocus}
+            style={styles.headerButton}
+            borderRadius={20}
+            focusScale={1.1}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <MaterialIcons name="chevron-left" size={28} color={focused ? currentTheme.colors.primary : currentTheme.colors.text} />
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            onPress={goToPreviousMonth}
+            style={styles.headerButton}
+          >
+            <MaterialIcons name="chevron-left" size={24} color={currentTheme.colors.text} />
+          </TouchableOpacity>
+        )}
+
+        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }, isTVDevice && styles.headerTitleTV]}>
           {format(currentDate, 'MMMM yyyy')}
         </Text>
-        
-        <TouchableOpacity 
-          onPress={goToNextMonth}
-          style={styles.headerButton}
-        >
-          <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.text} />
-        </TouchableOpacity>
+
+        {isTVDevice ? (
+          <Focusable
+            onPress={goToNextMonth}
+            onFocus={onFocus}
+            style={styles.headerButton}
+            borderRadius={20}
+            focusScale={1.1}
+            showFocusBorder={true}
+          >
+            {(focused) => (
+              <MaterialIcons name="chevron-right" size={28} color={focused ? currentTheme.colors.primary : currentTheme.colors.text} />
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            onPress={goToNextMonth}
+            style={styles.headerButton}
+          >
+            <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.text} />
+          </TouchableOpacity>
+        )}
       </View>
       
       <View style={styles.weekDaysContainer}>
@@ -312,5 +378,28 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
+  },
+  // TV-specific styles
+  headerTV: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  headerTitleTV: {
+    fontSize: 20,
+  },
+  weekRowTV: {
+    marginBottom: 12,
+  },
+  dayButtonTV: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  dayTextTV: {
+    fontSize: 16,
+  },
+  emptyDayTV: {
+    width: 48,
+    height: 48,
   },
 }); 

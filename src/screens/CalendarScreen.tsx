@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   StatusBar,
   Dimensions,
   SectionList,
-  Platform
+  Platform,
+  ScrollView
 } from 'react-native';
 import { InteractionManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -30,6 +31,8 @@ import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { memoryManager } from '../utils/memoryManager';
 import { useCalendarData } from '../hooks/useCalendarData';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from '../components/tv/Focusable';
 
 const { width } = Dimensions.get('window');
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
@@ -59,6 +62,25 @@ const CalendarScreen = () => {
   const { libraryItems, loading: libraryLoading } = useLibrary();
   const { currentTheme } = useTheme();
   const { calendarData, loading, refresh } = useCalendarData();
+  const isTVDevice = useIsTV();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const episodeListRef = useRef<View>(null);
+  const [calendarHeight, setCalendarHeight] = useState(0);
+
+  // Scroll to show episode list when an episode gets focus on TV
+  const handleEpisodeFocus = useCallback(() => {
+    if (isTVDevice && scrollViewRef.current && calendarHeight > 0) {
+      // Scroll down to show the episode list, keeping the header visible
+      scrollViewRef.current.scrollTo({ y: calendarHeight - 50, animated: true });
+    }
+  }, [isTVDevice, calendarHeight]);
+
+  // Scroll back up when calendar gets focus on TV
+  const handleCalendarFocus = useCallback(() => {
+    if (isTVDevice && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: 0, animated: true });
+    }
+  }, [isTVDevice]);
   const {
     isAuthenticated: traktAuthenticated,
     isLoading: traktLoading,
@@ -114,22 +136,106 @@ const CalendarScreen = () => {
     });
   }, [navigation, handleSeriesPress]);
   
-  const renderEpisodeItem = ({ item }: { item: CalendarEpisode }) => {
+  const renderEpisodeItem = ({ item, index }: { item: CalendarEpisode; index?: number }) => {
     const hasReleaseDate = !!item.releaseDate;
     const releaseDate = hasReleaseDate ? parseISO(item.releaseDate) : null;
     const formattedDate = releaseDate ? format(releaseDate, 'MMM d, yyyy') : '';
     const isFuture = releaseDate ? isAfter(releaseDate, new Date()) : false;
-    
+
     // Use episode still image if available, fallback to series poster
-    const imageUrl = item.still_path ? 
-      tmdbService.getImageUrl(item.still_path) : 
-      (item.season_poster_path ? 
-        tmdbService.getImageUrl(item.season_poster_path) : 
+    const imageUrl = item.still_path ?
+      tmdbService.getImageUrl(item.still_path) :
+      (item.season_poster_path ?
+        tmdbService.getImageUrl(item.season_poster_path) :
         item.poster);
-    
+
+    const episodeContent = (focused?: boolean) => (
+      <>
+        <FastImage
+          source={{ uri: imageUrl || '' }}
+          style={[styles.poster, isTVDevice && styles.posterTV]}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+
+        <View style={[styles.episodeDetails, isTVDevice && styles.episodeDetailsTV]}>
+          <Text style={[styles.seriesName, { color: focused ? currentTheme.colors.primary : currentTheme.colors.text }, isTVDevice && styles.seriesNameTV]} numberOfLines={1}>
+            {item.seriesName}
+          </Text>
+
+          {hasReleaseDate ? (
+            <>
+              <Text style={[styles.episodeTitle, { color: currentTheme.colors.lightGray }, isTVDevice && styles.episodeTitleTV]} numberOfLines={2}>
+                S{item.season}:E{item.episode} - {item.title}
+              </Text>
+
+              {item.overview && !isTVDevice ? (
+                <Text style={[styles.overview, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
+                  {item.overview}
+                </Text>
+              ) : null}
+
+              <View style={styles.metadataContainer}>
+                <View style={styles.dateContainer}>
+                  <MaterialIcons
+                    name={isFuture ? "event" : "event-available"}
+                    size={isTVDevice ? 14 : 16}
+                    color={currentTheme.colors.lightGray}
+                  />
+                  <Text style={[styles.date, { color: currentTheme.colors.lightGray }, isTVDevice && styles.dateTV]}>{formattedDate}</Text>
+                </View>
+
+                {item.vote_average > 0 && (
+                  <View style={styles.ratingContainer}>
+                    <MaterialIcons
+                      name="star"
+                      size={isTVDevice ? 14 : 16}
+                      color={currentTheme.colors.primary}
+                    />
+                    <Text style={[styles.rating, { color: currentTheme.colors.primary }, isTVDevice && styles.ratingTV]}>
+                      {item.vote_average.toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.noEpisodesText, { color: currentTheme.colors.text }]}>
+                No scheduled episodes
+              </Text>
+              <View style={styles.dateContainer}>
+                <MaterialIcons
+                  name="event-busy"
+                  size={isTVDevice ? 14 : 16}
+                  color={currentTheme.colors.lightGray}
+                />
+                <Text style={[styles.date, { color: currentTheme.colors.lightGray }, isTVDevice && styles.dateTV]}>Check back later</Text>
+              </View>
+            </>
+          )}
+        </View>
+      </>
+    );
+
+    if (isTVDevice) {
+      return (
+        <Focusable
+          style={[styles.episodeItem, styles.episodeItemTV, { borderBottomColor: currentTheme.colors.border + '20' }]}
+          onPress={() => handleEpisodePress(item)}
+          onFocus={handleEpisodeFocus}
+          borderRadius={8}
+          focusScale={1.02}
+          showFocusBorder={true}
+          autoFocus={index === 0}
+        >
+          {(focused) => episodeContent(focused)}
+        </Focusable>
+      );
+    }
+
     return (
       <Animated.View entering={FadeIn.duration(300).delay(100)}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.episodeItem, { borderBottomColor: currentTheme.colors.border + '20' }]}
           onPress={() => handleEpisodePress(item)}
           activeOpacity={0.7}
@@ -144,40 +250,40 @@ const CalendarScreen = () => {
               resizeMode={FastImage.resizeMode.cover}
             />
           </TouchableOpacity>
-          
+
           <View style={styles.episodeDetails}>
             <Text style={[styles.seriesName, { color: currentTheme.colors.text }]} numberOfLines={1}>
               {item.seriesName}
             </Text>
-            
+
             {hasReleaseDate ? (
               <>
                 <Text style={[styles.episodeTitle, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
                   S{item.season}:E{item.episode} - {item.title}
                 </Text>
-                
+
                 {item.overview ? (
                   <Text style={[styles.overview, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
                     {item.overview}
                   </Text>
                 ) : null}
-                
+
                 <View style={styles.metadataContainer}>
                   <View style={styles.dateContainer}>
-                    <MaterialIcons 
-                      name={isFuture ? "event" : "event-available"} 
-                      size={16} 
-                      color={currentTheme.colors.lightGray} 
+                    <MaterialIcons
+                      name={isFuture ? "event" : "event-available"}
+                      size={16}
+                      color={currentTheme.colors.lightGray}
                     />
                     <Text style={[styles.date, { color: currentTheme.colors.lightGray }]}>{formattedDate}</Text>
                   </View>
-                  
+
                   {item.vote_average > 0 && (
                     <View style={styles.ratingContainer}>
-                      <MaterialIcons 
-                        name="star" 
-                        size={16} 
-                        color={currentTheme.colors.primary} 
+                      <MaterialIcons
+                        name="star"
+                        size={16}
+                        color={currentTheme.colors.primary}
                       />
                       <Text style={[styles.rating, { color: currentTheme.colors.primary }]}>
                         {item.vote_average.toFixed(1)}
@@ -192,10 +298,10 @@ const CalendarScreen = () => {
                   No scheduled episodes
                 </Text>
                 <View style={styles.dateContainer}>
-                  <MaterialIcons 
-                    name="event-busy" 
-                    size={16} 
-                    color={currentTheme.colors.lightGray} 
+                  <MaterialIcons
+                    name="event-busy"
+                    size={16}
+                    color={currentTheme.colors.lightGray}
                   />
                   <Text style={[styles.date, { color: currentTheme.colors.lightGray }]}>Check back later</Text>
                 </View>
@@ -286,14 +392,29 @@ const CalendarScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle="light-content" />
       
-      <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }]}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>Calendar</Text>
+      <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }, isTVDevice && styles.headerTV]}>
+        {isTVDevice ? (
+          <Focusable
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            borderRadius={8}
+            focusScale={1.1}
+            showFocusBorder={true}
+            autoFocus
+          >
+            {(focused) => (
+              <MaterialIcons name="arrow-back" size={24} color={focused ? currentTheme.colors.primary : currentTheme.colors.text} />
+            )}
+          </Focusable>
+        ) : (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
+          </TouchableOpacity>
+        )}
+        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }, isTVDevice && styles.headerTitleTV]}>Calendar</Text>
         <View style={{ width: 40 }} />
       </View>
       
@@ -302,83 +423,182 @@ const CalendarScreen = () => {
           <Text style={[styles.filterInfoText, { color: currentTheme.colors.text }]}>
             Showing episodes for {format(selectedDate, 'MMMM d, yyyy')}
           </Text>
-          <TouchableOpacity onPress={clearDateFilter} style={styles.clearFilterButton}>
-            <MaterialIcons name="close" size={18} color={currentTheme.colors.text} />
-          </TouchableOpacity>
+          {isTVDevice ? (
+            <Focusable
+              onPress={clearDateFilter}
+              style={styles.clearFilterButton}
+              borderRadius={12}
+              focusScale={1.1}
+              showFocusBorder={true}
+            >
+              {(focused) => (
+                <MaterialIcons name="close" size={18} color={focused ? currentTheme.colors.primary : currentTheme.colors.text} />
+              )}
+            </Focusable>
+          ) : (
+            <TouchableOpacity onPress={clearDateFilter} style={styles.clearFilterButton}>
+              <MaterialIcons name="close" size={18} color={currentTheme.colors.text} />
+            </TouchableOpacity>
+          )}
         </View>
       )}
       
-      <CalendarSectionComponent 
-        episodes={allEpisodes}
-        onSelectDate={handleDateSelect}
-      />
-      
-      {selectedDate && filteredEpisodes.length > 0 ? (
-        <FlatList
-          data={filteredEpisodes}
-          keyExtractor={(item) => item.id}
-          renderItem={renderEpisodeItem}
-          contentContainerStyle={styles.listContent}
-          initialNumToRender={8}
-          maxToRenderPerBatch={8}
-          updateCellsBatchingPeriod={50}
-          windowSize={7}
-          removeClippedSubviews
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={currentTheme.colors.primary}
-              colors={[currentTheme.colors.primary]}
-            />
-          }
-        />
-      ) : selectedDate && filteredEpisodes.length === 0 ? (
-        <View style={styles.emptyFilterContainer}>
-          <MaterialIcons name="event-busy" size={48} color={currentTheme.colors.lightGray} />
-          <Text style={[styles.emptyFilterText, { color: currentTheme.colors.text }]}>
-            No episodes for {format(selectedDate, 'MMMM d, yyyy')}
-          </Text>
-          <TouchableOpacity 
-            style={[styles.clearFilterButtonLarge, { backgroundColor: currentTheme.colors.primary }]}
-            onPress={clearDateFilter}
+      {isTVDevice ? (
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.tvScrollView}
+          contentContainerStyle={styles.tvScrollViewContent}
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <View
+            onLayout={(e) => setCalendarHeight(e.nativeEvent.layout.height)}
           >
-            <Text style={[styles.clearFilterButtonText, { color: currentTheme.colors.text }]}>
-              Show All Episodes
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : calendarData.length > 0 ? (
-        <SectionList
-          sections={calendarData}
-          keyExtractor={(item) => item.id}
-          renderItem={renderEpisodeItem}
-          renderSectionHeader={renderSectionHeader}
-          contentContainerStyle={styles.listContent}
-          removeClippedSubviews
-          initialNumToRender={8}
-          maxToRenderPerBatch={8}
-          updateCellsBatchingPeriod={50}
-          windowSize={7}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={currentTheme.colors.primary}
-              colors={[currentTheme.colors.primary]}
+            <CalendarSectionComponent
+              episodes={allEpisodes}
+              onSelectDate={handleDateSelect}
+              onFocus={handleCalendarFocus}
             />
-          }
-        />
+          </View>
+
+          <View ref={episodeListRef}>
+            {selectedDate && filteredEpisodes.length > 0 ? (
+              <View style={styles.listContent}>
+                {filteredEpisodes.map((item, index) => (
+                  <View key={item.id}>
+                    {renderEpisodeItem({ item, index })}
+                  </View>
+                ))}
+              </View>
+            ) : selectedDate && filteredEpisodes.length === 0 ? (
+              <View style={styles.emptyFilterContainer}>
+                <MaterialIcons name="event-busy" size={48} color={currentTheme.colors.lightGray} />
+                <Text style={[styles.emptyFilterText, { color: currentTheme.colors.text }]}>
+                  No episodes for {format(selectedDate, 'MMMM d, yyyy')}
+                </Text>
+                <Focusable
+                  style={[styles.clearFilterButtonLarge, { backgroundColor: currentTheme.colors.primary }]}
+                  onPress={clearDateFilter}
+                  borderRadius={8}
+                  focusScale={1.05}
+                  showFocusBorder={true}
+                  autoFocus
+                >
+                  {(focused) => (
+                    <Text style={[styles.clearFilterButtonText, { color: focused ? currentTheme.colors.white : currentTheme.colors.text }]}>
+                      Show All Episodes
+                    </Text>
+                  )}
+                </Focusable>
+              </View>
+            ) : calendarData.length > 0 ? (
+              <View style={styles.listContent}>
+                {calendarData.map((section) => (
+                  <View key={section.title}>
+                    <View style={[styles.sectionHeader, {
+                      backgroundColor: currentTheme.colors.darkBackground,
+                      borderBottomColor: currentTheme.colors.border
+                    }]}>
+                      <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>
+                        {section.title}
+                      </Text>
+                    </View>
+                    {section.data.map((item, index) => (
+                      <View key={item.id}>
+                        {renderEpisodeItem({ item, index })}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <MaterialIcons name="calendar-today" size={64} color={currentTheme.colors.lightGray} />
+                <Text style={[styles.emptyText, { color: currentTheme.colors.text }]}>
+                  No upcoming episodes found
+                </Text>
+                <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
+                  Add series to your library to see their upcoming episodes here
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
       ) : (
-        <View style={styles.emptyContainer}>
-          <MaterialIcons name="calendar-today" size={64} color={currentTheme.colors.lightGray} />
-          <Text style={[styles.emptyText, { color: currentTheme.colors.text }]}>
-            No upcoming episodes found
-          </Text>
-          <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
-            Add series to your library to see their upcoming episodes here
-          </Text>
-        </View>
+        <>
+          <CalendarSectionComponent
+            episodes={allEpisodes}
+            onSelectDate={handleDateSelect}
+          />
+
+          {selectedDate && filteredEpisodes.length > 0 ? (
+            <FlatList
+              data={filteredEpisodes}
+              keyExtractor={(item) => item.id}
+              renderItem={renderEpisodeItem}
+              contentContainerStyle={styles.listContent}
+              initialNumToRender={8}
+              maxToRenderPerBatch={8}
+              updateCellsBatchingPeriod={50}
+              windowSize={7}
+              removeClippedSubviews
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={currentTheme.colors.primary}
+                  colors={[currentTheme.colors.primary]}
+                />
+              }
+            />
+          ) : selectedDate && filteredEpisodes.length === 0 ? (
+            <View style={styles.emptyFilterContainer}>
+              <MaterialIcons name="event-busy" size={48} color={currentTheme.colors.lightGray} />
+              <Text style={[styles.emptyFilterText, { color: currentTheme.colors.text }]}>
+                No episodes for {format(selectedDate, 'MMMM d, yyyy')}
+              </Text>
+              <TouchableOpacity
+                style={[styles.clearFilterButtonLarge, { backgroundColor: currentTheme.colors.primary }]}
+                onPress={clearDateFilter}
+              >
+                <Text style={[styles.clearFilterButtonText, { color: currentTheme.colors.text }]}>
+                  Show All Episodes
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : calendarData.length > 0 ? (
+            <SectionList
+              sections={calendarData}
+              keyExtractor={(item) => item.id}
+              renderItem={renderEpisodeItem}
+              renderSectionHeader={renderSectionHeader}
+              contentContainerStyle={styles.listContent}
+              removeClippedSubviews
+              initialNumToRender={8}
+              maxToRenderPerBatch={8}
+              updateCellsBatchingPeriod={50}
+              windowSize={7}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={currentTheme.colors.primary}
+                  colors={[currentTheme.colors.primary]}
+                />
+              }
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <MaterialIcons name="calendar-today" size={64} color={currentTheme.colors.lightGray} />
+              <Text style={[styles.emptyText, { color: currentTheme.colors.text }]}>
+                No upcoming episodes found
+              </Text>
+              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
+                Add series to your library to see their upcoming episodes here
+              </Text>
+            </View>
+          )}
+        </>
       )}
     </SafeAreaView>
   );
@@ -545,6 +765,46 @@ const styles = StyleSheet.create({
   noEpisodesText: {
     fontSize: 14,
     marginBottom: 4,
+  },
+  // TV-specific styles
+  headerTV: {
+    paddingHorizontal: 24,
+  },
+  headerTitleTV: {
+    fontSize: 22,
+  },
+  episodeItemTV: {
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 8,
+    borderBottomWidth: 0,
+  },
+  posterTV: {
+    width: 160,
+    height: 90,
+  },
+  episodeDetailsTV: {
+    marginLeft: 16,
+  },
+  seriesNameTV: {
+    fontSize: 18,
+  },
+  episodeTitleTV: {
+    fontSize: 15,
+  },
+  dateTV: {
+    fontSize: 13,
+  },
+  ratingTV: {
+    fontSize: 13,
+  },
+  tvScrollView: {
+    flex: 1,
+  },
+  tvScrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
 });
 
