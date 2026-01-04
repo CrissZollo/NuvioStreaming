@@ -127,6 +127,7 @@ const HomeScreen = () => {
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
 
   // TV navigation: stable ref for the first continue watching item (for hero -> continue watching navigation)
@@ -498,6 +499,9 @@ const HomeScreen = () => {
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
 
       // Don't clear FastImage cache on unmount - it causes broken images on remount
       // FastImage's native libraries (SDWebImage/Glide) handle memory automatically
@@ -766,9 +770,11 @@ const HomeScreen = () => {
     HeaderVisibility.setHidden(hide);
   }, []);
 
-  // TV: Scroll to center the focused catalog row (immediate, no debounce)
+  // TV: Scroll to keep focused catalog row visible (only scroll when needed)
   const lastFocusedIndexRef = useRef<number>(-1);
   const isTVScrollingRef = useRef(false);
+  // Track visible range to avoid unnecessary scrolls
+  const visibleRangeRef = useRef<{ first: number; last: number }>({ first: 0, last: 5 });
 
   const handleCatalogFocus = useCallback((index: number) => {
     if (!isTVDevice || !flashListRef.current) return;
@@ -783,34 +789,76 @@ const HomeScreen = () => {
     const item = listData[index];
     if (!item || item.type === 'placeholder') return;
 
-    // Skip if already scrolling to prevent race conditions
-    if (isTVScrollingRef.current) return;
-
+    const prevIndex = lastFocusedIndexRef.current;
     lastFocusedIndexRef.current = index;
+
+    // Check if the focused index is within the "comfortable" visible range
+    // Only scroll if the item would be at the edges or outside the visible area
+    const { first, last } = visibleRangeRef.current;
+    const isNearTop = index <= first + 1; // Within 1 row of top edge
+    const isNearBottom = index >= last - 1; // Within 1 row of bottom edge
+    const isOutsideRange = index < first || index > last;
+
+    // Skip scroll if item is comfortably visible (not at edges)
+    if (!isNearTop && !isNearBottom && !isOutsideRange) {
+      return;
+    }
+
+    // Clear any pending scroll to debounce rapid focus changes
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    // Skip if already scrolling to prevent race conditions
+    if (isTVScrollingRef.current) {
+      // Queue the scroll for after current one finishes
+      scrollTimeoutRef.current = setTimeout(() => {
+        handleCatalogFocus(index);
+      }, 50);
+      return;
+    }
+
     isTVScrollingRef.current = true;
 
-    // Use requestAnimationFrame to ensure layout is complete before scrolling
-    requestAnimationFrame(() => {
+    // Small delay to batch rapid focus changes (e.g., holding down key)
+    scrollTimeoutRef.current = setTimeout(() => {
       try {
         // Double-check the ref and data are still valid
         if (flashListRef.current && index < listData.length && listData[index]?.type !== 'placeholder') {
+          // Determine scroll position based on direction
+          // When going up, position item lower; when going down, position it higher
+          const isMovingDown = index > prevIndex;
+          const viewPosition = isMovingDown ? 0.2 : 0.3;
+
           flashListRef.current.scrollToIndex({
             index,
-            animated: false, // Instant scroll - no rubber-banding
-            viewPosition: 0.25, // Position focused row at ~25% from top
+            animated: true,
+            viewPosition,
           });
         }
       } catch (e) {
         // FlashList may throw if index is out of bounds during loading
         if (__DEV__) console.warn('[HomeScreen] scrollToIndex failed:', e);
       } finally {
-        // Reset scrolling flag after a short delay
+        // Reset scrolling flag after animation completes
         setTimeout(() => {
           isTVScrollingRef.current = false;
-        }, 100);
+        }, 200);
       }
-    });
+    }, 16); // Single frame delay for batching
   }, [isTVDevice, listData]);
+
+  // Track visible items to optimize scroll decisions
+  const handleViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+    if (!isTVDevice || viewableItems.length === 0) return;
+    const indices = viewableItems.map(item => item.index).filter((i): i is number => i !== null);
+    if (indices.length > 0) {
+      visibleRangeRef.current = {
+        first: Math.min(...indices),
+        last: Math.max(...indices),
+      };
+    }
+  }, [isTVDevice]);
 
   // Stabilize renderItem to prevent FlashList re-renders
   const renderListItem = useCallback(({ item, index }: { item: HomeScreenListItem; index: number }) => {
@@ -979,6 +1027,8 @@ const HomeScreen = () => {
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
           onScroll={handleScroll}
+          onViewableItemsChanged={isTVDevice ? handleViewableItemsChanged : undefined}
+          viewabilityConfig={isTVDevice ? { itemVisiblePercentThreshold: 50 } : undefined}
         />
         {/* Toasts are rendered globally at root */}
       </View>
@@ -993,7 +1043,9 @@ const HomeScreen = () => {
     memoizedHeader,
     ListFooterComponent,
     handleLoadMoreCatalogs,
-    handleScroll
+    handleScroll,
+    isTVDevice,
+    handleViewableItemsChanged
   ]);
 
   return isLoading ? renderLoadingScreen : renderMainContent;
