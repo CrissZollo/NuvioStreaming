@@ -11,10 +11,9 @@ import { TVFocusProvider, useTVFocus } from '../contexts/TVFocusContext';
 import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SearchScreen from '../screens/SearchScreen';
-import DownloadsScreen from '../screens/DownloadsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
-type ScreenKey = 'Home' | 'Library' | 'Search' | 'Downloads' | 'Settings';
+type ScreenKey = 'Home' | 'Library' | 'Search' | 'Settings';
 
 interface ScreenConfig {
   component: React.ComponentType<any>;
@@ -25,7 +24,6 @@ const SCREENS: Record<ScreenKey, ScreenConfig> = {
   Home: { component: HomeScreen, name: 'Home' },
   Library: { component: LibraryScreen, name: 'Library' },
   Search: { component: SearchScreen, name: 'Search' },
-  Downloads: { component: DownloadsScreen, name: 'Downloads' },
   Settings: { component: SettingsScreen, name: 'Settings' },
 };
 

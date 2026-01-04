@@ -5,26 +5,30 @@ import {
   StyleSheet,
   Animated,
   BackHandler,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
 
+// Nuvio logo
+const NuvioLogo = require('../../assets/IMG_0762.png');
+
 export interface NavItem {
   key: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon: string;
+  iconLibrary: 'feather' | 'ionicons';
   label: string;
   screen: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'home', icon: 'home', label: 'Home', screen: 'Home' },
-  { key: 'search', icon: 'search', label: 'Search', screen: 'Search' },
-  { key: 'library', icon: 'favorite', label: 'Library', screen: 'Library' },
-  { key: 'downloads', icon: 'download', label: 'Downloads', screen: 'Downloads' },
-  { key: 'settings', icon: 'settings', label: 'Settings', screen: 'Settings' },
+  { key: 'home', icon: 'home', iconLibrary: 'feather', label: 'Home', screen: 'Home' },
+  { key: 'search', icon: 'search', iconLibrary: 'feather', label: 'Search', screen: 'Search' },
+  { key: 'library', icon: 'library', iconLibrary: 'ionicons', label: 'Library', screen: 'Library' },
+  { key: 'settings', icon: 'settings', iconLibrary: 'feather', label: 'Settings', screen: 'Settings' },
 ];
 
 const COLLAPSED_WIDTH = 60;
@@ -204,9 +208,11 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
 
         {/* App Logo/Brand at top */}
         <View style={styles.brandContainer}>
-          <Text style={[styles.brandText, { color: currentTheme.colors.primary }]}>
-            {isExpanded ? 'Nuvio' : 'N'}
-          </Text>
+          <Image
+            source={NuvioLogo}
+            style={styles.brandLogo}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Navigation Items */}
@@ -236,19 +242,22 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
                 nextFocusUp={refsReady && !isFirst ? navItemViewRefs[index - 1] : undefined}
                 nextFocusDown={refsReady && !isLast ? navItemViewRefs[index + 1] : undefined}
               >
-                {(focused) => (
+                {(focused) => {
+                  const iconColor = focused
+                    ? '#FFFFFF'
+                    : isActive
+                    ? currentTheme.colors.primary
+                    : currentTheme.colors.text;
+
+                  const IconComponent = item.iconLibrary === 'ionicons' ? Ionicons : Feather;
+
+                  return (
                   <>
                     <View style={styles.navItemContent}>
-                      <MaterialIcons
-                        name={item.icon}
-                        size={20}
-                        color={
-                          focused
-                            ? '#FFFFFF'
-                            : isActive
-                            ? currentTheme.colors.primary
-                            : currentTheme.colors.text
-                        }
+                      <IconComponent
+                        name={item.icon as any}
+                        size={22}
+                        color={iconColor}
                       />
                       {isExpanded && (
                         <Animated.Text
@@ -278,7 +287,8 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
                       />
                     )}
                   </>
-                )}
+                  );
+                }}
               </Focusable>
             );
           })}
@@ -314,14 +324,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   brandContainer: {
-    height: 44,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
-  brandText: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  brandLogo: {
+    width: 44,
+    height: 44,
   },
   navItems: {
     flex: 1,
