@@ -24,19 +24,30 @@ export const TVFocusSection: React.FC<TVFocusSectionProps> = ({
   const isTV = useIsTV();
   const tvScroll = useTVScroll();
   const sectionRef = useRef<View>(null);
-  const lastFocusTime = useRef<number>(0);
+  const hasFocusWithin = useRef<boolean>(false);
 
   const handleFocusCapture = useCallback(() => {
     if (!isTV || !tvScroll?.scrollToElement) return;
 
-    // Debounce: only scroll if more than 300ms since last focus
-    // This prevents scrolling when navigating horizontally within the section
-    const now = Date.now();
-    if (now - lastFocusTime.current > 300) {
+    // Only scroll when focus ENTERS the section from outside
+    // Don't scroll when navigating between items within the section
+    if (!hasFocusWithin.current) {
+      hasFocusWithin.current = true;
       tvScroll.scrollToElement(sectionRef);
     }
-    lastFocusTime.current = now;
   }, [isTV, tvScroll]);
+
+  const handleBlurCapture = useCallback(() => {
+    // Use a small delay to check if focus moved to another item within the section
+    // or if it truly left the section
+    setTimeout(() => {
+      if (sectionRef.current) {
+        // Check if the section still contains the focused element
+        // If not, mark as no longer having focus within
+        hasFocusWithin.current = false;
+      }
+    }, 50);
+  }, []);
 
   // On non-TV, just render children without the wrapper logic
   if (!isTV) {
@@ -48,6 +59,7 @@ export const TVFocusSection: React.FC<TVFocusSectionProps> = ({
       ref={sectionRef}
       style={style}
       onFocusCapture={handleFocusCapture}
+      onBlurCapture={handleBlurCapture}
     >
       {children}
     </View>

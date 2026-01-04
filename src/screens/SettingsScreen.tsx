@@ -332,6 +332,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
               ]}
               borderRadius={10}
               focusScale={1.03}
+              animateBackground={true}
             >
               {(focused) => renderCategoryItem(category, focused)}
             </Focusable>
@@ -700,40 +701,27 @@ const SettingsScreen: React.FC = () => {
               icon="sliders"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('ThemeSettings')}
+              isLast={isTVDevice || isTablet}
               isTablet={isTablet}
               isTV={isTVDevice}
             />
-            <SettingItem
-              title="Episode Layout"
-              description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
-              icon="grid"
-              onPress={isTVDevice ? () => updateSetting('episodeLayoutStyle', settings?.episodeLayoutStyle === 'horizontal' ? 'vertical' : 'horizontal') : undefined}
-              renderControl={(focused) => (
-                isTVDevice ? (
-                  <View style={styles.tvSwitchContainer}>
-                    <View style={[
-                      styles.tvSwitchTrack,
-                      { backgroundColor: focused ? ((settings?.episodeLayoutStyle === 'horizontal') ? '#333' : '#666') : ((settings?.episodeLayoutStyle === 'horizontal') ? currentTheme.colors.primary : currentTheme.colors.elevation2) }
-                    ]}>
-                      <View style={[
-                        styles.tvSwitchThumb,
-                        (settings?.episodeLayoutStyle === 'horizontal') ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                        { backgroundColor: focused ? '#000' : ((settings?.episodeLayoutStyle === 'horizontal') ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis) }
-                      ]} />
-                    </View>
-                  </View>
-                ) : (
+            {!isTVDevice && (
+              <SettingItem
+                title="Episode Layout"
+                description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
+                icon="grid"
+                renderControl={() => (
                   <CustomSwitch
                     value={settings?.episodeLayoutStyle === 'horizontal'}
                     onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
                   />
-                )
-              )}
-              isLast={isTablet}
-              isTablet={isTablet}
-              isTV={isTVDevice}
-            />
-            {!isTablet && (
+                )}
+                isLast={isTablet}
+                isTablet={isTablet}
+                isTV={isTVDevice}
+              />
+            )}
+            {!isTablet && !isTVDevice && (
               <SettingItem
                 title="Streams Backdrop"
                 description="Show blurred backdrop on mobile streams"

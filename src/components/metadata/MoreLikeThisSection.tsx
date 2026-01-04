@@ -119,9 +119,11 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
     }
   };
 
-  const renderItem = ({ item }: { item: StreamingContent }) => {
+  const renderItem = ({ item, index }: { item: StreamingContent; index: number }) => {
     const itemStyle = [styles.itemContainer, { width: posterWidth, marginRight: itemSpacing }];
     const borderRadius = isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8;
+    const isFirst = index === 0;
+    const isLast = index === recommendations.length - 1;
 
     const posterImage = (
       <FastImage
@@ -147,6 +149,8 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
             focusScale={1.05}
             animateBackground={false}
             showFocusBorder={true}
+            blockLeft={isFirst}
+            blockRight={isLast}
           >
             {posterImage}
           </Focusable>
@@ -188,6 +192,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
         keyExtractor={(item) => item.id}
         horizontal
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={!isTVDevice}
         contentContainerStyle={[styles.listContentContainer, { paddingHorizontal: horizontalPadding, paddingRight: horizontalPadding + itemSpacing }]}
       />
       <CustomAlert

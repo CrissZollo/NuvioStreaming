@@ -148,6 +148,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
         horizontal
         data={cast}
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={!isTVDevice}
         contentContainerStyle={[
           styles.castList,
           { paddingHorizontal: horizontalPadding }
@@ -266,6 +267,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
                     focusScale={1.05}
                     animateBackground={false}
                     showFocusBorder={true}
+                    blockLeft={index === 0}
+                    blockRight={index === cast.length - 1}
                   >
                     {item.profile_path ? (
                       <FastImage

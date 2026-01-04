@@ -13,6 +13,8 @@ import {
 import FastImage from '@d11/react-native-fast-image';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from '../components/tv/Focusable';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for ShowRatingsScreen
 let GlassViewComp: any = null;
@@ -129,41 +131,73 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, getIMDbRating
   );
 });
 
-const RatingSourceToggle = memo(({ ratingSource, setRatingSource, theme }: {
+const RatingSourceToggle = memo(({ ratingSource, setRatingSource, theme, isTVDevice }: {
   ratingSource: RatingSource;
   setRatingSource: (source: RatingSource) => void;
   theme: any;
-}) => (
-  <View style={styles.ratingSourceContainer}>
-    <Text style={[styles.sectionTitle, { color: theme.colors.white }]}>Rating Source:</Text>
-    <View style={styles.ratingSourceButtons}>
-      {['tmdb', 'imdb', 'tvmaze'].map((source) => {
-        const isActive = ratingSource === source;
-        return (
-          <TouchableOpacity
-            key={source}
-            style={[
-              styles.sourceButton,
-              { borderColor: theme.colors.lightGray },
-              isActive && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
-            ]}
-            onPress={() => setRatingSource(source as RatingSource)}
-          >
-            <Text 
-              style={{
-                fontSize: 13,
-                fontWeight: isActive ? '700' : '600',
-                color: isActive ? theme.colors.white : theme.colors.lightGray
-              }}
+  isTVDevice: boolean;
+}) => {
+  const sources: RatingSource[] = ['tmdb', 'imdb', 'tvmaze'];
+
+  return (
+    <View style={styles.ratingSourceContainer}>
+      <Text style={[styles.sectionTitle, { color: theme.colors.white }]}>Rating Source:</Text>
+      <View style={styles.ratingSourceButtons}>
+        {sources.map((source, index) => {
+          const isActive = ratingSource === source;
+          const isFirst = index === 0;
+          const isLast = index === sources.length - 1;
+
+          const buttonStyle = [
+            styles.sourceButton,
+            { borderColor: theme.colors.lightGray },
+            isActive && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+            isTVDevice && { paddingHorizontal: 20, paddingVertical: 12 }
+          ];
+
+          const textStyle = {
+            fontSize: isTVDevice ? 16 : 13,
+            fontWeight: isActive ? '700' as const : '600' as const,
+            color: isActive ? theme.colors.white : theme.colors.lightGray
+          };
+
+          if (isTVDevice) {
+            return (
+              <Focusable
+                key={source}
+                style={buttonStyle}
+                onPress={() => setRatingSource(source)}
+                borderRadius={6}
+                focusScale={1.05}
+                animateBackground={false}
+                showFocusBorder={true}
+                blockLeft={isFirst}
+                blockRight={isLast}
+                autoFocus={index === 0}
+              >
+                <Text style={textStyle}>
+                  {source.toUpperCase()}
+                </Text>
+              </Focusable>
+            );
+          }
+
+          return (
+            <TouchableOpacity
+              key={source}
+              style={buttonStyle}
+              onPress={() => setRatingSource(source)}
             >
-              {source.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+              <Text style={textStyle}>
+                {source.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
-  </View>
-));
+  );
+});
 
 const ShowInfo = memo(({ show, theme }: { show: Show | null, theme: any }) => {
   // singular / plural logic
@@ -217,6 +251,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
   const { showId } = route.params;
+  const isTVDevice = useIsTV();
   const [show, setShow] = useState<Show | null>(null);
   const [seasons, setSeasons] = useState<TMDBSeason[]>([]);
   const [tvmazeEpisodes, setTvmazeEpisodes] = useState<TVMazeEpisode[]>([]);
@@ -438,10 +473,11 @@ const ShowRatingsScreen = ({ route }: Props) => {
                 entering={FadeIn.delay(100).duration(300)}
                 style={styles.section}
               >
-                <RatingSourceToggle 
-                  ratingSource={ratingSource} 
-                  setRatingSource={setRatingSource} 
-                  theme={currentTheme} 
+                <RatingSourceToggle
+                  ratingSource={ratingSource}
+                  setRatingSource={setRatingSource}
+                  theme={currentTheme}
+                  isTVDevice={isTVDevice}
                 />
               </Animated.View>
 

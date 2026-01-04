@@ -746,6 +746,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            scrollEnabled={!isTVDevice}
             contentContainerStyle={[
               styles.trailersScrollContent,
               { gap: trailerCardSpacing }
@@ -756,6 +757,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
             snapToAlignment="start"
           >
             {trailers[selectedCategory].map((trailer, index) => {
+              const isFirst = index === 0;
+              const isLast = index === trailers[selectedCategory].length - 1;
               const cardStyle = [
                 styles.trailerCard,
                 {
@@ -804,6 +807,9 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                       borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
                       focusScale={1.05}
                       animateBackground={false}
+                      showFocusBorder={true}
+                      blockLeft={isFirst}
+                      blockRight={isLast}
                     >
                       {cardContent}
                     </Focusable>

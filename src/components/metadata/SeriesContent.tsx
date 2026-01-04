@@ -9,6 +9,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { useIsTV } from '../../contexts/TVContext';
 import { Focusable } from '../tv/Focusable';
+import { TVFocusSection } from '../tv/TVFocusSection';
 import { Episode } from '../../types/metadata';
 import { tmdbService, IMDbRatings } from '../../services/tmdbService';
 import { storageService } from '../../services/storageService';
@@ -77,6 +78,9 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
+
+  // On TV, always use horizontal layout regardless of settings
+  const effectiveEpisodeLayout = isTVDevice ? 'horizontal' : settings?.episodeLayoutStyle;
 
   // Enhanced spacing and padding for seasons section
   const horizontalPadding = useMemo(() => {
@@ -197,6 +201,53 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   const episodeScrollViewRef = useRef<FlashListRef<Episode>>(null);
   const horizontalEpisodeScrollViewRef = useRef<FlatList<Episode>>(null);
 
+  // TV Focus refs for episode items - store refs for directional focus
+  const tvEpisodeRefs = useRef<Map<number, React.RefObject<View>>>(new Map());
+  const tvSeasonRefs = useRef<Map<number, React.RefObject<View>>>(new Map());
+
+  // Get or create ref for TV episode focus
+  const getEpisodeRef = useCallback((index: number) => {
+    if (!tvEpisodeRefs.current.has(index)) {
+      tvEpisodeRefs.current.set(index, React.createRef<View>());
+    }
+    return tvEpisodeRefs.current.get(index)!;
+  }, []);
+
+  // Get or create ref for TV season focus
+  const getSeasonRef = useCallback((season: number) => {
+    if (!tvSeasonRefs.current.has(season)) {
+      tvSeasonRefs.current.set(season, React.createRef<View>());
+    }
+    return tvSeasonRefs.current.get(season)!;
+  }, []);
+
+  // TV focus state for scrolling on focus
+  const [tvFocusedEpisodeIndex, setTvFocusedEpisodeIndex] = useState(0);
+  const lastTVFocusTime = useRef<number>(0);
+  const TV_FOCUS_DEBOUNCE_MS = 80;
+
+  // Handle TV episode focus - scroll to keep focused item visible
+  const handleTVEpisodeFocus = useCallback((index: number) => {
+    // Debounce rapid focus events
+    const now = Date.now();
+    if (now - lastTVFocusTime.current < TV_FOCUS_DEBOUNCE_MS) {
+      return;
+    }
+    lastTVFocusTime.current = now;
+
+    setTvFocusedEpisodeIndex(index);
+
+    // Scroll to focused episode
+    if (effectiveEpisodeLayout === 'horizontal' && horizontalEpisodeScrollViewRef.current) {
+      const itemWidth = horizontalCardWidth + horizontalItemSpacing;
+      const scrollX = Math.max(0, index * itemWidth - horizontalPadding);
+      horizontalEpisodeScrollViewRef.current.scrollToOffset({
+        offset: scrollX,
+        animated: true
+      });
+    }
+  }, [effectiveEpisodeLayout, horizontalCardWidth, horizontalItemSpacing, horizontalPadding]);
+
   // Load saved global view mode preference when component mounts
   useEffect(() => {
     const loadViewModePreference = async () => {
@@ -313,7 +364,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
   // Function to find and scroll to the most recently watched episode
   const scrollToMostRecentEpisode = () => {
-    if (!metadata?.id || !settings?.episodeLayoutStyle || settings.episodeLayoutStyle !== 'horizontal') {
+    if (!metadata?.id || !effectiveEpisodeLayout || effectiveEpisodeLayout !== 'horizontal') {
       return;
     }
 
@@ -515,10 +566,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
   // Add effect to scroll to most recently watched episode when season changes or progress loads
   useEffect(() => {
-    if (Object.keys(episodeProgress).length > 0 && selectedSeason && settings?.episodeLayoutStyle) {
+    if (Object.keys(episodeProgress).length > 0 && selectedSeason && effectiveEpisodeLayout) {
       scrollToMostRecentEpisode();
     }
-  }, [selectedSeason, episodeProgress, settings?.episodeLayoutStyle, groupedEpisodes]);
+  }, [selectedSeason, episodeProgress, effectiveEpisodeLayout, groupedEpisodes]);
 
 
 
@@ -833,8 +884,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={3}
-          renderItem={({ item: season }) => {
+          renderItem={({ item: season, index }) => {
             const seasonEpisodes = groupedEpisodes[season] || [];
+            const isFirstSeason = index === 0;
+            const isLastSeason = index === seasons.length - 1;
 
             // Get season poster URL (needed for both views)
             let seasonPoster = DEFAULT_PLACEHOLDER;
@@ -881,11 +934,14 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                 >
                   {isTVDevice ? (
                     <Focusable
+                      viewRef={getSeasonRef(season)}
                       style={textButtonStyle}
                       onPress={() => onSeasonChange(season)}
                       borderRadius={isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12}
                       focusScale={1.05}
                       animateBackground={false}
+                      blockLeft={isFirstSeason}
+                      blockRight={isLastSeason}
                     >
                       {textButtonContent}
                     </Focusable>
@@ -962,11 +1018,14 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               >
                 {isTVDevice ? (
                   <Focusable
+                    viewRef={getSeasonRef(season)}
                     style={posterButtonStyle}
                     onPress={() => onSeasonChange(season)}
                     borderRadius={isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8}
                     focusScale={1.05}
                     animateBackground={false}
+                    blockLeft={isFirstSeason}
+                    blockRight={isLastSeason}
                   >
                     {posterButtonContent}
                   </Focusable>
@@ -1275,6 +1334,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
           focusScale={1.03}
           animateBackground={false}
+          blockLeft={true}
+          blockRight={true}
         >
           {episodeCardContent}
         </Focusable>
@@ -1296,7 +1357,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   };
 
   // Horizontal layout episode card (Netflix-style)
-  const renderHorizontalEpisodeCard = (episode: Episode) => {
+  const renderHorizontalEpisodeCard = (episode: Episode, index: number, totalEpisodes: number) => {
     const resolveEpisodeImage = (): string => {
       const candidates: Array<string | undefined | null> = [
         (episode as any).thumbnail,
@@ -1405,25 +1466,25 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           <View style={[
             styles.episodeContent,
             {
-              padding: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 12,
-              paddingBottom: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 16
+              padding: isTV ? 14 : isLargeTablet ? 18 : isTablet ? 16 : 12,
+              paddingBottom: isTV ? 16 : isLargeTablet ? 22 : isTablet ? 20 : 16
             }
           ]}>
             {/* Episode Number Badge */}
             <View style={[
               styles.episodeNumberBadgeHorizontal,
               {
-                paddingHorizontal: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 6 : 6,
-                paddingVertical: isTV ? 5 : isLargeTablet ? 4 : isTablet ? 3 : 3,
-                borderRadius: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 4 : 4,
-                marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 6 : 6
+                paddingHorizontal: isTV ? 8 : isLargeTablet ? 8 : isTablet ? 6 : 6,
+                paddingVertical: isTV ? 3 : isLargeTablet ? 4 : isTablet ? 3 : 3,
+                borderRadius: isTV ? 6 : isLargeTablet ? 6 : isTablet ? 4 : 4,
+                marginBottom: isTV ? 6 : isLargeTablet ? 8 : isTablet ? 6 : 6
               }
             ]}>
               <Text style={[
                 styles.episodeNumberHorizontal,
                 {
-                  fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 10,
-                  fontWeight: isTV ? '700' : isLargeTablet ? '700' : isTablet ? '600' : '600'
+                  fontSize: isTV ? 11 : isLargeTablet ? 13 : isTablet ? 12 : 10,
+                  fontWeight: isTV ? '600' : isLargeTablet ? '700' : isTablet ? '600' : '600'
                 }
               ]}>{episodeString}</Text>
             </View>
@@ -1432,10 +1493,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             <Text style={[
               styles.episodeTitleHorizontal,
               {
-                fontSize: isTV ? 20 : isLargeTablet ? 19 : isTablet ? 18 : 15,
-                fontWeight: isTV ? '800' : isLargeTablet ? '800' : isTablet ? '700' : '700',
-                lineHeight: isTV ? 26 : isLargeTablet ? 24 : isTablet ? 22 : 18,
-                marginBottom: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 4 : 4
+                fontSize: isTV ? 16 : isLargeTablet ? 19 : isTablet ? 18 : 15,
+                fontWeight: isTV ? '700' : isLargeTablet ? '800' : isTablet ? '700' : '700',
+                lineHeight: isTV ? 20 : isLargeTablet ? 24 : isTablet ? 22 : 18,
+                marginBottom: isTV ? 4 : isLargeTablet ? 6 : isTablet ? 4 : 4
               }
             ]} numberOfLines={2}>
               {episode.name}
@@ -1445,12 +1506,12 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             <Text style={[
               styles.episodeDescriptionHorizontal,
               {
-                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
-                lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16,
-                marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-                opacity: isTV ? 0.95 : isLargeTablet ? 0.9 : isTablet ? 0.9 : 0.9
+                fontSize: isTV ? 12 : isLargeTablet ? 15 : isTablet ? 14 : 12,
+                lineHeight: isTV ? 16 : isLargeTablet ? 20 : isTablet ? 18 : 16,
+                marginBottom: isTV ? 8 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                opacity: isTV ? 0.85 : isLargeTablet ? 0.9 : isTablet ? 0.9 : 0.9
               }
-            ]} numberOfLines={isLargeScreen ? 4 : 3}>
+            ]} numberOfLines={isTV ? 3 : (isLargeScreen ? 4 : 3)}>
               {(episode.overview || (episode as any).description || (episode as any).plot || (episode as any).synopsis || 'No description available')}
             </Text>
 
@@ -1458,17 +1519,17 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             <View style={[
               styles.episodeMetadataRowHorizontal,
               {
-                gap: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                gap: isTV ? 12 : isLargeTablet ? 14 : isTablet ? 12 : 12
               }
             ]}>
               {effectiveRuntime && (
                 <View style={styles.runtimeContainerHorizontal}>
-                  <MaterialIcons name="schedule" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color={currentTheme.colors.mediumEmphasis} />
+                  <MaterialIcons name="schedule" size={isTV ? 12 : isLargeTablet ? 15 : isTablet ? 14 : 14} color={currentTheme.colors.mediumEmphasis} />
                   <Text style={[
                     styles.runtimeTextHorizontal,
                     {
-                      fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                      fontWeight: isTV ? '600' : isLargeTablet ? '500' : isTablet ? '500' : '500',
+                      fontSize: isTV ? 11 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                      fontWeight: isTV ? '500' : isLargeTablet ? '500' : isTablet ? '500' : '500',
                       color: currentTheme.colors.mediumEmphasis
                     }
                   ]}>
@@ -1485,8 +1546,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                         style={[
                           styles.imdbLogoHorizontal,
                           {
-                            width: isTV ? 32 : isLargeTablet ? 30 : isTablet ? 28 : 28,
-                            height: isTV ? 17 : isLargeTablet ? 16 : isTablet ? 15 : 15
+                            width: isTV ? 26 : isLargeTablet ? 30 : isTablet ? 28 : 28,
+                            height: isTV ? 14 : isLargeTablet ? 16 : isTablet ? 15 : 15
                           }
                         ]}
                         resizeMode={FastImage.resizeMode.contain}
@@ -1494,8 +1555,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                       <Text style={[
                         styles.ratingTextHorizontal,
                         {
-                          fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                          fontWeight: isTV ? '600' : isLargeTablet ? '600' : isTablet ? '600' : '600',
+                          fontSize: isTV ? 11 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                          fontWeight: isTV ? '500' : isLargeTablet ? '600' : isTablet ? '600' : '600',
                           color: '#F5C518'
                         }
                       ]}>
@@ -1504,12 +1565,12 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     </>
                   ) : (
                     <>
-                      <MaterialIcons name="star" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color="#FFD700" />
+                      <MaterialIcons name="star" size={isTV ? 12 : isLargeTablet ? 15 : isTablet ? 14 : 14} color="#FFD700" />
                       <Text style={[
                         styles.ratingTextHorizontal,
                         {
-                          fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                          fontWeight: isTV ? '600' : isLargeTablet ? '600' : isTablet ? '600' : '600'
+                          fontSize: isTV ? 11 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                          fontWeight: isTV ? '500' : isLargeTablet ? '600' : isTablet ? '600' : '600'
                         }
                       ]}>
                         {effectiveVote.toFixed(1)}
@@ -1523,7 +1584,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                   styles.airDateTextHorizontal,
                   {
                     color: currentTheme.colors.mediumEmphasis,
-                    fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11
+                    fontSize: isTV ? 11 : isLargeTablet ? 12 : isTablet ? 11 : 11
                   }
                 ]}>
                   {formatDate(episode.air_date)}
@@ -1583,15 +1644,39 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     );
 
     if (isTVDevice) {
+      const cardBorderRadius = isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16;
+      const isFirst = index === 0;
+      const isLast = index === totalEpisodes - 1;
+
+      // TV episode card style without border (Focusable handles the focus border)
+      const tvCardStyle = [
+        styles.episodeCardHorizontal,
+        {
+          borderRadius: cardBorderRadius,
+          height: horizontalCardHeight,
+          elevation: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
+          shadowOpacity: isTV ? 0.4 : isLargeTablet ? 0.35 : isTablet ? 0.3 : 0.3,
+          shadowRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          overflow: 'hidden' as const,
+        }
+      ];
+
       return (
         <Focusable
           key={episode.id}
-          style={horizontalCardStyle}
+          style={tvCardStyle}
           onPress={() => onSelectEpisode(episode)}
           onLongPress={() => handleEpisodeLongPress(episode)}
-          borderRadius={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16}
-          focusScale={1.03}
+          onFocus={() => handleTVEpisodeFocus(index)}
+          borderRadius={cardBorderRadius}
+          unfocusedScale={0.92}
+          focusScale={1.0}
           animateBackground={false}
+          showFocusBorder={true}
+          blockLeft={isFirst}
+          blockRight={isLast}
         >
           {horizontalCardContent}
         </Focusable>
@@ -1616,15 +1701,18 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
   return (
     <View style={styles.container}>
-      <Animated.View
-        entering={FadeIn.duration(300).delay(50)}
-      >
-        {renderSeasonSelector()}
-      </Animated.View>
+      <TVFocusSection>
+        <Animated.View
+          entering={FadeIn.duration(300).delay(50)}
+        >
+          {renderSeasonSelector()}
+        </Animated.View>
+      </TVFocusSection>
 
-      <Animated.View
-        entering={FadeIn.duration(300).delay(100)}
-      >
+      <TVFocusSection>
+        <Animated.View
+          entering={FadeIn.duration(300).delay(100)}
+        >
         <Text style={[
           styles.sectionTitle,
           {
@@ -1652,10 +1740,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
         {/* Only render episode list if there are episodes */}
         {currentSeasonEpisodes.length > 0 && (
-          (settings?.episodeLayoutStyle === 'horizontal') ? (
+          (effectiveEpisodeLayout === 'horizontal') ? (
             // Horizontal Layout (Netflix-style) - Using FlatList
             <FlatList
-              key={`episodes-${settings?.episodeLayoutStyle}-${selectedSeason}`}
+              key={`episodes-${effectiveEpisodeLayout}-${selectedSeason}`}
               ref={horizontalEpisodeScrollViewRef}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
@@ -1669,12 +1757,15 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     }
                   ]}
                 >
-                  {renderHorizontalEpisodeCard(episode)}
+                  {renderHorizontalEpisodeCard(episode, index, currentSeasonEpisodes.length)}
                 </Animated.View>
               )}
               keyExtractor={episode => episode.id.toString()}
               horizontal
               showsHorizontalScrollIndicator={false}
+              // On TV, disable scroll so D-pad controls focus instead of scrolling
+              // The handleTVEpisodeFocus callback will scroll programmatically
+              scrollEnabled={!isTVDevice}
               contentContainerStyle={[
                 styles.episodeListContentHorizontal,
                 {
@@ -1682,13 +1773,13 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                   paddingRight: horizontalPadding
                 }
               ]}
-              removeClippedSubviews
-              initialNumToRender={3}
-              maxToRenderPerBatch={5}
-              windowSize={5}
-              snapToInterval={horizontalCardWidth + horizontalItemSpacing}
-              snapToAlignment="start"
-              decelerationRate="fast"
+              removeClippedSubviews={!isTVDevice}
+              initialNumToRender={isTVDevice ? 10 : 3}
+              maxToRenderPerBatch={isTVDevice ? 10 : 5}
+              windowSize={isTVDevice ? 21 : 5}
+              snapToInterval={isTVDevice ? undefined : horizontalCardWidth + horizontalItemSpacing}
+              snapToAlignment={isTVDevice ? undefined : "start"}
+              decelerationRate={isTVDevice ? undefined : "fast"}
               getItemLayout={(data, index) => {
                 const length = horizontalCardWidth + horizontalItemSpacing;
                 return {
@@ -1715,7 +1806,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           ) : (
             // Vertical Layout (Traditional) - Using FlashList
             <FlashList
-              key={`episodes-${settings?.episodeLayoutStyle}-${selectedSeason}`}
+              key={`episodes-${effectiveEpisodeLayout}-${selectedSeason}`}
               ref={episodeScrollViewRef}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
@@ -1738,6 +1829,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           )
         )}
       </Animated.View>
+      </TVFocusSection>
 
       {/* Episode Action Menu Modal */}
       <Modal

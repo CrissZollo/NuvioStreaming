@@ -65,6 +65,8 @@ interface FocusableProps {
   borderRadius?: number;
   /** Scale factor when focused (default 1.05 for TV visibility) */
   focusScale?: number;
+  /** Scale factor when unfocused (default 1.0, use < 1 to make items smaller when not focused) */
+  unfocusedScale?: number;
   /** Whether to animate background color change (default false for performance) */
   animateBackground?: boolean;
   /** External ref to the underlying View for directional focus linking */
@@ -115,6 +117,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       showFocusBorder = true,
       borderRadius = 8,
       focusScale = 1.05,
+      unfocusedScale = 1.0,
       animateBackground = false, // Default to false for performance
       viewRef,
     },
@@ -203,9 +206,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     }));
 
     // Animated styles for focus effect - simplified for performance
+    // When unfocusedScale < 1, items start smaller and grow to focusScale when focused
     const animatedContainerStyle = useAnimatedStyle(() => {
       'worklet';
-      const scale = interpolate(focusProgress.value, [0, 1], [1, focusScale]);
+      const scale = interpolate(focusProgress.value, [0, 1], [unfocusedScale, focusScale]);
       return {
         transform: [{ scale }],
       };
@@ -257,12 +261,16 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     if (rightHandle) tvProps.nextFocusRight = rightHandle;
 
     // Static focus border style - no animation for performance
-    const focusBorderStyle = useMemo(() => {
-      if (!showFocusBorder) return {};
-      return isFocused
-        ? { borderWidth: 3, borderColor: TV_FOCUS_BORDER_COLOR }
-        : { borderWidth: 3, borderColor: 'transparent' };
-    }, [isFocused, showFocusBorder]);
+    const focusBorderStyle = showFocusBorder
+      ? (isFocused
+          ? { borderWidth: 3, borderColor: TV_FOCUS_BORDER_COLOR }
+          : { borderWidth: 3, borderColor: 'transparent' })
+      : undefined;
+
+    // Background style when animateBackground is true
+    const backgroundStyle = animateBackground && isFocused
+      ? { backgroundColor: '#FFFFFF' }
+      : undefined;
 
     return (
       <AnimatedPressable
@@ -276,6 +284,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
           animatedContainerStyle,
           { borderRadius },
           focusBorderStyle,
+          backgroundStyle,
           isFocused && focusStyle,
         ]}
         testID={testID}

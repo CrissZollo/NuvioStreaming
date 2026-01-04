@@ -135,9 +135,11 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
     });
   }, [collectionMovies]);
 
-  const renderItem = ({ item }: { item: StreamingContent }) => {
+  const renderItem = ({ item, index }: { item: StreamingContent; index: number }) => {
     const itemStyle = [styles.itemContainer, { width: backdropWidth, marginRight: itemSpacing }];
     const borderRadius = isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8;
+    const isFirst = index === 0;
+    const isLast = index === sortedCollectionMovies.length - 1;
 
     const backdropImage = (
       <FastImage
@@ -182,6 +184,8 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
             focusScale={1.05}
             animateBackground={false}
             showFocusBorder={true}
+            blockLeft={isFirst}
+            blockRight={isLast}
           >
             {backdropImage}
           </Focusable>
@@ -229,6 +233,7 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
         keyExtractor={(item) => item.id}
         horizontal
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={!isTVDevice}
         contentContainerStyle={[styles.listContentContainer, {
           paddingHorizontal: horizontalPadding,
           paddingRight: horizontalPadding + itemSpacing
