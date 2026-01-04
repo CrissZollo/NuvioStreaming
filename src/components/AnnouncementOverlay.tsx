@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Feather } from '@expo/vector-icons';
+import { useIsTV } from '../contexts/TVContext';
+import { Focusable } from './tv/Focusable';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,6 +42,7 @@ const AnnouncementOverlay: React.FC<AnnouncementOverlayProps> = ({
 }) => {
     const { currentTheme } = useTheme();
     const colors = currentTheme.colors;
+    const isTVDevice = useIsTV();
 
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -109,6 +112,7 @@ const AnnouncementOverlay: React.FC<AnnouncementOverlayProps> = ({
                 <Animated.View
                     style={[
                         styles.container,
+                        isTVDevice && styles.containerTV,
                         {
                             opacity: opacityAnim,
                             transform: [{ scale: scaleAnim }],
@@ -117,12 +121,27 @@ const AnnouncementOverlay: React.FC<AnnouncementOverlayProps> = ({
                 >
                     <View style={styles.card}>
                         {/* Close Button */}
-                        <TouchableOpacity
-                            style={styles.closeButton}
-                            onPress={handleClose}
-                        >
-                            <Feather name="x" size={20} color={colors.white} />
-                        </TouchableOpacity>
+                        {isTVDevice ? (
+                            <Focusable
+                                style={styles.closeButton}
+                                onPress={handleClose}
+                                borderRadius={16}
+                                focusScale={1.1}
+                                animateBackground={true}
+                                showFocusBorder={true}
+                            >
+                                {(focused) => (
+                                    <Feather name="x" size={20} color={focused ? '#000' : colors.white} />
+                                )}
+                            </Focusable>
+                        ) : (
+                            <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={handleClose}
+                            >
+                                <Feather name="x" size={20} color={colors.white} />
+                            </TouchableOpacity>
+                        )}
 
                         {/* Header */}
                         <View style={styles.header}>
@@ -168,12 +187,28 @@ const AnnouncementOverlay: React.FC<AnnouncementOverlayProps> = ({
                         </ScrollView>
 
                         {/* Action Button */}
-                        <TouchableOpacity
-                            style={[styles.button, { backgroundColor: colors.primary }]}
-                            onPress={handleAction}
-                        >
-                            <Text style={styles.buttonText}>{actionButtonText}</Text>
-                        </TouchableOpacity>
+                        {isTVDevice ? (
+                            <Focusable
+                                style={[styles.button, { backgroundColor: colors.primary }]}
+                                onPress={handleAction}
+                                autoFocus={true}
+                                borderRadius={12}
+                                focusScale={1.05}
+                                animateBackground={false}
+                                showFocusBorder={true}
+                            >
+                                {() => (
+                                    <Text style={styles.buttonText}>{actionButtonText}</Text>
+                                )}
+                            </Focusable>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.button, { backgroundColor: colors.primary }]}
+                                onPress={handleAction}
+                            >
+                                <Text style={styles.buttonText}>{actionButtonText}</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </Animated.View>
             </View>
@@ -192,6 +227,10 @@ const styles = StyleSheet.create({
         width: width * 0.9,
         maxWidth: 500,
         maxHeight: height * 0.8,
+    },
+    containerTV: {
+        width: width * 0.5,
+        maxWidth: 650,
     },
     card: {
         backgroundColor: '#1a1a1a',
