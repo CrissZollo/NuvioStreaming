@@ -253,8 +253,8 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         decelerationRate="fast"
-        scrollEnabled={true}
-        nestedScrollEnabled={true}
+        scrollEnabled={!isTVDevice}
+        nestedScrollEnabled={!isTVDevice}
         contentContainerStyle={StyleSheet.flatten([
           styles.catalogList,
           isTVLayout && styles.catalogListTV,
