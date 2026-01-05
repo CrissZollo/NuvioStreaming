@@ -42,6 +42,7 @@ interface VideoSurfaceProps {
     screenDimensions: { width: number, height: number };
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
     useHardwareDecoding?: boolean;
+    enableAudioPassthrough?: boolean;
 }
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
@@ -67,6 +68,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
     screenDimensions,
     onTracksChanged,
     useHardwareDecoding,
+    enableAudioPassthrough,
 }) => {
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
@@ -125,6 +127,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
                     rate={playbackSpeed}
                     resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
                     style={localStyles.player}
+                    enableAudioPassthrough={enableAudioPassthrough}
                     onLoad={handleLoad}
                     onProgress={handleProgress}
                     onEnd={handleEnd}

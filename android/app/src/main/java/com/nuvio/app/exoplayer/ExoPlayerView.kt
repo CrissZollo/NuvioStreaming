@@ -6,6 +6,7 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.SurfaceView
 import android.widget.FrameLayout
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -165,6 +166,7 @@ class ExoPlayerView @JvmOverloads constructor(
     private val maxSourceErrorRetries: Int = 2
     private var hasReportedLoad: Boolean = false  // Prevent duplicate onLoad callbacks
     private var audioRecoveryAttempted: Boolean = false  // Prevent infinite audio recovery loops
+    private var audioPassthroughEnabled: Boolean = false  // Enable HDMI audio passthrough for surround formats
 
     // Callbacks
     var onLoadCallback: ((duration: Double, width: Int, height: Int) -> Unit)? = null
@@ -244,13 +246,30 @@ class ExoPlayerView @JvmOverloads constructor(
             // Enable decoder fallback - critical for DV -> HEVC fallback
             .setEnableDecoderFallback(true)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            // Enable audio passthrough if configured - this allows AC3/EAC3/DTS to pass through HDMI
+            .setEnableAudioTrackPlaybackParams(audioPassthroughEnabled)
 
-        Log.d(TAG, "Using NoDolbyVisionCodecSelector to block DV decoders")
+        Log.d(TAG, "Using NoDolbyVisionCodecSelector to block DV decoders, audioPassthrough=$audioPassthroughEnabled")
 
-        Log.d(TAG, "Creating ExoPlayer instance, isPaused=$isPaused")
+        // Configure audio attributes for passthrough
+        val audioAttributes = if (audioPassthroughEnabled) {
+            Log.d(TAG, "Configuring AudioAttributes for HDMI passthrough (movie content)")
+            AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                .build()
+        } else {
+            AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .build()
+        }
+
+        Log.d(TAG, "Creating ExoPlayer instance, isPaused=$isPaused, audioPassthrough=$audioPassthroughEnabled")
         player = ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector!!)
             .setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT)
+            .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
             .build()
             .apply {
                 setVideoSurfaceView(surfaceView)
@@ -439,11 +458,19 @@ class ExoPlayerView @JvmOverloads constructor(
     /**
      * Automatically select a supported audio track if the default/current selection
      * uses an unsupported codec (like AC3/EAC3 on devices without Dolby license).
+     * When audio passthrough is enabled, all surround formats are allowed via HDMI.
      */
     private fun autoSelectSupportedAudioTrack(tracks: Tracks) {
+        // Skip auto-selection when passthrough is enabled - let ExoPlayer handle it
+        // Passthrough will send AC3/EAC3/DTS directly to the receiver via HDMI
+        if (audioPassthroughEnabled) {
+            Log.d(TAG, "Audio passthrough enabled - skipping auto codec selection, allowing all formats via HDMI")
+            return
+        }
+
         val selector = trackSelector ?: return
 
-        Log.d(TAG, "Checking audio tracks for supported codecs")
+        Log.d(TAG, "Checking audio tracks for supported codecs (passthrough disabled)")
 
         for (group in tracks.groups) {
             if (group.type != C.TRACK_TYPE_AUDIO) continue
@@ -550,54 +577,192 @@ class ExoPlayerView @JvmOverloads constructor(
         onErrorCallback?.invoke("No supported audio formats available on this device")
     }
 
+    // Store track group mappings for proper selection
+    // We store the actual TrackGroup reference to avoid index mismatches
+    private data class TrackInfo(val trackGroup: TrackGroup, val trackIndex: Int, val format: Format)
+    private var audioTrackMap = mutableMapOf<Int, TrackInfo>()
+    private var subtitleTrackMap = mutableMapOf<Int, TrackInfo>()
+
+    /**
+     * Convert ISO 639 language codes to human readable names
+     */
+    private fun getLanguageName(code: String): String? {
+        if (code.isEmpty()) return null
+        return when (code.lowercase()) {
+            "en", "eng" -> "English"
+            "es", "spa" -> "Spanish"
+            "fr", "fra", "fre" -> "French"
+            "de", "deu", "ger" -> "German"
+            "it", "ita" -> "Italian"
+            "pt", "por" -> "Portuguese"
+            "ru", "rus" -> "Russian"
+            "ja", "jpn" -> "Japanese"
+            "ko", "kor" -> "Korean"
+            "zh", "zho", "chi" -> "Chinese"
+            "ar", "ara" -> "Arabic"
+            "hi", "hin" -> "Hindi"
+            "nl", "nld", "dut" -> "Dutch"
+            "pl", "pol" -> "Polish"
+            "sv", "swe" -> "Swedish"
+            "da", "dan" -> "Danish"
+            "no", "nor" -> "Norwegian"
+            "fi", "fin" -> "Finnish"
+            "tr", "tur" -> "Turkish"
+            "cs", "ces", "cze" -> "Czech"
+            "el", "ell", "gre" -> "Greek"
+            "he", "heb" -> "Hebrew"
+            "hu", "hun" -> "Hungarian"
+            "id", "ind" -> "Indonesian"
+            "th", "tha" -> "Thai"
+            "vi", "vie" -> "Vietnamese"
+            "uk", "ukr" -> "Ukrainian"
+            "ro", "ron", "rum" -> "Romanian"
+            "bg", "bul" -> "Bulgarian"
+            "hr", "hrv" -> "Croatian"
+            "sk", "slk", "slo" -> "Slovak"
+            "sl", "slv" -> "Slovenian"
+            "sr", "srp" -> "Serbian"
+            "lt", "lit" -> "Lithuanian"
+            "lv", "lav" -> "Latvian"
+            "et", "est" -> "Estonian"
+            "ms", "msa", "may" -> "Malay"
+            "ta", "tam" -> "Tamil"
+            "te", "tel" -> "Telugu"
+            "bn", "ben" -> "Bengali"
+            "ml", "mal" -> "Malayalam"
+            "mr", "mar" -> "Marathi"
+            "gu", "guj" -> "Gujarati"
+            "kn", "kan" -> "Kannada"
+            "pa", "pan" -> "Punjabi"
+            "und" -> "Unknown"
+            else -> null
+        }
+    }
+
     private fun parseAndSendTracks(tracks: Tracks) {
         val audioTracks = mutableListOf<Map<String, Any>>()
         val subtitleTracks = mutableListOf<Map<String, Any>>()
 
+        // Clear track maps
+        audioTrackMap.clear()
+        subtitleTrackMap.clear()
+
         // Cache codec support checks to avoid repeated queries
         val codecSupportCache = mutableMapOf<String, Boolean>()
 
-        for (group in tracks.groups) {
+        // Use global indices for proper track identification
+        var audioIndex = 0
+        var subtitleIndex = 0
+
+        // Track seen audio formats to detect duplicates (same language + codec)
+        val seenAudioFormats = mutableSetOf<String>()
+
+        for ((groupIndex, group) in tracks.groups.withIndex()) {
             val trackGroup = group.mediaTrackGroup
-            for (i in 0 until trackGroup.length) {
-                val format = trackGroup.getFormat(i)
-                val trackType = format.sampleMimeType ?: continue
 
-                when {
-                    trackType.startsWith("audio/") -> {
+            when (group.type) {
+                C.TRACK_TYPE_AUDIO -> {
+                    for (i in 0 until trackGroup.length) {
+                        val format = trackGroup.getFormat(i)
+                        val trackType = format.sampleMimeType ?: continue
+
                         // Check if this audio codec is supported
-                        val isSupported = codecSupportCache.getOrPut(trackType) {
-                            isAudioCodecSupported(trackType)
+                        // When passthrough is enabled, surround formats (AC3/EAC3/DTS) are supported via HDMI
+                        val isPassthroughFormat = trackType in PROBLEMATIC_AUDIO_CODECS
+                        val isSupported = if (audioPassthroughEnabled && isPassthroughFormat) {
+                            true // Passthrough formats are supported via HDMI
+                        } else {
+                            codecSupportCache.getOrPut(trackType) {
+                                isAudioCodecSupported(trackType)
+                            }
                         }
 
-                        // Build track name with codec info
-                        val baseName = format.label ?: format.language?.uppercase() ?: "Audio ${i + 1}"
-                        val codecName = format.codecs ?: trackType.removePrefix("audio/").uppercase()
-                        val displayName = if (!isSupported) {
-                            "$baseName ($codecName - Unsupported)"
-                        } else {
-                            baseName
+                        // Get codec display name
+                        val codecName = when (trackType) {
+                            MimeTypes.AUDIO_AAC -> "AAC"
+                            MimeTypes.AUDIO_AC3 -> "AC3"
+                            MimeTypes.AUDIO_E_AC3 -> "EAC3"
+                            MimeTypes.AUDIO_DTS -> "DTS"
+                            MimeTypes.AUDIO_OPUS -> "Opus"
+                            MimeTypes.AUDIO_VORBIS -> "Vorbis"
+                            MimeTypes.AUDIO_FLAC -> "FLAC"
+                            else -> format.codecs?.split(".")?.firstOrNull()?.uppercase() ?: trackType.removePrefix("audio/").uppercase()
                         }
+
+                        // Get channel info
+                        val channels = when (format.channelCount) {
+                            1 -> "Mono"
+                            2 -> "Stereo"
+                            6 -> "5.1"
+                            8 -> "7.1"
+                            else -> if (format.channelCount > 0) "${format.channelCount}ch" else ""
+                        }
+
+                        // Build language name
+                        val langName = format.label ?: getLanguageName(format.language ?: "") ?: format.language?.uppercase() ?: ""
+
+                        // Create unique key to detect duplicates
+                        val uniqueKey = "${format.language ?: ""}_${trackType}_${format.channelCount}_${format.bitrate}"
+
+                        // Skip duplicates (same language, codec, channels, bitrate)
+                        if (seenAudioFormats.contains(uniqueKey)) {
+                            Log.d(TAG, "Skipping duplicate audio track: $uniqueKey")
+                            continue
+                        }
+                        seenAudioFormats.add(uniqueKey)
+
+                        // Build display name with codec and channel info
+                        val displayParts = mutableListOf<String>()
+                        if (langName.isNotEmpty()) displayParts.add(langName)
+
+                        val codecPart = if (channels.isNotEmpty()) "$codecName $channels" else codecName
+                        displayParts.add(codecPart)
+
+                        // Show passthrough indicator for surround formats when passthrough is enabled
+                        if (audioPassthroughEnabled && isPassthroughFormat) {
+                            displayParts.add("Passthrough")
+                        } else if (!isSupported) {
+                            displayParts.add("Unsupported")
+                        }
+
+                        val displayName = displayParts.joinToString(" • ")
+
+                        // Store mapping for track selection - store the actual TrackGroup reference
+                        audioTrackMap[audioIndex] = TrackInfo(trackGroup, i, format)
 
                         val track = mapOf(
-                            "id" to i,
+                            "id" to audioIndex,
                             "name" to displayName,
                             "language" to (format.language ?: ""),
                             "codec" to (format.codecs ?: trackType),
                             "supported" to isSupported
                         )
                         audioTracks.add(track)
-                        Log.d(TAG, "Found audio track: $track (supported=$isSupported)")
+                        Log.d(TAG, "Found audio track $audioIndex: $displayName (trackInGroup=$i, codec=$trackType)")
+                        audioIndex++
                     }
-                    trackType.startsWith("text/") || trackType == MimeTypes.APPLICATION_SUBRIP -> {
+                }
+                C.TRACK_TYPE_TEXT -> {
+                    for (i in 0 until trackGroup.length) {
+                        val format = trackGroup.getFormat(i)
+                        val trackType = format.sampleMimeType ?: continue
+
+                        if (!trackType.startsWith("text/") && trackType != MimeTypes.APPLICATION_SUBRIP) continue
+
+                        val langName = format.label ?: getLanguageName(format.language ?: "") ?: format.language?.uppercase() ?: "Subtitle ${subtitleIndex + 1}"
+
+                        // Store mapping for track selection - store the actual TrackGroup reference
+                        subtitleTrackMap[subtitleIndex] = TrackInfo(trackGroup, i, format)
+
                         val track = mapOf(
-                            "id" to i,
-                            "name" to (format.label ?: format.language?.uppercase() ?: "Subtitle ${i + 1}"),
+                            "id" to subtitleIndex,
+                            "name" to langName,
                             "language" to (format.language ?: ""),
                             "codec" to (format.codecs ?: trackType)
                         )
                         subtitleTracks.add(track)
-                        Log.d(TAG, "Found subtitle track: $track")
+                        Log.d(TAG, "Found subtitle track $subtitleIndex: $langName (trackInGroup=$i)")
+                        subtitleIndex++
                     }
                 }
             }
@@ -820,115 +985,153 @@ class ExoPlayerView @JvmOverloads constructor(
 
     fun setAudioTrack(trackId: Int) {
         Log.d(TAG, "setAudioTrack: $trackId")
-        val player = player ?: return
-        val trackSelector = trackSelector ?: return
+        val player = player ?: run {
+            Log.e(TAG, "setAudioTrack: player is null")
+            return
+        }
+        val selector = trackSelector ?: run {
+            Log.e(TAG, "setAudioTrack: trackSelector is null")
+            return
+        }
 
         if (trackId == -1) {
             // Disable audio
-            trackSelector.setParameters(
-                trackSelector.buildUponParameters()
+            Log.d(TAG, "Disabling audio track")
+            selector.setParameters(
+                selector.buildUponParameters()
                     .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
             )
-        } else {
-            // Find and select the audio track
-            val tracks = player.currentTracks
-            for (group in tracks.groups) {
-                if (group.type == C.TRACK_TYPE_AUDIO) {
-                    val trackGroup = group.mediaTrackGroup
-                    if (trackId < trackGroup.length) {
-                        // Check if the selected codec is supported
-                        val format = trackGroup.getFormat(trackId)
-                        val mimeType = format.sampleMimeType ?: ""
-                        val isSupported = isAudioCodecSupported(mimeType)
-
-                        if (!isSupported) {
-                            Log.w(TAG, "Selected audio track $trackId uses unsupported codec: $mimeType")
-                            // Find first supported audio track as fallback
-                            var fallbackTrackId: Int? = null
-                            for (i in 0 until trackGroup.length) {
-                                val fallbackFormat = trackGroup.getFormat(i)
-                                val fallbackMimeType = fallbackFormat.sampleMimeType ?: ""
-                                if (isAudioCodecSupported(fallbackMimeType)) {
-                                    fallbackTrackId = i
-                                    Log.d(TAG, "Found supported fallback audio track: $i ($fallbackMimeType)")
-                                    break
-                                }
-                            }
-
-                            if (fallbackTrackId != null) {
-                                // Use the fallback track
-                                trackSelector.setParameters(
-                                    trackSelector.buildUponParameters()
-                                        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
-                                        .setOverrideForType(
-                                            TrackSelectionOverride(trackGroup, listOf(fallbackTrackId))
-                                        )
-                                )
-                                onErrorCallback?.invoke("Audio format not supported on this device. Using fallback audio track.")
-                            } else {
-                                // No supported tracks found, try anyway (might fail)
-                                Log.w(TAG, "No supported audio tracks found, attempting to use unsupported track")
-                                trackSelector.setParameters(
-                                    trackSelector.buildUponParameters()
-                                        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
-                                        .setOverrideForType(
-                                            TrackSelectionOverride(trackGroup, listOf(trackId))
-                                        )
-                                )
-                            }
-                        } else {
-                            // Codec is supported, select normally
-                            trackSelector.setParameters(
-                                trackSelector.buildUponParameters()
-                                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
-                                    .setOverrideForType(
-                                        TrackSelectionOverride(trackGroup, listOf(trackId))
-                                    )
-                            )
-                        }
-                        break
-                    }
-                }
-            }
+            return
         }
+
+        // Look up the track in our mapping
+        val trackInfo = audioTrackMap[trackId]
+        if (trackInfo == null) {
+            Log.e(TAG, "Audio track $trackId not found in track map. Available tracks: ${audioTrackMap.keys}")
+            return
+        }
+
+        val trackGroup = trackInfo.trackGroup
+        val trackIndex = trackInfo.trackIndex
+
+        Log.d(TAG, "Selecting audio track $trackId -> trackIndex=$trackIndex in trackGroup (length=${trackGroup.length})")
+
+        if (trackIndex >= trackGroup.length) {
+            Log.e(TAG, "Track index $trackIndex out of bounds for group (length=${trackGroup.length})")
+            return
+        }
+
+        // Check if the selected codec is supported (for logging purposes)
+        val format = trackGroup.getFormat(trackIndex)
+        val mimeType = format.sampleMimeType ?: ""
+        val isPassthroughFormat = mimeType in PROBLEMATIC_AUDIO_CODECS
+        val isSupported = if (audioPassthroughEnabled && isPassthroughFormat) {
+            true
+        } else {
+            isAudioCodecSupported(mimeType)
+        }
+
+        if (!isSupported && !audioPassthroughEnabled) {
+            Log.w(TAG, "Selected audio track uses unsupported codec: $mimeType (passthrough disabled)")
+            onErrorCallback?.invoke("Audio format not supported on this device")
+        } else {
+            Log.d(TAG, "Audio track codec: $mimeType, supported=$isSupported, passthrough=$audioPassthroughEnabled")
+        }
+
+        // Select the track using TrackSelectionOverride with the stored TrackGroup
+        selector.setParameters(
+            selector.buildUponParameters()
+                .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+                .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                .setOverrideForType(
+                    TrackSelectionOverride(trackGroup, listOf(trackIndex))
+                )
+        )
+        Log.d(TAG, "Audio track selection applied: trackIndex=$trackIndex, format=$mimeType")
     }
 
     fun setSubtitleTrack(trackId: Int) {
         Log.d(TAG, "setSubtitleTrack: $trackId")
-        val player = player ?: return
-        val trackSelector = trackSelector ?: return
+        val player = player ?: run {
+            Log.e(TAG, "setSubtitleTrack: player is null")
+            return
+        }
+        val selector = trackSelector ?: run {
+            Log.e(TAG, "setSubtitleTrack: trackSelector is null")
+            return
+        }
 
         if (trackId == -1) {
             // Disable subtitles
-            trackSelector.setParameters(
-                trackSelector.buildUponParameters()
+            Log.d(TAG, "Disabling subtitle track")
+            selector.setParameters(
+                selector.buildUponParameters()
                     .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
             )
-        } else {
-            // Find and select the subtitle track
-            val tracks = player.currentTracks
-            for (group in tracks.groups) {
-                if (group.type == C.TRACK_TYPE_TEXT) {
-                    val trackGroup = group.mediaTrackGroup
-                    if (trackId < trackGroup.length) {
-                        trackSelector.setParameters(
-                            trackSelector.buildUponParameters()
-                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-                                .setOverrideForType(
-                                    TrackSelectionOverride(trackGroup, listOf(trackId))
-                                )
-                        )
-                        break
-                    }
-                }
-            }
+            return
         }
+
+        // Look up the track in our mapping
+        val trackInfo = subtitleTrackMap[trackId]
+        if (trackInfo == null) {
+            Log.e(TAG, "Subtitle track $trackId not found in track map. Available tracks: ${subtitleTrackMap.keys}")
+            return
+        }
+
+        val trackGroup = trackInfo.trackGroup
+        val trackIndex = trackInfo.trackIndex
+
+        Log.d(TAG, "Selecting subtitle track $trackId -> trackIndex=$trackIndex in trackGroup (length=${trackGroup.length})")
+
+        if (trackIndex >= trackGroup.length) {
+            Log.e(TAG, "Subtitle track index $trackIndex out of bounds for group (length=${trackGroup.length})")
+            return
+        }
+
+        // Select the track using TrackSelectionOverride with the stored TrackGroup
+        selector.setParameters(
+            selector.buildUponParameters()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                .setOverrideForType(
+                    TrackSelectionOverride(trackGroup, listOf(trackIndex))
+                )
+        )
+        Log.d(TAG, "Subtitle track selection applied: trackIndex=$trackIndex")
     }
 
     fun setResizeMode(mode: String) {
         Log.d(TAG, "setResizeMode: $mode")
         resizeMode = mode
         player?.videoSize?.let { updateAspectRatio(it) }
+    }
+
+    fun setAudioPassthrough(enabled: Boolean) {
+        Log.d(TAG, "setAudioPassthrough: $enabled")
+        val wasEnabled = audioPassthroughEnabled
+        audioPassthroughEnabled = enabled
+
+        // If passthrough setting changed and we have an active player, we need to recreate it
+        // to apply the new audio configuration
+        if (wasEnabled != enabled && player != null && pendingSource != null) {
+            Log.d(TAG, "Audio passthrough setting changed - reinitializing player")
+            val currentPosition = player?.currentPosition ?: 0
+            val wasPlaying = player?.isPlaying ?: false
+
+            // Release and recreate player with new audio settings
+            release()
+            initializePlayer()
+
+            // Restore position after a short delay
+            if (currentPosition > 0) {
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    player?.seekTo(currentPosition)
+                    if (wasPlaying) {
+                        player?.playWhenReady = true
+                    }
+                }, 500)
+            }
+        }
     }
 
     fun release() {

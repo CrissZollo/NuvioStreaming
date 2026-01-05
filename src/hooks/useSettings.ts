@@ -90,6 +90,12 @@ export interface AppSettings {
   useExternalPlayerForDownloads: boolean; // Enable/disable external player for downloaded content
   // Android MPV player settings
   useHardwareDecoding: boolean; // Enable hardware decoding for MPV player on Android (default: false for software decoding)
+  // Default track preferences
+  defaultAudioLanguage: string; // Preferred audio language (ISO 639-1 code, e.g., 'en', 'es', 'ru')
+  defaultSubtitleLanguage: string; // Preferred subtitle language (ISO 639-1 code, e.g., 'en', 'es', 'off')
+  defaultSubtitleEnabled: boolean; // Whether subtitles should be enabled by default
+  // Android TV ExoPlayer settings
+  enableAudioPassthrough: boolean; // Enable HDMI audio passthrough for AC3/EAC3/DTS (TV only)
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -153,6 +159,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enableStreamsBackdrop: true, // Enable by default (new behavior)
   // Android MPV player settings
   useHardwareDecoding: false, // Default to software decoding (more compatible)
+  // Default track preferences
+  defaultAudioLanguage: '', // Empty means auto-select (first available)
+  defaultSubtitleLanguage: '', // Empty means auto-select
+  defaultSubtitleEnabled: false, // Subtitles off by default
+  // Android TV ExoPlayer settings
+  enableAudioPassthrough: false, // Disabled by default - requires HDMI connection to compatible receiver
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
@@ -235,7 +247,9 @@ export const useSettings = () => {
     value: AppSettings[K],
     emitEvent: boolean = true
   ) => {
-    const newSettings = { ...settings, [key]: value };
+    // Use cached settings or current settings to ensure we have the latest
+    const currentSettings = cachedSettings || settings;
+    const newSettings = { ...currentSettings, [key]: value };
     try {
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
@@ -247,7 +261,7 @@ export const useSettings = () => {
       // Ensure a current scope exists to avoid future loads missing the chosen scope
       await mmkvStorage.setItem('@user:current', scope);
 
-      // Update cache
+      // Update cache IMMEDIATELY so subsequent calls see the new value
       cachedSettings = newSettings;
       settingsCacheTimestamp = Date.now();
 

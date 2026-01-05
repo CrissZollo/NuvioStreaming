@@ -20,6 +20,7 @@ export interface ExoPlayerProps {
     rate?: number;
     resizeMode?: 'contain' | 'cover' | 'stretch';
     style?: any;
+    enableAudioPassthrough?: boolean;
     onLoad?: (data: { duration: number; width: number; height: number }) => void;
     onProgress?: (data: { currentTime: number; duration: number }) => void;
     onEnd?: () => void;
@@ -96,6 +97,7 @@ const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
             volume={props.volume ?? 1.0}
             rate={props.rate ?? 1.0}
             resizeMode={props.resizeMode ?? 'contain'}
+            enableAudioPassthrough={props.enableAudioPassthrough ?? false}
             onLoad={handleLoad}
             onProgress={handleProgress}
             onEnd={handleEnd}

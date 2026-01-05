@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import { View, StyleSheet, Platform, Animated } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { toast } from '@backpackapp-io/react-native-toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -86,6 +87,199 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Get the active player ref based on device type
   const activePlayerRef = isTVDevice ? exoPlayerRef : mpvPlayerRef;
+
+  // Track if we've already applied default track preferences for this session
+  const hasAppliedDefaultTracksRef = useRef(false);
+
+  // Helper function to find the best matching track by language
+  const findTrackByLanguage = useCallback((tracks: any[], preferredLanguage: string): number | null => {
+    if (!preferredLanguage || !tracks || tracks.length === 0) return null;
+
+    const langLower = preferredLanguage.toLowerCase();
+
+    // Try exact match first (e.g., 'en' matches 'en' or 'eng')
+    for (const track of tracks) {
+      const trackLang = (track.language || '').toLowerCase();
+      if (trackLang === langLower ||
+          trackLang.startsWith(langLower) ||
+          langLower.startsWith(trackLang)) {
+        return track.id;
+      }
+    }
+
+    // Try matching by common language codes
+    const langMappings: { [key: string]: string[] } = {
+      'en': ['en', 'eng', 'english'],
+      'es': ['es', 'spa', 'spanish'],
+      'fr': ['fr', 'fra', 'fre', 'french'],
+      'de': ['de', 'deu', 'ger', 'german'],
+      'it': ['it', 'ita', 'italian'],
+      'pt': ['pt', 'por', 'portuguese'],
+      'ru': ['ru', 'rus', 'russian'],
+      'ja': ['ja', 'jpn', 'japanese'],
+      'ko': ['ko', 'kor', 'korean'],
+      'zh': ['zh', 'zho', 'chi', 'chinese'],
+      'ar': ['ar', 'ara', 'arabic'],
+      'hi': ['hi', 'hin', 'hindi'],
+      'nl': ['nl', 'nld', 'dut', 'dutch'],
+      'pl': ['pl', 'pol', 'polish'],
+      'tr': ['tr', 'tur', 'turkish'],
+      'sv': ['sv', 'swe', 'swedish'],
+      'da': ['da', 'dan', 'danish'],
+      'no': ['no', 'nor', 'norwegian'],
+      'fi': ['fi', 'fin', 'finnish'],
+      'cs': ['cs', 'ces', 'cze', 'czech'],
+      'hu': ['hu', 'hun', 'hungarian'],
+      'ro': ['ro', 'ron', 'rum', 'romanian'],
+      'el': ['el', 'ell', 'gre', 'greek'],
+      'he': ['he', 'heb', 'hebrew'],
+      'th': ['th', 'tha', 'thai'],
+      'vi': ['vi', 'vie', 'vietnamese'],
+      'id': ['id', 'ind', 'indonesian'],
+      'ms': ['ms', 'msa', 'may', 'malay'],
+      'uk': ['uk', 'ukr', 'ukrainian'],
+    };
+
+    const matchingCodes = langMappings[langLower] || [langLower];
+
+    for (const track of tracks) {
+      const trackLang = (track.language || '').toLowerCase();
+      if (matchingCodes.some(code => trackLang.includes(code) || code.includes(trackLang))) {
+        return track.id;
+      }
+    }
+
+    return null;
+  }, []);
+
+  // Helper function to find the best matching SUPPORTED track by language
+  const findSupportedTrackByLanguage = useCallback((tracks: any[], preferredLanguage: string): number | null => {
+    if (!preferredLanguage || !tracks || tracks.length === 0) return null;
+
+    const langLower = preferredLanguage.toLowerCase();
+
+    // Language mapping for matching different codes
+    const langMappings: { [key: string]: string[] } = {
+      'en': ['en', 'eng', 'english'],
+      'es': ['es', 'spa', 'spanish'],
+      'fr': ['fr', 'fra', 'fre', 'french'],
+      'de': ['de', 'deu', 'ger', 'german'],
+      'it': ['it', 'ita', 'italian'],
+      'pt': ['pt', 'por', 'portuguese'],
+      'ru': ['ru', 'rus', 'russian'],
+      'ja': ['ja', 'jpn', 'japanese'],
+      'ko': ['ko', 'kor', 'korean'],
+      'zh': ['zh', 'zho', 'chi', 'chinese'],
+      'ar': ['ar', 'ara', 'arabic'],
+      'hi': ['hi', 'hin', 'hindi'],
+      'nl': ['nl', 'nld', 'dut', 'dutch'],
+      'pl': ['pl', 'pol', 'polish'],
+      'tr': ['tr', 'tur', 'turkish'],
+      'sv': ['sv', 'swe', 'swedish'],
+      'da': ['da', 'dan', 'danish'],
+      'no': ['no', 'nor', 'norwegian'],
+      'fi': ['fi', 'fin', 'finnish'],
+      'cs': ['cs', 'ces', 'cze', 'czech'],
+      'hu': ['hu', 'hun', 'hungarian'],
+      'ro': ['ro', 'ron', 'rum', 'romanian'],
+      'el': ['el', 'ell', 'gre', 'greek'],
+      'he': ['he', 'heb', 'hebrew'],
+      'th': ['th', 'tha', 'thai'],
+      'vi': ['vi', 'vie', 'vietnamese'],
+      'id': ['id', 'ind', 'indonesian'],
+      'ms': ['ms', 'msa', 'may', 'malay'],
+      'uk': ['uk', 'ukr', 'ukrainian'],
+    };
+
+    const matchingCodes = langMappings[langLower] || [langLower];
+
+    // Helper to check if track language matches
+    const isLanguageMatch = (trackLang: string): boolean => {
+      const trackLangLower = trackLang.toLowerCase();
+      return trackLangLower === langLower ||
+             trackLangLower.startsWith(langLower) ||
+             langLower.startsWith(trackLangLower) ||
+             matchingCodes.some(code => trackLangLower.includes(code) || code.includes(trackLangLower));
+    };
+
+    // First, try to find a SUPPORTED track matching the language
+    for (const track of tracks) {
+      const trackLang = (track.language || '').toLowerCase();
+      const isSupported = track.supported !== false; // Default to supported if not specified
+
+      if (isSupported && isLanguageMatch(trackLang)) {
+        console.log('[AndroidVideoPlayer] Found supported track matching language:', track.id, trackLang);
+        return track.id;
+      }
+    }
+
+    // If no supported track matches the preferred language, don't select anything
+    // (let the native player handle default selection or show error)
+    console.log('[AndroidVideoPlayer] No supported track found for language:', preferredLanguage);
+    return null;
+  }, []);
+
+  // Apply default track preferences when tracks are loaded
+  const applyDefaultTrackPreferences = useCallback((audioTracks: any[], subtitleTracks: any[]) => {
+    if (hasAppliedDefaultTracksRef.current) return;
+    hasAppliedDefaultTracksRef.current = true;
+
+    // Check if there are any supported audio tracks at all
+    const supportedAudioTracks = audioTracks?.filter(t => t.supported !== false) || [];
+
+    console.log('[AndroidVideoPlayer] Applying default track preferences:', {
+      defaultAudioLanguage: settings.defaultAudioLanguage,
+      defaultSubtitleLanguage: settings.defaultSubtitleLanguage,
+      defaultSubtitleEnabled: settings.defaultSubtitleEnabled,
+      audioTracksCount: audioTracks?.length || 0,
+      supportedAudioTracksCount: supportedAudioTracks.length,
+      subtitleTracksCount: subtitleTracks?.length || 0,
+    });
+
+    // Apply default audio language - only if there are supported tracks
+    if (settings.defaultAudioLanguage && supportedAudioTracks.length > 0) {
+      const matchingAudioTrackId = findSupportedTrackByLanguage(audioTracks, settings.defaultAudioLanguage);
+      if (matchingAudioTrackId !== null) {
+        console.log('[AndroidVideoPlayer] Auto-selecting supported audio track:', matchingAudioTrackId);
+        tracksHook.setSelectedAudioTrack({ type: 'index', value: matchingAudioTrackId });
+        if (activePlayerRef.current) {
+          activePlayerRef.current.setAudioTrack(matchingAudioTrackId);
+        }
+      } else {
+        // No supported track matches preferred language - try to select first supported track
+        if (supportedAudioTracks.length > 0) {
+          const firstSupportedTrack = supportedAudioTracks[0];
+          console.log('[AndroidVideoPlayer] Preferred language not found/supported, selecting first supported track:', firstSupportedTrack.id);
+          tracksHook.setSelectedAudioTrack({ type: 'index', value: firstSupportedTrack.id });
+          if (activePlayerRef.current) {
+            activePlayerRef.current.setAudioTrack(firstSupportedTrack.id);
+          }
+        }
+      }
+    } else if (supportedAudioTracks.length === 0 && audioTracks && audioTracks.length > 0) {
+      // All audio tracks are unsupported - don't try to auto-select, let native handle the error
+      console.log('[AndroidVideoPlayer] No supported audio tracks available - skipping auto-selection');
+    }
+
+    // Apply default subtitle language
+    if (settings.defaultSubtitleLanguage && settings.defaultSubtitleLanguage !== 'off' && subtitleTracks && subtitleTracks.length > 0) {
+      const matchingSubtitleTrackId = findTrackByLanguage(subtitleTracks, settings.defaultSubtitleLanguage);
+      if (matchingSubtitleTrackId !== null) {
+        console.log('[AndroidVideoPlayer] Auto-selecting subtitle track:', matchingSubtitleTrackId);
+        tracksHook.setSelectedTextTrack(matchingSubtitleTrackId);
+        if (activePlayerRef.current) {
+          activePlayerRef.current.setSubtitleTrack(matchingSubtitleTrackId);
+        }
+      }
+    } else if (settings.defaultSubtitleLanguage === 'off' || !settings.defaultSubtitleEnabled) {
+      // Disable subtitles by default
+      console.log('[AndroidVideoPlayer] Disabling subtitles by default');
+      tracksHook.setSelectedTextTrack(-1);
+      if (activePlayerRef.current) {
+        activePlayerRef.current.setSubtitleTrack(-1);
+      }
+    }
+  }, [settings.defaultAudioLanguage, settings.defaultSubtitleLanguage, settings.defaultSubtitleEnabled, findTrackByLanguage, findSupportedTrackByLanguage, tracksHook, activePlayerRef]);
 
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>((route.params as any).videoType);
@@ -583,28 +777,52 @@ const AndroidVideoPlayer: React.FC = () => {
                 displayError = JSON.stringify(err);
               }
 
+              // Check if this is an audio codec error - if so, just show a toast and continue
+              // The video will play without audio (or with whatever audio track ExoPlayer can handle)
+              const isAudioError = displayError.toLowerCase().includes('audio') &&
+                                   (displayError.toLowerCase().includes('not supported') ||
+                                    displayError.toLowerCase().includes('no supported'));
+
+              if (isAudioError) {
+                // Just log and show a brief toast - don't block playback
+                console.log('[AndroidVideoPlayer] Audio codec not supported - continuing playback without audio');
+                toast.error('Audio format not supported - playing without audio', { duration: 3000 });
+                // Don't show error modal, let playback continue
+                return;
+              }
+
               modals.setErrorDetails(displayError);
               modals.setShowErrorModal(true);
             }}
             onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
             onTracksChanged={(data) => {
               console.log('[AndroidVideoPlayer] onTracksChanged:', data);
+              let formattedAudioTracks: any[] = [];
+              let formattedSubtitleTracks: any[] = [];
+
               if (data?.audioTracks) {
-                const formatted = data.audioTracks.map((t: any) => ({
+                formattedAudioTracks = data.audioTracks.map((t: any) => ({
                   id: t.id,
                   name: t.name || `Track ${t.id}`,
-                  language: t.language
+                  language: t.language,
+                  supported: t.supported,
                 }));
-                tracksHook.setRnVideoAudioTracks(formatted);
+                tracksHook.setRnVideoAudioTracks(formattedAudioTracks);
               }
               if (data?.subtitleTracks) {
-                const formatted = data.subtitleTracks.map((t: any) => ({
+                formattedSubtitleTracks = data.subtitleTracks.map((t: any) => ({
                   id: t.id,
                   name: t.name || `Track ${t.id}`,
                   language: t.language
                 }));
-                tracksHook.setRnVideoTextTracks(formatted);
+                tracksHook.setRnVideoTextTracks(formattedSubtitleTracks);
               }
+
+              // Apply default track preferences after tracks are loaded
+              // Use a small delay to ensure player is ready
+              setTimeout(() => {
+                applyDefaultTrackPreferences(formattedAudioTracks, formattedSubtitleTracks);
+              }, 500);
             }}
             mpvPlayerRef={mpvPlayerRef}
             exoPlayerRef={exoPlayerRef}
@@ -613,7 +831,35 @@ const AndroidVideoPlayer: React.FC = () => {
             onPinchHandlerStateChange={() => { }}
             screenDimensions={playerState.screenDimensions}
             useHardwareDecoding={settings.useHardwareDecoding}
+            enableAudioPassthrough={settings.enableAudioPassthrough}
           />
+        )}
+
+        {/* Pause indicator - shows when video is paused (TV only) */}
+        {isTVDevice && playerState.paused && !playerState.showControls && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            <View style={{
+              width: 80,
+              height: 80,
+              borderRadius: 40,
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <MaterialIcons name="pause" size={48} color="white" />
+            </View>
+          </View>
         )}
 
         {/* Custom Subtitles for addon subtitles */}
@@ -771,6 +1017,10 @@ const AndroidVideoPlayer: React.FC = () => {
             activePlayerRef.current.setAudioTrack(trackId);
           }
         }}
+        onModalClosed={() => {
+          // Re-show controls to restore focus on TV
+          playerState.setShowControls(true);
+        }}
       />
 
       <SubtitleModals
@@ -826,6 +1076,10 @@ const AndroidVideoPlayer: React.FC = () => {
         setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
         subtitleOffsetSec={subtitleOffsetSec}
         setSubtitleOffsetSec={setSubtitleOffsetSec}
+        onModalClosed={() => {
+          // Re-show controls to restore focus on TV
+          playerState.setShowControls(true);
+        }}
       />
 
       <SourcesModal

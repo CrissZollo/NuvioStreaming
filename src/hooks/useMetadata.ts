@@ -653,6 +653,16 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                   setImdbId(imdbId);
                   // Also store the TMDB ID for later use
                   setTmdbId(parseInt(tmdbId));
+                  // Store the pre-fetched logo for use later in the general metadata path
+                  // This prevents the logo from being lost when we have an IMDb ID and continue to addon fetching
+                  // Use imdbId as key to prevent race conditions with multiple loads
+                  if (logoResult.status === 'fulfilled' && logoResult.value) {
+                    (globalThis as any).__prefetchedTVLogo = {
+                      logo: logoResult.value,
+                      imdbId: imdbId,
+                    };
+                    if (__DEV__) logger.log(`Pre-fetched TV show logo for later use: ${tmdbId} (IMDb: ${imdbId})`);
+                  }
                 } else {
                   // If no IMDb ID, create formatted show from TMDB data
                   const formattedShow: StreamingContent = {
@@ -909,35 +919,51 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         // Centralized logo fetching logic
         try {
           if (settings.enrichMetadataWithTMDB) {
-            // Only use TMDB logos when enrichment is ON
-            const tmdbService = TMDBService.getInstance();
-            const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-            const contentType = type === 'series' ? 'tv' : 'movie';
-
-            // Get TMDB ID
-            let tmdbIdForLogo = null;
-            if (tmdbId) {
-              tmdbIdForLogo = String(tmdbId);
-            } else if (finalMetadata.imdb_id) {
-              const foundId = await tmdbService.findTMDBIdByIMDB(finalMetadata.imdb_id);
-              tmdbIdForLogo = foundId ? String(foundId) : null;
-            }
-
-            if (tmdbIdForLogo) {
-              const logoUrl = await tmdbService.getContentLogo(contentType, tmdbIdForLogo, preferredLanguage);
-              finalMetadata.logo = logoUrl || undefined; // TMDB logo or undefined (no addon fallback)
+            // Check if we have a pre-fetched logo from the TV show early path
+            const prefetchedData = (globalThis as any).__prefetchedTVLogo;
+            const currentImdbId = finalMetadata.imdb_id || actualId;
+            if (prefetchedData && type === 'series' && prefetchedData.imdbId === currentImdbId) {
+              // Use the pre-fetched logo and clear it
+              finalMetadata.logo = prefetchedData.logo;
+              delete (globalThis as any).__prefetchedTVLogo;
               if (__DEV__) {
-                console.log('[useMetadata] Logo fetch result:', {
-                  contentType,
-                  tmdbIdForLogo,
-                  preferredLanguage,
-                  logoUrl: !!logoUrl,
+                console.log('[useMetadata] Using pre-fetched TV show logo:', {
+                  hasLogo: true,
+                  imdbId: currentImdbId,
                   enrichmentEnabled: true
                 });
               }
             } else {
-              finalMetadata.logo = undefined; // No TMDB ID means no logo
-              if (__DEV__) console.log('[useMetadata] No TMDB ID found for logo, will show text title');
+              // Only use TMDB logos when enrichment is ON
+              const tmdbService = TMDBService.getInstance();
+              const preferredLanguage = settings.tmdbLanguagePreference || 'en';
+              const contentType = type === 'series' ? 'tv' : 'movie';
+
+              // Get TMDB ID
+              let tmdbIdForLogo = null;
+              if (tmdbId) {
+                tmdbIdForLogo = String(tmdbId);
+              } else if (finalMetadata.imdb_id) {
+                const foundId = await tmdbService.findTMDBIdByIMDB(finalMetadata.imdb_id);
+                tmdbIdForLogo = foundId ? String(foundId) : null;
+              }
+
+              if (tmdbIdForLogo) {
+                const logoUrl = await tmdbService.getContentLogo(contentType, tmdbIdForLogo, preferredLanguage);
+                finalMetadata.logo = logoUrl || undefined; // TMDB logo or undefined (no addon fallback)
+                if (__DEV__) {
+                  console.log('[useMetadata] Logo fetch result:', {
+                    contentType,
+                    tmdbIdForLogo,
+                    preferredLanguage,
+                    logoUrl: !!logoUrl,
+                    enrichmentEnabled: true
+                  });
+                }
+              } else {
+                finalMetadata.logo = undefined; // No TMDB ID means no logo
+                if (__DEV__) console.log('[useMetadata] No TMDB ID found for logo, will show text title');
+              }
             }
           } else {
             // When enrichment is OFF, keep addon logo or undefined

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import * as ExpoClipboard from 'expo-clipboard';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, BackHandler } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
     FadeIn,
@@ -8,6 +8,8 @@ import Animated, {
     ZoomIn,
     ZoomOut,
 } from 'react-native-reanimated';
+import { useIsTV } from '../../../contexts/TVContext';
+import { Focusable } from '../../tv/Focusable';
 
 interface ErrorModalProps {
     showErrorModal: boolean;
@@ -24,7 +26,8 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
 }) => {
     const [copied, setCopied] = React.useState(false);
     const { width } = useWindowDimensions();
-    const MODAL_WIDTH = Math.min(width * 0.8, 400);
+    const isTVDevice = useIsTV();
+    const MODAL_WIDTH = isTVDevice ? Math.min(width * 0.5, 500) : Math.min(width * 0.8, 400);
 
     const handleClose = () => {
         setShowErrorModal(false);
@@ -32,6 +35,18 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
             onDismiss();
         }
     };
+
+    // Handle Android TV back button to close modal
+    useEffect(() => {
+        if (!showErrorModal) return;
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+            handleClose();
+            return true; // Prevent default back behavior
+        });
+
+        return () => backHandler.remove();
+    }, [showErrorModal]);
 
     const handleCopy = async () => {
         await ExpoClipboard.setStringAsync(errorDetails);
@@ -118,26 +133,55 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                    style={{
-                        backgroundColor: 'white',
-                        paddingVertical: 12,
-                        paddingHorizontal: 32,
-                        borderRadius: 12,
-                        width: '100%',
-                        alignItems: 'center'
-                    }}
-                    onPress={handleClose}
-                    activeOpacity={0.9}
-                >
-                    <Text style={{
-                        color: 'black',
-                        fontSize: 16,
-                        fontWeight: '700'
-                    }}>
-                        Dismiss
-                    </Text>
-                </TouchableOpacity>
+                {isTVDevice ? (
+                    <Focusable
+                        onPress={handleClose}
+                        autoFocus={true}
+                        style={{
+                            backgroundColor: 'white',
+                            paddingVertical: 14,
+                            paddingHorizontal: 32,
+                            borderRadius: 12,
+                            width: '100%',
+                            alignItems: 'center'
+                        }}
+                        borderRadius={12}
+                        focusScale={1.05}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                    >
+                        {(focused) => (
+                            <Text style={{
+                                color: focused ? '#000' : 'black',
+                                fontSize: 18,
+                                fontWeight: '700'
+                            }}>
+                                Dismiss
+                            </Text>
+                        )}
+                    </Focusable>
+                ) : (
+                    <TouchableOpacity
+                        style={{
+                            backgroundColor: 'white',
+                            paddingVertical: 12,
+                            paddingHorizontal: 32,
+                            borderRadius: 12,
+                            width: '100%',
+                            alignItems: 'center'
+                        }}
+                        onPress={handleClose}
+                        activeOpacity={0.9}
+                    >
+                        <Text style={{
+                            color: 'black',
+                            fontSize: 16,
+                            fontWeight: '700'
+                        }}>
+                            Dismiss
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </Animated.View>
         </View>
     );

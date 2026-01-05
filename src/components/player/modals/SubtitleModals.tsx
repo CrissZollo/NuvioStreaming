@@ -58,6 +58,8 @@ interface SubtitleModalsProps {
   setSubtitleLineHeightMultiplier: (n: number) => void;
   subtitleOffsetSec: number;
   setSubtitleOffsetSec: (n: number) => void;
+  /** Called when modal is closed (for TV focus restoration) */
+  onModalClosed?: () => void;
 }
 
 const MorphingTab = ({ label, isSelected, onPress, isTVDevice, autoFocus }: any) => {
@@ -74,15 +76,21 @@ const MorphingTab = ({ label, isSelected, onPress, isTVDevice, autoFocus }: any)
         style={{ flex: 1 }}
         borderRadius={10}
         focusScale={1.05}
-        animateBackground={false}
+        animateBackground={true}
         showFocusBorder={true}
       >
         {(focused) => (
-          <Animated.View style={[{ paddingVertical: 10, alignItems: 'center', justifyContent: 'center' }, animatedStyle]}>
+          <View style={[{
+            paddingVertical: 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: isSelected ? 10 : 40,
+            backgroundColor: (isSelected || focused) ? 'white' : 'rgba(255,255,255,0.06)',
+          }]}>
             <Text style={{ color: (isSelected || focused) ? 'black' : 'white', fontWeight: (isSelected || focused) ? '700' : '400', fontSize: 15 }}>
               {label}
             </Text>
-          </Animated.View>
+          </View>
         )}
       </Focusable>
     );
@@ -110,6 +118,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleOutlineWidth, setSubtitleOutlineWidth, subtitleAlign, setSubtitleAlign,
   subtitleBottomOffset, setSubtitleBottomOffset, subtitleLetterSpacing, setSubtitleLetterSpacing,
   subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier, subtitleOffsetSec, setSubtitleOffsetSec,
+  onModalClosed,
 }) => {
   const { width, height } = useWindowDimensions();
   const isTVDevice = useIsTV();
@@ -132,7 +141,14 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
     if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) fetchAvailableSubtitles();
   }, [showSubtitleModal]);
 
-  const handleClose = () => setShowSubtitleModal(false);
+  const handleClose = () => {
+    setShowSubtitleModal(false);
+    // Call onModalClosed after a short delay to allow the modal to close
+    // This helps restore focus to the player controls on TV
+    if (isTVDevice && onModalClosed) {
+      setTimeout(() => onModalClosed(), 300);
+    }
+  };
 
   // Handle Android TV back button to close modal
   useEffect(() => {

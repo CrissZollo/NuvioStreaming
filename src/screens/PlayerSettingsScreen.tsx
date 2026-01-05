@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   StatusBar,
   Switch,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSettings, AppSettings } from '../hooks/useSettings';
@@ -121,6 +123,46 @@ const SettingItem: React.FC<SettingItemProps> = ({
   );
 };
 
+// Language options for audio and subtitle selection
+const LANGUAGE_OPTIONS = [
+  { code: '', name: 'Auto (First Available)' },
+  { code: 'en', name: 'English' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'nl', name: 'Dutch' },
+  { code: 'pl', name: 'Polish' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'sv', name: 'Swedish' },
+  { code: 'da', name: 'Danish' },
+  { code: 'no', name: 'Norwegian' },
+  { code: 'fi', name: 'Finnish' },
+  { code: 'cs', name: 'Czech' },
+  { code: 'hu', name: 'Hungarian' },
+  { code: 'ro', name: 'Romanian' },
+  { code: 'el', name: 'Greek' },
+  { code: 'he', name: 'Hebrew' },
+  { code: 'th', name: 'Thai' },
+  { code: 'vi', name: 'Vietnamese' },
+  { code: 'id', name: 'Indonesian' },
+  { code: 'ms', name: 'Malay' },
+  { code: 'uk', name: 'Ukrainian' },
+];
+
+// Subtitle-specific options (includes "Off" option)
+const SUBTITLE_LANGUAGE_OPTIONS = [
+  { code: 'off', name: 'Off (Disabled)' },
+  ...LANGUAGE_OPTIONS,
+];
+
 const PlayerSettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
@@ -135,10 +177,41 @@ const PlayerSettingsScreen: React.FC = () => {
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
 
+  // Language picker modal state
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [languageModalType, setLanguageModalType] = useState<'audio' | 'subtitle'>('audio');
+
   const openAlert = (title: string, message: string) => {
     setAlertTitle(title);
     setAlertMessage(message);
     setAlertVisible(true);
+  };
+
+  const openLanguagePicker = (type: 'audio' | 'subtitle') => {
+    setLanguageModalType(type);
+    setLanguageModalVisible(true);
+  };
+
+  const getLanguageDisplayName = (code: string, type: 'audio' | 'subtitle'): string => {
+    if (type === 'subtitle' && code === 'off') return 'Off (Disabled)';
+    if (!code) return 'Auto (First Available)';
+    const options = type === 'subtitle' ? SUBTITLE_LANGUAGE_OPTIONS : LANGUAGE_OPTIONS;
+    const found = options.find(opt => opt.code === code);
+    return found ? found.name : code.toUpperCase();
+  };
+
+  const handleLanguageSelect = async (code: string) => {
+    if (languageModalType === 'audio') {
+      await updateSetting('defaultAudioLanguage', code);
+    } else {
+      await updateSetting('defaultSubtitleLanguage', code);
+      // If setting to 'off', also disable subtitles by default
+      await updateSetting('defaultSubtitleEnabled', code !== 'off');
+    }
+    // Small delay to ensure state update propagates before modal closes
+    setTimeout(() => {
+      setLanguageModalVisible(false);
+    }, 50);
   };
 
   const playerOptions = [
@@ -509,113 +582,108 @@ const PlayerSettingsScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Hardware Decoding for Android Internal Player */}
-            {Platform.OS === 'android' && !settings.useExternalPlayer && (
-              isTV ? (
-                <Focusable
-                  onPress={() => {
-                    updateSetting('useHardwareDecoding', !settings.useHardwareDecoding);
-                    openAlert(
-                      'Restart Required',
-                      'Please restart the app for the decoding change to take effect.'
-                    );
-                  }}
-                  style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}
-                  borderRadius={0}
-                  focusScale={1}
-                  animateBackground={true}
-                  showFocusBorder={true}
-                >
-                  {(focused) => (
-                    <View style={styles.settingContent}>
-                      <View style={[
-                        styles.settingIconContainer,
-                        { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
-                      ]}>
-                        <MaterialIcons
-                          name="memory"
-                          size={20}
-                          color={focused ? '#000' : currentTheme.colors.primary}
-                        />
-                      </View>
-                      <View style={styles.settingText}>
-                        <Text
-                          style={[
-                            styles.settingTitle,
-                            { color: focused ? '#000' : currentTheme.colors.text },
-                          ]}
-                        >
-                          Hardware Decoding
-                        </Text>
-                        <Text
-                          style={[
-                            styles.settingDescription,
-                            { color: focused ? '#333' : currentTheme.colors.textMuted },
-                          ]}
-                        >
-                          Use GPU for video decoding. May improve performance but can cause issues on some devices.
-                        </Text>
-                      </View>
-                      <View style={styles.tvSwitchContainer}>
-                        <View style={[
-                          styles.tvSwitchTrack,
-                          { backgroundColor: focused ? (settings.useHardwareDecoding ? '#333' : '#666') : (settings.useHardwareDecoding ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
-                        ]}>
-                          <View style={[
-                            styles.tvSwitchThumb,
-                            settings.useHardwareDecoding ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                            { backgroundColor: focused ? '#000' : (settings.useHardwareDecoding ? '#fff' : '#888') }
-                          ]} />
-                        </View>
-                      </View>
-                    </View>
-                  )}
-                </Focusable>
-              ) : (
-                <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+            {/* Hardware Decoding for Android Internal Player - Mobile only */}
+            {Platform.OS === 'android' && !settings.useExternalPlayer && !isTV && (
+              <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+                <View style={styles.settingContent}>
+                  <View style={[
+                    styles.settingIconContainer,
+                    { backgroundColor: 'rgba(255,255,255,0.1)' }
+                  ]}>
+                    <MaterialIcons
+                      name="memory"
+                      size={20}
+                      color={currentTheme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingText}>
+                    <Text
+                      style={[
+                        styles.settingTitle,
+                        { color: currentTheme.colors.text },
+                      ]}
+                    >
+                      Hardware Decoding
+                    </Text>
+                    <Text
+                      style={[
+                        styles.settingDescription,
+                        { color: currentTheme.colors.textMuted },
+                      ]}
+                    >
+                      Use GPU for video decoding. May improve performance but can cause issues on some devices.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={settings.useHardwareDecoding}
+                    onValueChange={(value) => {
+                      updateSetting('useHardwareDecoding', value);
+                      openAlert(
+                        'Restart Required',
+                        'Please restart the app for the decoding change to take effect.'
+                      );
+                    }}
+                    thumbColor={settings.useHardwareDecoding ? currentTheme.colors.primary : undefined}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Audio Passthrough for Android TV - TV only */}
+            {Platform.OS === 'android' && isTV && (
+              <Focusable
+                onPress={() => updateSetting('enableAudioPassthrough', !settings.enableAudioPassthrough)}
+                style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}
+                borderRadius={0}
+                focusScale={1}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
                   <View style={styles.settingContent}>
                     <View style={[
                       styles.settingIconContainer,
-                      { backgroundColor: 'rgba(255,255,255,0.1)' }
+                      { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
                     ]}>
                       <MaterialIcons
-                        name="memory"
+                        name="surround-sound"
                         size={20}
-                        color={currentTheme.colors.primary}
+                        color={focused ? '#000' : currentTheme.colors.primary}
                       />
                     </View>
                     <View style={styles.settingText}>
                       <Text
                         style={[
                           styles.settingTitle,
-                          { color: currentTheme.colors.text },
+                          { color: focused ? '#000' : currentTheme.colors.text },
                         ]}
                       >
-                        Hardware Decoding
+                        Audio Passthrough
                       </Text>
                       <Text
                         style={[
                           styles.settingDescription,
-                          { color: currentTheme.colors.textMuted },
+                          { color: focused ? '#333' : currentTheme.colors.textMuted },
                         ]}
                       >
-                        Use GPU for video decoding. May improve performance but can cause issues on some devices.
+                        Send AC3/EAC3/DTS audio directly to your receiver via HDMI. Requires compatible AVR.
                       </Text>
                     </View>
-                    <Switch
-                      value={settings.useHardwareDecoding}
-                      onValueChange={(value) => {
-                        updateSetting('useHardwareDecoding', value);
-                        openAlert(
-                          'Restart Required',
-                          'Please restart the app for the decoding change to take effect.'
-                        );
-                      }}
-                      thumbColor={settings.useHardwareDecoding ? currentTheme.colors.primary : undefined}
-                    />
+                    <View style={styles.tvSwitchContainer}>
+                      <View style={[
+                        styles.tvSwitchTrack,
+                        { backgroundColor: focused ? (settings.enableAudioPassthrough ? '#333' : '#666') : (settings.enableAudioPassthrough ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                      ]}>
+                        <View style={[
+                          styles.tvSwitchThumb,
+                          settings.enableAudioPassthrough ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
+                          { backgroundColor: focused ? '#000' : (settings.enableAudioPassthrough ? '#fff' : '#888') }
+                        ]} />
+                      </View>
+                    </View>
                   </View>
-                </View>
-              )
+                )}
+              </Focusable>
             )}
 
             {/* External Player for Downloads - hide on TV */}
@@ -661,7 +729,298 @@ const PlayerSettingsScreen: React.FC = () => {
               )}
           </View>
         </View>
+
+        {/* Default Tracks Section */}
+        <View style={styles.section}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: currentTheme.colors.textMuted },
+            ]}
+          >
+            DEFAULT TRACKS
+          </Text>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: currentTheme.colors.elevation2,
+              },
+            ]}
+          >
+            {/* Default Audio Language */}
+            {isTV ? (
+              <Focusable
+                onPress={() => openLanguagePicker('audio')}
+                style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: 'rgba(255,255,255,0.08)' }]}
+                borderRadius={0}
+                focusScale={1.02}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="audiotrack"
+                        size={20}
+                        color={focused ? '#000' : currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: focused ? '#000' : currentTheme.colors.text },
+                        ]}
+                      >
+                        Default Audio Language
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        {getLanguageDisplayName(settings.defaultAudioLanguage, 'audio')}
+                      </Text>
+                    </View>
+                    <MaterialIcons
+                      name="chevron-right"
+                      size={24}
+                      color={focused ? '#000' : currentTheme.colors.textMuted}
+                    />
+                  </View>
+                )}
+              </Focusable>
+            ) : (
+              <TouchableOpacity
+                onPress={() => openLanguagePicker('audio')}
+                activeOpacity={0.7}
+                style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: 'rgba(255,255,255,0.08)' }]}
+              >
+                <View style={styles.settingContent}>
+                  <View style={[
+                    styles.settingIconContainer,
+                    { backgroundColor: 'rgba(255,255,255,0.1)' }
+                  ]}>
+                    <MaterialIcons
+                      name="audiotrack"
+                      size={20}
+                      color={currentTheme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingText}>
+                    <Text
+                      style={[
+                        styles.settingTitle,
+                        { color: currentTheme.colors.text },
+                      ]}
+                    >
+                      Default Audio Language
+                    </Text>
+                    <Text
+                      style={[
+                        styles.settingDescription,
+                        { color: currentTheme.colors.textMuted },
+                      ]}
+                    >
+                      {getLanguageDisplayName(settings.defaultAudioLanguage, 'audio')}
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={24}
+                    color={currentTheme.colors.textMuted}
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Default Subtitle Language */}
+            {isTV ? (
+              <Focusable
+                onPress={() => openLanguagePicker('subtitle')}
+                style={styles.settingItem}
+                borderRadius={0}
+                focusScale={1.02}
+                animateBackground={true}
+                showFocusBorder={true}
+              >
+                {(focused) => (
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="subtitles"
+                        size={20}
+                        color={focused ? '#000' : currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: focused ? '#000' : currentTheme.colors.text },
+                        ]}
+                      >
+                        Default Subtitle Language
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        {getLanguageDisplayName(settings.defaultSubtitleLanguage, 'subtitle')}
+                      </Text>
+                    </View>
+                    <MaterialIcons
+                      name="chevron-right"
+                      size={24}
+                      color={focused ? '#000' : currentTheme.colors.textMuted}
+                    />
+                  </View>
+                )}
+              </Focusable>
+            ) : (
+              <TouchableOpacity
+                onPress={() => openLanguagePicker('subtitle')}
+                activeOpacity={0.7}
+                style={styles.settingItem}
+              >
+                <View style={styles.settingContent}>
+                  <View style={[
+                    styles.settingIconContainer,
+                    { backgroundColor: 'rgba(255,255,255,0.1)' }
+                  ]}>
+                    <MaterialIcons
+                      name="subtitles"
+                      size={20}
+                      color={currentTheme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingText}>
+                    <Text
+                      style={[
+                        styles.settingTitle,
+                        { color: currentTheme.colors.text },
+                      ]}
+                    >
+                      Default Subtitle Language
+                    </Text>
+                    <Text
+                      style={[
+                        styles.settingDescription,
+                        { color: currentTheme.colors.textMuted },
+                      ]}
+                    >
+                      {getLanguageDisplayName(settings.defaultSubtitleLanguage, 'subtitle')}
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={24}
+                    color={currentTheme.colors.textMuted}
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </ScrollView>
+
+      {/* Language Picker Modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setLanguageModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: 'rgba(20, 20, 20, 0.98)' }]}>
+            <Text style={[styles.modalTitle, { color: currentTheme.colors.text }]}>
+              {languageModalType === 'audio' ? 'Select Audio Language' : 'Select Subtitle Language'}
+            </Text>
+            <FlatList
+              data={languageModalType === 'subtitle' ? SUBTITLE_LANGUAGE_OPTIONS : LANGUAGE_OPTIONS}
+              keyExtractor={(item) => item.code}
+              style={styles.languageList}
+              renderItem={({ item, index }) => {
+                const isSelected = languageModalType === 'audio'
+                  ? settings.defaultAudioLanguage === item.code
+                  : settings.defaultSubtitleLanguage === item.code;
+
+                if (isTV) {
+                  return (
+                    <Focusable
+                      onPress={() => handleLanguageSelect(item.code)}
+                      autoFocus={index === 0}
+                      style={[
+                        styles.languageItem,
+                        isSelected && { backgroundColor: 'rgba(255,255,255,0.15)' }
+                      ]}
+                      borderRadius={8}
+                      focusScale={1.02}
+                      animateBackground={true}
+                      showFocusBorder={true}
+                    >
+                      {(focused) => (
+                        <>
+                          <Text style={[
+                            styles.languageText,
+                            { color: focused ? '#000' : currentTheme.colors.text }
+                          ]}>
+                            {item.name}
+                          </Text>
+                          {isSelected && (
+                            <MaterialIcons
+                              name="check"
+                              size={20}
+                              color={focused ? '#000' : currentTheme.colors.primary}
+                            />
+                          )}
+                        </>
+                      )}
+                    </Focusable>
+                  );
+                }
+
+                return (
+                  <TouchableOpacity
+                    onPress={() => handleLanguageSelect(item.code)}
+                    style={[
+                      styles.languageItem,
+                      isSelected && { backgroundColor: 'rgba(255,255,255,0.15)' }
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.languageText, { color: currentTheme.colors.text }]}>
+                      {item.name}
+                    </Text>
+                    {isSelected && (
+                      <MaterialIcons
+                        name="check"
+                        size={20}
+                        color={currentTheme.colors.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <CustomAlert
         visible={alertVisible}
@@ -792,6 +1151,45 @@ const styles = StyleSheet.create({
   },
   tvSwitchThumbOff: {
     left: 0,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '85%',
+    maxWidth: 400,
+    maxHeight: '70%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    paddingVertical: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  languageList: {
+    maxHeight: 400,
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    marginVertical: 2,
+  },
+  languageText: {
+    fontSize: 16,
   },
 });
 

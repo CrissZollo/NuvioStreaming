@@ -181,6 +181,12 @@ class ExoPlayerViewManager : SimpleViewManager<ExoPlayerView>() {
         mode?.let { view.setResizeMode(it) }
     }
 
+    @ReactProp(name = "enableAudioPassthrough")
+    fun setEnableAudioPassthrough(view: ExoPlayerView, enabled: Boolean) {
+        Log.d(TAG, "setEnableAudioPassthrough: $enabled")
+        view.setAudioPassthrough(enabled)
+    }
+
     override fun onDropViewInstance(view: ExoPlayerView) {
         Log.d(TAG, "onDropViewInstance")
         view.release()

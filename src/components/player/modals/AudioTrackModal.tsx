@@ -25,6 +25,8 @@ interface AudioTrackModalProps {
   ksAudioTracks: Array<AudioTrack>;
   selectedAudioTrack: number | null;
   selectAudioTrack: (trackId: number) => void;
+  /** Called when modal is closed (for TV focus restoration) */
+  onModalClosed?: () => void;
 }
 
 export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
@@ -33,6 +35,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   ksAudioTracks,
   selectedAudioTrack,
   selectAudioTrack,
+  onModalClosed,
 }) => {
   const { width, height } = useWindowDimensions();
   const isTVDevice = useIsTV();
@@ -41,7 +44,14 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   const menuWidth = isTVDevice ? Math.min(width * 0.5, 500) : Math.min(width * 0.9, 420);
   const menuMaxHeight = height * 0.9;
 
-  const handleClose = () => setShowAudioModal(false);
+  const handleClose = () => {
+    setShowAudioModal(false);
+    // Call onModalClosed after a short delay to allow the modal to close
+    // This helps restore focus to the player controls on TV
+    if (isTVDevice && onModalClosed) {
+      setTimeout(() => onModalClosed(), 300);
+    }
+  };
 
   // Handle Android TV back button to close modal
   useEffect(() => {
