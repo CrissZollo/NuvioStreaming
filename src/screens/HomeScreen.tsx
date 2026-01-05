@@ -698,10 +698,11 @@ const HomeScreen = () => {
 
   // Memoize individual section components to prevent re-renders
   const memoizedFeaturedContent = useMemo(() => {
-    const heroStyleToUse = settings.heroStyle;
+    // TV uses carousel by default, mobile uses user preference
+    const heroStyleToUse = isTVDevice ? 'carousel' : settings.heroStyle;
 
-    // AppleTVHero is only available on mobile devices (not tablets)
-    if (heroStyleToUse === 'appletv' && !isTablet) {
+    // AppleTVHero is only available on mobile devices (not tablets or TV)
+    if (heroStyleToUse === 'appletv' && !isTablet && !isTVDevice) {
       return (
         <AppleTVHero
           featuredContent={featuredContent || null}
@@ -711,6 +712,7 @@ const HomeScreen = () => {
         />
       );
     } else if (heroStyleToUse === 'carousel') {
+      // Carousel works on both TV and mobile
       return (
         <HeroCarousel
           items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
@@ -719,6 +721,7 @@ const HomeScreen = () => {
         />
       );
     } else {
+      // Legacy style
       return (
         <>
           <FeaturedContent
@@ -742,7 +745,7 @@ const HomeScreen = () => {
         </>
       );
     }
-  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading]);
+  }, [isTablet, isTVDevice, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => (

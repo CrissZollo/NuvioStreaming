@@ -46,6 +46,7 @@ import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 // Android-specific components
 import { VideoSurface } from './android/components/VideoSurface';
 import { MpvPlayerRef } from './android/MpvPlayer';
+import { ExoPlayerRef } from './android/ExoPlayer';
 
 // Utils
 import { logger } from '../../utils/logger';
@@ -79,8 +80,12 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const videoRef = useRef<any>(null);
   const mpvPlayerRef = useRef<MpvPlayerRef>(null);
+  const exoPlayerRef = useRef<ExoPlayerRef>(null);
   const pinchRef = useRef(null);
   const tracksHook = usePlayerTracks();
+
+  // Get the active player ref based on device type
+  const activePlayerRef = isTVDevice ? exoPlayerRef : mpvPlayerRef;
 
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>((route.params as any).videoType);
@@ -126,7 +131,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const setupHook = usePlayerSetup(playerState.setScreenDimensions, setVolume, setBrightness, playerState.paused);
 
   const controlsHook = usePlayerControls(
-    mpvPlayerRef,
+    activePlayerRef,
     playerState.paused,
     playerState.setPaused,
     playerState.currentTime,
@@ -240,6 +245,33 @@ const AndroidVideoPlayer: React.FC = () => {
     subtitleAlign, subtitleBottomOffset, subtitleLetterSpacing, subtitleLineHeightMultiplier
   ]);
 
+  // Apply subtitle styles to MPV when they change (for built-in subtitles)
+  // Note: ExoPlayer doesn't support subtitle styling - it uses system defaults
+  useEffect(() => {
+    if (!isTVDevice && mpvPlayerRef.current && !useCustomSubtitles) {
+      mpvPlayerRef.current.setSubtitleStyle({
+        fontSize: subtitleSize,
+        color: subtitleTextColor,
+        borderColor: subtitleOutline ? subtitleOutlineColor : '#00000000',
+        borderSize: subtitleOutline ? subtitleOutlineWidth : 0,
+        shadowOffset: subtitleTextShadow ? 2 : 0,
+        shadowColor: subtitleTextShadow ? '#000000' : '#00000000',
+        backgroundOpacity: subtitleBackground ? subtitleBgOpacity : 0,
+      });
+    }
+  }, [
+    subtitleSize, subtitleTextColor, subtitleOutline, subtitleOutlineColor,
+    subtitleOutlineWidth, subtitleTextShadow, subtitleBackground, subtitleBgOpacity,
+    useCustomSubtitles, isTVDevice
+  ]);
+
+  // Apply subtitle timing offset to MPV (not supported on ExoPlayer)
+  useEffect(() => {
+    if (!isTVDevice && mpvPlayerRef.current && !useCustomSubtitles) {
+      mpvPlayerRef.current.setSubtitleDelay(subtitleOffsetSec);
+    }
+  }, [subtitleOffsetSec, useCustomSubtitles, isTVDevice]);
+
   const handleLoad = useCallback((data: any) => {
     if (!playerState.isMounted.current) return;
 
@@ -291,13 +323,13 @@ const AndroidVideoPlayer: React.FC = () => {
       console.log('[AndroidVideoPlayer] Seeking to resume position:', resumeTarget, 'duration:', videoDuration);
       // Use a small delay to ensure the player is ready, then seek directly
       setTimeout(() => {
-        if (mpvPlayerRef.current) {
-          console.log('[AndroidVideoPlayer] Calling mpvPlayerRef.current.seek directly');
-          mpvPlayerRef.current.seek(Math.min(resumeTarget, videoDuration - 0.5));
+        if (activePlayerRef.current) {
+          console.log('[AndroidVideoPlayer] Calling activePlayerRef.current.seek directly');
+          activePlayerRef.current.seek(Math.min(resumeTarget, videoDuration - 0.5));
         }
       }, 200);
     }
-  }, [id, type, episodeId, playerState.isMounted, watchProgress.initialPosition]);
+  }, [id, type, episodeId, playerState.isMounted, watchProgress.initialPosition, activePlayerRef]);
 
   const handleProgress = useCallback((data: any) => {
     if (playerState.isDragging.current || playerState.isSeeking.current || !playerState.isMounted.current || setupHook.isAppBackgrounded.current) return;
@@ -462,10 +494,10 @@ const AndroidVideoPlayer: React.FC = () => {
       setCustomSubtitles(parsedCues);
       setUseCustomSubtitles(true);
 
-      // Disable MPV's built-in subtitle track when using custom subtitles
+      // Disable built-in subtitle track when using custom subtitles
       tracksHook.setSelectedTextTrack(-1);
-      if (mpvPlayerRef.current) {
-        mpvPlayerRef.current.setSubtitleTrack(-1);
+      if (activePlayerRef.current) {
+        activePlayerRef.current.setSubtitleTrack(-1);
       }
 
       // Set initial subtitle based on current time
@@ -575,6 +607,7 @@ const AndroidVideoPlayer: React.FC = () => {
               }
             }}
             mpvPlayerRef={mpvPlayerRef}
+            exoPlayerRef={exoPlayerRef}
             pinchRef={pinchRef}
             onPinchGestureEvent={() => { }}
             onPinchHandlerStateChange={() => { }}
@@ -733,9 +766,9 @@ const AndroidVideoPlayer: React.FC = () => {
         selectedAudioTrack={tracksHook.computedSelectedAudioTrack}
         selectAudioTrack={(trackId) => {
           tracksHook.setSelectedAudioTrack(trackId === null ? null : { type: 'index', value: trackId });
-          // Actually tell MPV to switch the audio track
-          if (trackId !== null && mpvPlayerRef.current) {
-            mpvPlayerRef.current.setAudioTrack(trackId);
+          // Tell the active player to switch the audio track
+          if (trackId !== null && activePlayerRef.current) {
+            activePlayerRef.current.setAudioTrack(trackId);
           }
         }}
       />
@@ -759,9 +792,9 @@ const AndroidVideoPlayer: React.FC = () => {
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={(trackId) => {
           tracksHook.setSelectedTextTrack(trackId);
-          // Actually tell MPV to switch the subtitle track
-          if (mpvPlayerRef.current) {
-            mpvPlayerRef.current.setSubtitleTrack(trackId);
+          // Tell the active player to switch the subtitle track
+          if (activePlayerRef.current) {
+            activePlayerRef.current.setSubtitleTrack(trackId);
           }
           // Disable custom subtitles when selecting built-in track
           setUseCustomSubtitles(false);

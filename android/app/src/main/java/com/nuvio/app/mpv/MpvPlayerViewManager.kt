@@ -16,11 +16,13 @@ class MpvPlayerViewManager(
 
     companion object {
         const val REACT_CLASS = "MpvPlayer"
-        
+
         // Commands
         const val COMMAND_SEEK = 1
         const val COMMAND_SET_AUDIO_TRACK = 2
         const val COMMAND_SET_SUBTITLE_TRACK = 3
+        const val COMMAND_SET_SUBTITLE_STYLE = 4
+        const val COMMAND_SET_SUBTITLE_DELAY = 5
     }
 
     override fun getName(): String = REACT_CLASS
@@ -106,11 +108,13 @@ class MpvPlayerViewManager(
     }
 
     override fun getCommandsMap(): Map<String, Int> {
-        return MapBuilder.of(
-            "seek", COMMAND_SEEK,
-            "setAudioTrack", COMMAND_SET_AUDIO_TRACK,
-            "setSubtitleTrack", COMMAND_SET_SUBTITLE_TRACK
-        )
+        return MapBuilder.builder<String, Int>()
+            .put("seek", COMMAND_SEEK)
+            .put("setAudioTrack", COMMAND_SET_AUDIO_TRACK)
+            .put("setSubtitleTrack", COMMAND_SET_SUBTITLE_TRACK)
+            .put("setSubtitleStyle", COMMAND_SET_SUBTITLE_STYLE)
+            .put("setSubtitleDelay", COMMAND_SET_SUBTITLE_DELAY)
+            .build()
     }
 
     override fun receiveCommand(view: MPVView, commandId: String?, args: ReadableArray?) {
@@ -126,6 +130,18 @@ class MpvPlayerViewManager(
             }
             "setSubtitleTrack" -> {
                 args?.getInt(0)?.let { view.setSubtitleTrack(it) }
+            }
+            "setSubtitleStyle" -> {
+                args?.getString(0)?.let { styleJson ->
+                    android.util.Log.d("MpvPlayerViewManager", "setSubtitleStyle: $styleJson")
+                    view.setSubtitleStyle(styleJson)
+                }
+            }
+            "setSubtitleDelay" -> {
+                args?.getDouble(0)?.let { delay ->
+                    android.util.Log.d("MpvPlayerViewManager", "setSubtitleDelay: $delay")
+                    view.setSubtitleDelay(delay)
+                }
             }
         }
     }

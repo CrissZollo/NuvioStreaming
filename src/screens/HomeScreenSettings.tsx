@@ -259,13 +259,10 @@ const HomeScreenSettings: React.FC = () => {
     setShowSavedIndicator(true);
   }, [updateSetting]);
 
-  // Ensure carousel is the default hero layout on tablets for all users
-  // Ensure legacy is the default hero layout on TV for all users
+  // Ensure carousel is the default hero layout on tablets and TV for all users
   useEffect(() => {
     try {
-      if (isTV && settings.heroStyle !== 'legacy') {
-        updateSetting('heroStyle', 'legacy' as any);
-      } else if (isTabletDevice && !isTV && settings.heroStyle !== 'carousel') {
+      if ((isTV || isTabletDevice) && settings.heroStyle !== 'carousel') {
         updateSetting('heroStyle', 'carousel' as any);
       }
     } catch {}
@@ -508,36 +505,57 @@ const HomeScreenSettings: React.FC = () => {
           )}
         </SettingsCard>
 
-        {settings.showHeroSection && !isTV && (
+        {settings.showHeroSection && (
           <>
-            <View style={styles.segmentCard}>
-              <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Hero Layout</Text>
-              <SegmentedControl
-                options={[
-                  { label: 'Legacy', value: 'legacy' },
-                  { label: 'Carousel', value: 'carousel' },
-                  { label: 'Apple TV', value: 'appletv' }
-                ]}
-                value={settings.heroStyle}
-                onChange={(val) => handleUpdateSetting('heroStyle', val as any)}
-              />
-              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner, swipeable cards, or Apple TV style</Text>
-            </View>
+            {/* Hero Layout - only show options on non-TV, TV always uses legacy */}
+            {!isTV && (
+              <View style={styles.segmentCard}>
+                <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Hero Layout</Text>
+                <SegmentedControl
+                  options={[
+                    { label: 'Legacy', value: 'legacy' },
+                    { label: 'Carousel', value: 'carousel' },
+                    { label: 'Apple TV', value: 'appletv' }
+                  ]}
+                  value={settings.heroStyle}
+                  onChange={(val) => handleUpdateSetting('heroStyle', val as any)}
+                />
+                <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner, swipeable cards, or Apple TV style</Text>
+              </View>
+            )}
 
             <View style={styles.segmentCard}>
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Featured Source</Text>
               <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Using Catalogs</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('HeroCatalogs')}
-                style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
-                activeOpacity={0.8}
-              >
-                <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
-                <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
-              </TouchableOpacity>
+              {isTV ? (
+                <Focusable
+                  onPress={() => navigation.navigate('HeroCatalogs')}
+                  style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
+                  borderRadius={10}
+                  focusScale={1.02}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <>
+                      <Text style={{ color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark), fontWeight: '600' }}>Manage selected catalogs</Text>
+                      <MaterialIcons name="chevron-right" size={20} color={focused ? '#000' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark)} />
+                    </>
+                  )}
+                </Focusable>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('HeroCatalogs')}
+                  style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
+                  <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
+                </TouchableOpacity>
+              )}
             </View>
 
-            {settings.heroStyle === 'carousel' && (
+            {settings.heroStyle === 'carousel' && !isTV && (
               <SettingsCard isDarkMode={isDarkMode} colors={colors}>
                 <SettingItem
                   title="Dynamic Hero Background"

@@ -1,31 +1,18 @@
-import React, { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { View, StyleSheet, requireNativeComponent, Platform, UIManager, findNodeHandle } from 'react-native';
 
 // Only available on Android
-const MpvPlayerNative = Platform.OS === 'android'
-    ? requireNativeComponent<any>('MpvPlayer')
+const ExoPlayerNative = Platform.OS === 'android'
+    ? requireNativeComponent<any>('ExoPlayer')
     : null;
 
-export interface SubtitleStyle {
-    fontSize?: number;
-    color?: string;
-    borderColor?: string;
-    borderSize?: number;
-    shadowOffset?: number;
-    shadowColor?: string;
-    backgroundColor?: string;
-    backgroundOpacity?: number;
-}
-
-export interface MpvPlayerRef {
+export interface ExoPlayerRef {
     seek: (positionSeconds: number) => void;
     setAudioTrack: (trackId: number) => void;
     setSubtitleTrack: (trackId: number) => void;
-    setSubtitleStyle: (style: SubtitleStyle) => void;
-    setSubtitleDelay: (delaySeconds: number) => void;
 }
 
-export interface MpvPlayerProps {
+export interface ExoPlayerProps {
     source: string;
     headers?: { [key: string]: string };
     paused?: boolean;
@@ -38,10 +25,9 @@ export interface MpvPlayerProps {
     onEnd?: () => void;
     onError?: (error: { error: string }) => void;
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
-    useHardwareDecoding?: boolean;
 }
 
-const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
+const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
     const nativeRef = useRef<any>(null);
 
     const dispatchCommand = useCallback((commandName: string, args: any[] = []) => {
@@ -67,25 +53,17 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
         setSubtitleTrack: (trackId: number) => {
             dispatchCommand('setSubtitleTrack', [trackId]);
         },
-        setSubtitleStyle: (style: SubtitleStyle) => {
-            dispatchCommand('setSubtitleStyle', [JSON.stringify(style)]);
-        },
-        setSubtitleDelay: (delaySeconds: number) => {
-            dispatchCommand('setSubtitleDelay', [delaySeconds]);
-        },
     }), [dispatchCommand]);
 
-    if (Platform.OS !== 'android' || !MpvPlayerNative) {
+    if (Platform.OS !== 'android' || !ExoPlayerNative) {
         // Fallback for iOS or if native component is not available
         return (
             <View style={[styles.container, props.style, { backgroundColor: 'black' }]} />
         );
     }
 
-    // Debug logging removed to prevent console spam
-
     const handleLoad = (event: any) => {
-        console.log('[MpvPlayer] Native onLoad event:', event?.nativeEvent);
+        console.log('[ExoPlayer] onLoad event:', event?.nativeEvent);
         props.onLoad?.(event?.nativeEvent);
     };
 
@@ -94,22 +72,22 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
     };
 
     const handleEnd = (event: any) => {
-        console.log('[MpvPlayer] Native onEnd event');
+        console.log('[ExoPlayer] onEnd event');
         props.onEnd?.();
     };
 
     const handleError = (event: any) => {
-        console.log('[MpvPlayer] Native onError event:', event?.nativeEvent);
+        console.log('[ExoPlayer] onError event:', event?.nativeEvent);
         props.onError?.(event?.nativeEvent);
     };
 
     const handleTracksChanged = (event: any) => {
-        console.log('[MpvPlayer] Native onTracksChanged event:', event?.nativeEvent);
+        console.log('[ExoPlayer] onTracksChanged event:', event?.nativeEvent);
         props.onTracksChanged?.(event?.nativeEvent);
     };
 
     return (
-        <MpvPlayerNative
+        <ExoPlayerNative
             ref={nativeRef}
             style={[styles.container, props.style]}
             source={props.source}
@@ -123,7 +101,6 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
             onEnd={handleEnd}
             onError={handleError}
             onTracksChanged={handleTracksChanged}
-            useHardwareDecoding={props.useHardwareDecoding ?? false}
         />
     );
 });
@@ -135,6 +112,6 @@ const styles = StyleSheet.create({
     },
 });
 
-MpvPlayer.displayName = 'MpvPlayer';
+ExoPlayer.displayName = 'ExoPlayer';
 
-export default MpvPlayer;
+export default ExoPlayer;

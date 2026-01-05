@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, StyleSheet, Platform } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, StyleSheet, Platform, BackHandler } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -12,10 +12,17 @@ import { logger } from '../../../utils/logger';
 import { useIsTV } from '../../../contexts/TVContext';
 import { Focusable } from '../../tv/Focusable';
 
+interface AudioTrack {
+  id: number;
+  name: string;
+  language?: string;
+  supported?: boolean;
+}
+
 interface AudioTrackModalProps {
   showAudioModal: boolean;
   setShowAudioModal: (show: boolean) => void;
-  ksAudioTracks: Array<{id: number, name: string, language?: string}>;
+  ksAudioTracks: Array<AudioTrack>;
   selectedAudioTrack: number | null;
   selectAudioTrack: (trackId: number) => void;
 }
@@ -35,6 +42,18 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   const menuMaxHeight = height * 0.9;
 
   const handleClose = () => setShowAudioModal(false);
+
+  // Handle Android TV back button to close modal
+  useEffect(() => {
+    if (!showAudioModal) return;
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true; // Prevent default back behavior
+    });
+
+    return () => backHandler.remove();
+  }, [showAudioModal]);
 
   if (!showAudioModal) return null;
 
@@ -80,6 +99,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
             <View style={{ gap: 8 }}>
               {ksAudioTracks.map((track, index) => {
                 const isSelected = selectedAudioTrack === track.id;
+                const isUnsupported = track.supported === false;
 
                 const handleSelect = () => {
                   selectAudioTrack(track.id);
@@ -88,16 +108,22 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
 
                 const trackContent = (focused?: boolean) => (
                   <>
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      {isUnsupported && (
+                        <MaterialIcons name="warning" size={16} color={(isSelected || focused) ? '#B45309' : '#F59E0B'} />
+                      )}
                       <Text style={{
-                        color: (isSelected || focused) ? 'black' : 'white',
+                        color: isUnsupported
+                          ? ((isSelected || focused) ? '#B45309' : '#F59E0B')
+                          : ((isSelected || focused) ? 'black' : 'white'),
                         fontWeight: (isSelected || focused) ? '700' : '400',
-                        fontSize: isTVDevice ? 18 : 15
+                        fontSize: isTVDevice ? 18 : 15,
+                        flex: 1
                       }}>
                         {getTrackDisplayName(track)}
                       </Text>
                     </View>
-                    {isSelected && <MaterialIcons name="check" size={18} color="black" />}
+                    {isSelected && <MaterialIcons name="check" size={18} color={isUnsupported ? '#B45309' : 'black'} />}
                   </>
                 );
 

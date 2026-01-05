@@ -106,25 +106,34 @@ class MPVView @JvmOverloads constructor(
         Log.d(TAG, "Video output: vo=gpu, gpu-context=android")
 
         // Hardware decoding configuration
-        // - mediacodec: Direct hardware decoding (best performance, but some devices have issues)
-        // - mediacodec-copy: Hardware decode + copy to CPU (more compatible, slightly slower)
-        // - auto: Let MPV decide (may fall back to software on some devices)
         if (isTV) {
             // For Android TV (Nvidia Shield, Fire TV, etc.):
-            // Use mediacodec for direct hardware decoding - best performance
-            // Fall back to mediacodec-copy if direct fails
-            MPVLib.setOptionString("hwdec", "mediacodec,mediacodec-copy,auto")
-            Log.d(TAG, "Hardware decoding (TV): hwdec=mediacodec,mediacodec-copy,auto")
+            // Use mediacodec-copy for better compatibility with subtitle rendering
+            // Direct mediacodec can conflict with GPU subtitle blending
+            MPVLib.setOptionString("hwdec", "mediacodec-copy,mediacodec,auto")
+            Log.d(TAG, "Hardware decoding (TV): hwdec=mediacodec-copy,mediacodec,auto")
 
-            // GPU shader optimizations for TV - prefer performance over quality
+            // GPU optimizations for TV
             MPVLib.setOptionString("profile", "fast")
-            MPVLib.setOptionString("gpu-dumb-mode", "yes")
-            Log.d(TAG, "GPU optimizations: profile=fast, gpu-dumb-mode=yes")
+            // Cache compiled shaders to avoid recompilation overhead
+            MPVLib.setOptionString("gpu-shader-cache-dir", context.cacheDir.absolutePath)
+            Log.d(TAG, "GPU optimizations: profile=fast, shader cache enabled")
 
-            // Reduce demuxer overhead for smoother playback
+            // Video timing - let video drop frames to keep sync with audio
+            MPVLib.setOptionString("video-sync", "audio")
+            MPVLib.setOptionString("framedrop", "decoder+vo")
+            MPVLib.setOptionString("interpolation", "no")
+            Log.d(TAG, "Video sync: audio with framedrop enabled")
+
+            // Reduce video latency
+            MPVLib.setOptionString("vd-lavc-threads", "4")
+            MPVLib.setOptionString("video-latency-hacks", "yes")
+            Log.d(TAG, "Video latency optimizations enabled")
+
+            // Smaller demuxer buffers for lower latency
             MPVLib.setOptionString("demuxer-max-bytes", "50MiB")
-            MPVLib.setOptionString("demuxer-max-back-bytes", "25MiB")
-            Log.d(TAG, "Demuxer buffers: max=50MiB, back=25MiB")
+            MPVLib.setOptionString("demuxer-max-back-bytes", "10MiB")
+            Log.d(TAG, "Demuxer buffers: max=50MiB, back=10MiB")
         } else {
             // For mobile/tablet: Use auto with mediacodec-copy fallback
             MPVLib.setOptionString("hwdec", "mediacodec-copy,auto")
@@ -135,18 +144,37 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("ao", "audiotrack,opensles")
         Log.d(TAG, "Audio output: ao=audiotrack,opensles")
 
-        // Caching for network streams
+        // Audio track switching - immediate switch without reinit
+        MPVLib.setOptionString("audio-file-auto", "no")
+        MPVLib.setOptionString("audio-pitch-correction", "no")
+
+        // Caching for network streams - fast startup, good seeking
         MPVLib.setOptionString("cache", "yes")
         MPVLib.setOptionString("cache-secs", "30")
+        MPVLib.setOptionString("cache-pause-wait", "1")
+        MPVLib.setOptionString("cache-pause-initial", "no")
         Log.d(TAG, "Cache: enabled, 30 seconds")
 
-        // Disable unnecessary features that consume resources
+        // Subtitle configuration - enable rendering with performance optimization
+        MPVLib.setOptionString("sub-auto", "fuzzy")
+        MPVLib.setOptionString("sub-visibility", "yes")
+        MPVLib.setOptionString("sub-ass-force-style", "")
+        MPVLib.setOptionString("sub-font-size", "45")
+        MPVLib.setOptionString("sub-color", "#FFFFFFFF")
+        MPVLib.setOptionString("sub-border-color", "#FF000000")
+        MPVLib.setOptionString("sub-border-size", "3")
+        MPVLib.setOptionString("sub-shadow-offset", "2")
+        MPVLib.setOptionString("sub-shadow-color", "#80000000")
+        // Use "video" blend mode for better performance with hardware decoding
+        // "video" blends during video output stage, more efficient than "yes"
+        MPVLib.setOptionString("blend-subtitles", "video")
+        MPVLib.setOptionString("sub-use-margins", "no")
+        Log.d(TAG, "Subtitles: enabled with video blending for performance")
+
+        // Disable unnecessary features
         MPVLib.setOptionString("osc", "no")
         MPVLib.setOptionString("terminal", "no")
         MPVLib.setOptionString("input-default-bindings", "no")
-        MPVLib.setOptionString("sub-auto", "fuzzy")
-
-        // Disable screenshot and other unused features
         MPVLib.setOptionString("screenshot", "no")
 
         // Logging (reduce in production for performance)
@@ -162,24 +190,16 @@ class MPVView @JvmOverloads constructor(
         val MPV_FORMAT_INT64 = 4
         val MPV_FORMAT_DOUBLE = 5
 
+        // Core playback properties
         MPVLib.observeProperty("time-pos", MPV_FORMAT_DOUBLE)
         MPVLib.observeProperty("duration/full", MPV_FORMAT_DOUBLE) // Use /full for complete HLS duration
-        MPVLib.observeProperty("pause", MPV_FORMAT_FLAG)
-        MPVLib.observeProperty("paused-for-cache", MPV_FORMAT_FLAG)
         MPVLib.observeProperty("eof-reached", MPV_FORMAT_FLAG)
-        MPVLib.observeProperty("video-params/aspect", MPV_FORMAT_DOUBLE)
         MPVLib.observeProperty("width", MPV_FORMAT_INT64)
         MPVLib.observeProperty("height", MPV_FORMAT_INT64)
         MPVLib.observeProperty("track-list", MPV_FORMAT_NONE)
 
-        // Observe subtitle properties for debugging
-        MPVLib.observeProperty("sid", MPV_FORMAT_INT64)
-        MPVLib.observeProperty("sub-visibility", MPV_FORMAT_FLAG)
-        MPVLib.observeProperty("sub-text", MPV_FORMAT_NONE)
-
-        // Observe error/status properties for better debugging
-        MPVLib.observeProperty("path", MPV_FORMAT_NONE)
-        MPVLib.observeProperty("file-loaded-status", MPV_FORMAT_NONE)
+        // Note: Removed sub-text observation - it fires constantly and causes performance issues
+        // Removed other debugging properties to reduce callback overhead
     }
 
     private fun loadFile(url: String) {
@@ -329,8 +349,10 @@ class MPVView @JvmOverloads constructor(
     fun seekTo(positionSeconds: Double) {
         Log.d(TAG, "seekTo called: positionSeconds=$positionSeconds, isMpvInitialized=$isMpvInitialized")
         if (isMpvInitialized) {
-            Log.d(TAG, "Executing MPV seek command: seek $positionSeconds absolute")
-            MPVLib.command(arrayOf("seek", positionSeconds.toString(), "absolute"))
+            // Use absolute+keyframes for faster seeking (seeks to nearest keyframe)
+            // This is much faster than exact seeking, especially for large jumps
+            Log.d(TAG, "Executing MPV seek command: seek $positionSeconds absolute+keyframes")
+            MPVLib.command(arrayOf("seek", positionSeconds.toString(), "absolute+keyframes"))
         }
     }
 
@@ -348,11 +370,15 @@ class MPVView @JvmOverloads constructor(
     }
 
     fun setAudioTrack(trackId: Int) {
+        Log.d(TAG, "setAudioTrack called: trackId=$trackId, isMpvInitialized=$isMpvInitialized")
         if (isMpvInitialized) {
             if (trackId == -1) {
+                Log.d(TAG, "Disabling audio (aid=no)")
                 MPVLib.setPropertyString("aid", "no")
             } else {
-                MPVLib.setPropertyInt("aid", trackId)
+                Log.d(TAG, "Setting audio track to: $trackId")
+                // Use command for faster track switching
+                MPVLib.command(arrayOf("set", "aid", trackId.toString()))
             }
         }
     }
@@ -363,20 +389,116 @@ class MPVView @JvmOverloads constructor(
             if (trackId == -1) {
                 Log.d(TAG, "Disabling subtitles (sid=no)")
                 MPVLib.setPropertyString("sid", "no")
-                MPVLib.setPropertyString("sub-visibility", "no")
+                MPVLib.setPropertyBoolean("sub-visibility", false)
             } else {
                 Log.d(TAG, "Setting subtitle track to: $trackId")
+
+                // First ensure visibility is on
+                MPVLib.setPropertyBoolean("sub-visibility", true)
+
+                // Then set the track using property (more reliable than command)
                 MPVLib.setPropertyInt("sid", trackId)
-                // Ensure subtitles are visible
-                MPVLib.setPropertyString("sub-visibility", "yes")
-                
+
                 // Debug: Verify the subtitle was set correctly
-                val currentSid = MPVLib.getPropertyInt("sid")
-                val subVisibility = MPVLib.getPropertyString("sub-visibility")
-                val subDelay = MPVLib.getPropertyDouble("sub-delay")
-                val subScale = MPVLib.getPropertyDouble("sub-scale")
-                Log.d(TAG, "After setting - sid=$currentSid, sub-visibility=$subVisibility, sub-delay=$subDelay, sub-scale=$subScale")
+                try {
+                    val currentSid = MPVLib.getPropertyInt("sid")
+                    val subVisibility = MPVLib.getPropertyBoolean("sub-visibility")
+                    val trackCount = MPVLib.getPropertyInt("track-list/count") ?: 0
+                    Log.d(TAG, "After setting - sid=$currentSid, sub-visibility=$subVisibility, total tracks=$trackCount")
+
+                    // Log available subtitle tracks for debugging
+                    for (i in 0 until trackCount) {
+                        val type = MPVLib.getPropertyString("track-list/$i/type")
+                        if (type == "sub") {
+                            val id = MPVLib.getPropertyInt("track-list/$i/id")
+                            val title = MPVLib.getPropertyString("track-list/$i/title") ?: ""
+                            val lang = MPVLib.getPropertyString("track-list/$i/lang") ?: ""
+                            val selected = MPVLib.getPropertyBoolean("track-list/$i/selected") ?: false
+                            Log.d(TAG, "Subtitle track $i: id=$id, title=$title, lang=$lang, selected=$selected")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error verifying subtitle track", e)
+                }
             }
+        }
+    }
+
+    fun setSubtitleStyle(styleJson: String) {
+        Log.d(TAG, "setSubtitleStyle called: $styleJson")
+        if (isMpvInitialized) {
+            try {
+                val json = org.json.JSONObject(styleJson)
+
+                // Font size
+                if (json.has("fontSize")) {
+                    val fontSize = json.getInt("fontSize")
+                    MPVLib.setPropertyInt("sub-font-size", fontSize)
+                    Log.d(TAG, "Set sub-font-size to $fontSize")
+                }
+
+                // Text color (hex string like #FFFFFF)
+                if (json.has("color")) {
+                    val color = json.getString("color")
+                    // MPV uses format like "#RRGGBBAA" or "#RRGGBB"
+                    val mpvColor = if (color.length == 7) "${color}FF" else color
+                    MPVLib.setPropertyString("sub-color", mpvColor)
+                    Log.d(TAG, "Set sub-color to $mpvColor")
+                }
+
+                // Border/outline color
+                if (json.has("borderColor")) {
+                    val borderColor = json.getString("borderColor")
+                    val mpvBorderColor = if (borderColor.length == 7) "${borderColor}FF" else borderColor
+                    MPVLib.setPropertyString("sub-border-color", mpvBorderColor)
+                    Log.d(TAG, "Set sub-border-color to $mpvBorderColor")
+                }
+
+                // Border size
+                if (json.has("borderSize")) {
+                    val borderSize = json.getInt("borderSize")
+                    MPVLib.setPropertyInt("sub-border-size", borderSize)
+                    Log.d(TAG, "Set sub-border-size to $borderSize")
+                }
+
+                // Shadow offset
+                if (json.has("shadowOffset")) {
+                    val shadowOffset = json.getInt("shadowOffset")
+                    MPVLib.setPropertyInt("sub-shadow-offset", shadowOffset)
+                    Log.d(TAG, "Set sub-shadow-offset to $shadowOffset")
+                }
+
+                // Shadow color
+                if (json.has("shadowColor")) {
+                    val shadowColor = json.getString("shadowColor")
+                    val mpvShadowColor = if (shadowColor.length == 7) "${shadowColor}80" else shadowColor
+                    MPVLib.setPropertyString("sub-shadow-color", mpvShadowColor)
+                    Log.d(TAG, "Set sub-shadow-color to $mpvShadowColor")
+                }
+
+                // Background color with opacity
+                if (json.has("backgroundOpacity")) {
+                    val bgOpacity = json.getDouble("backgroundOpacity")
+                    // Convert opacity (0-1) to hex alpha (00-FF)
+                    val alpha = (bgOpacity * 255).toInt().coerceIn(0, 255)
+                    val alphaHex = String.format("%02X", alpha)
+                    // MPV uses sub-back-color for background
+                    MPVLib.setPropertyString("sub-back-color", "#000000$alphaHex")
+                    Log.d(TAG, "Set sub-back-color with opacity $bgOpacity (alpha: $alphaHex)")
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing subtitle style JSON", e)
+            }
+        }
+    }
+
+    fun setSubtitleDelay(delaySeconds: Double) {
+        Log.d(TAG, "setSubtitleDelay called: $delaySeconds seconds")
+        if (isMpvInitialized) {
+            // MPV sub-delay is in seconds, positive = later, negative = earlier
+            MPVLib.setPropertyDouble("sub-delay", delaySeconds)
+            Log.d(TAG, "Set sub-delay to $delaySeconds")
         }
     }
 
@@ -410,20 +532,23 @@ class MPVView @JvmOverloads constructor(
 
     // MPVLib.EventObserver implementation
 
+    // Track deduplication - only send if tracks actually changed
+    private var lastTrackCount = -1
+    private var lastAudioCount = -1
+    private var lastSubtitleCount = -1
+
     override fun eventProperty(property: String) {
-        Log.d(TAG, "Property changed: $property")
         when (property) {
-            "track-list" -> {
-                // Parse track list and notify React Native
-                parseAndSendTracks()
-            }
+            "track-list" -> parseAndSendTracks()
         }
     }
-    
+
     private fun parseAndSendTracks() {
         try {
             val trackCount = MPVLib.getPropertyInt("track-list/count") ?: 0
-            Log.d(TAG, "Track count: $trackCount")
+
+            // Quick check - if track count is same, likely no change
+            if (trackCount == lastTrackCount && trackCount > 0) return
 
             val audioTracks = mutableListOf<Map<String, Any>>()
             val subtitleTracks = mutableListOf<Map<String, Any>>()
@@ -435,13 +560,7 @@ class MPVView @JvmOverloads constructor(
                 val lang = MPVLib.getPropertyString("track-list/$i/lang") ?: ""
                 val codec = MPVLib.getPropertyString("track-list/$i/codec") ?: ""
 
-                // Log ALL tracks regardless of type for debugging
-                Log.d(TAG, "Track $i: type=$type, id=$id, title=$title, lang=$lang, codec=$codec")
-
-                if (type == null || id == null) {
-                    Log.d(TAG, "Skipping track $i - type or id is null")
-                    continue
-                }
+                if (type == null || id == null) continue
 
                 val trackName = when {
                     title.isNotEmpty() -> title
@@ -457,37 +576,30 @@ class MPVView @JvmOverloads constructor(
                 )
 
                 when (type) {
-                    "audio" -> {
-                        Log.d(TAG, "Found audio track: $track")
-                        audioTracks.add(track)
-                    }
-                    "sub" -> {
-                        Log.d(TAG, "Found subtitle track: $track")
-                        subtitleTracks.add(track)
-                    }
-                    "video" -> {
-                        Log.d(TAG, "Found video track: $track")
-                        // Video tracks are not sent to React Native but log them
-                    }
-                    else -> {
-                        Log.d(TAG, "Unknown track type '$type': $track")
-                    }
+                    "audio" -> audioTracks.add(track)
+                    "sub" -> subtitleTracks.add(track)
                 }
             }
 
-            Log.d(TAG, "Sending tracks - Audio: ${audioTracks.size}, Subtitles: ${subtitleTracks.size}")
-            onTracksChangedCallback?.invoke(audioTracks, subtitleTracks)
+            // Only send if counts actually changed
+            if (audioTracks.size != lastAudioCount || subtitleTracks.size != lastSubtitleCount) {
+                lastTrackCount = trackCount
+                lastAudioCount = audioTracks.size
+                lastSubtitleCount = subtitleTracks.size
+                Log.d(TAG, "Tracks changed - Audio: ${audioTracks.size}, Subtitles: ${subtitleTracks.size}")
+                onTracksChangedCallback?.invoke(audioTracks, subtitleTracks)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing tracks", e)
         }
     }
 
     override fun eventProperty(property: String, value: Long) {
-        Log.d(TAG, "Property $property = $value (Long)")
+        // Removed logging - fires too frequently
     }
 
     override fun eventProperty(property: String, value: Double) {
-        Log.d(TAG, "Property $property = $value (Double)")
+        // Removed logging - time-pos fires every frame
         when (property) {
             "time-pos" -> {
                 val duration = MPVLib.getPropertyDouble("duration/full") ?: MPVLib.getPropertyDouble("duration") ?: 0.0
@@ -496,16 +608,17 @@ class MPVView @JvmOverloads constructor(
             "duration/full", "duration" -> {
                 val width = MPVLib.getPropertyInt("width") ?: 0
                 val height = MPVLib.getPropertyInt("height") ?: 0
+                Log.d(TAG, "Media loaded: duration=$value, ${width}x${height}")
                 onLoadCallback?.invoke(value, width, height)
             }
         }
     }
 
     override fun eventProperty(property: String, value: Boolean) {
-        Log.d(TAG, "Property $property = $value (Boolean)")
         when (property) {
             "eof-reached" -> {
                 if (value) {
+                    Log.d(TAG, "End of file reached")
                     onEndCallback?.invoke()
                 }
             }
@@ -513,7 +626,7 @@ class MPVView @JvmOverloads constructor(
     }
 
     override fun eventProperty(property: String, value: String) {
-        Log.d(TAG, "Property $property = $value (String)")
+        // Removed logging - not needed for production
     }
 
     override fun event(eventId: Int) {

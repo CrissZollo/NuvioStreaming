@@ -17,6 +17,7 @@ import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 import com.nuvio.app.tv.TVDetectionPackage
 import com.nuvio.app.mpv.MpvPackage
+import com.nuvio.app.exoplayer.ExoPlayerPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -28,6 +29,7 @@ class MainApplication : Application(), ReactApplication {
               // Packages that cannot be autolinked yet can be added manually here, for example:
               add(MpvPackage())
               add(TVDetectionPackage())
+              add(ExoPlayerPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
