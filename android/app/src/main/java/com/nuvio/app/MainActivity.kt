@@ -1,6 +1,5 @@
 package com.nuvio.app
 import com.reactnative.googlecast.api.RNGCCastContext
-import com.nuvio.app.tv.TVKeyEventModule
 
 import android.os.Build
 import android.os.Bundle
@@ -13,61 +12,9 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 import expo.modules.ReactActivityDelegateWrapper
 
+import com.nuvio.app.tv.TVKeyEventModule
+
 class MainActivity : ReactActivity() {
-  // Throttle D-pad navigation speed - minimum ms between allowing key events
-  private val NAV_THROTTLE_MS = 500L  // 500ms = 2 navigations per second max
-  private val lastAllowedTime = mutableMapOf<Int, Long>()
-  private val keyHeld = mutableMapOf<Int, Boolean>()
-
-  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-    // Forward key events to React Native via TVKeyEventModule
-    TVKeyEventModule.getInstance()?.sendKeyEvent(event.keyCode, event.action)
-
-    // Only throttle D-pad directional keys
-    val isDpadNav = event.keyCode in listOf(
-      KeyEvent.KEYCODE_DPAD_UP,
-      KeyEvent.KEYCODE_DPAD_DOWN,
-      KeyEvent.KEYCODE_DPAD_LEFT,
-      KeyEvent.KEYCODE_DPAD_RIGHT
-    )
-
-    if (!isDpadNav) {
-      return super.dispatchKeyEvent(event)
-    }
-
-    val keyCode = event.keyCode
-    val now = System.currentTimeMillis()
-
-    when (event.action) {
-      KeyEvent.ACTION_DOWN -> {
-        val isHeld = keyHeld[keyCode] == true
-        val lastTime = lastAllowedTime[keyCode] ?: 0L
-
-        if (!isHeld) {
-          // First press - always allow and mark as held
-          keyHeld[keyCode] = true
-          lastAllowedTime[keyCode] = now
-          return super.dispatchKeyEvent(event)
-        } else {
-          // Key is being held - throttle repeats
-          if (now - lastTime >= NAV_THROTTLE_MS) {
-            lastAllowedTime[keyCode] = now
-            return super.dispatchKeyEvent(event)
-          } else {
-            // Block - too soon
-            return true
-          }
-        }
-      }
-      KeyEvent.ACTION_UP -> {
-        // Key released - clear held state
-        keyHeld[keyCode] = false
-        return super.dispatchKeyEvent(event)
-      }
-    }
-
-    return super.dispatchKeyEvent(event)
-  }
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.
@@ -117,5 +64,18 @@ class MainActivity : ReactActivity() {
       // Use the default back button implementation on Android S
       // because it's doing more than [Activity.moveTaskToBack] in fact.
       super.invokeDefaultOnBackPressed()
+  }
+
+  /**
+   * Intercept key events from TV remote and forward to React Native
+   */
+  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+      TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_DOWN)
+      return super.onKeyDown(keyCode, event)
+  }
+
+  override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+      TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_UP)
+      return super.onKeyUp(keyCode, event)
   }
 }

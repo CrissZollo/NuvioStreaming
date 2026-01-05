@@ -7,10 +7,13 @@ import com.facebook.react.uimanager.ViewManager
 
 class TVDetectionPackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-        return listOf(TVDetectionModule(reactContext))
+        return listOf(
+            TVDetectionModule(reactContext),
+            TVKeyEventModule(reactContext)
+        )
     }
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
-        return emptyList()
+        return listOf(ExoPlayerViewManager())
     }
 }

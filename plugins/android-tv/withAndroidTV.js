@@ -1,4 +1,4 @@
-const { withAndroidManifest, withDangerousMod, withMainApplication } = require('@expo/config-plugins');
+const { withAndroidManifest, withDangerousMod, withMainApplication, withMainActivity } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -149,6 +149,60 @@ function withTVMainApplication(config) {
 }
 
 /**
+ * Modify MainActivity.kt to intercept TV key events
+ */
+function withTVMainActivity(config) {
+    return withMainActivity(config, async (config) => {
+        let contents = config.modResults.contents;
+
+        // Add import for KeyEvent and TVKeyEventModule
+        const keyEventImport = 'import android.view.KeyEvent';
+        const tvKeyEventModuleImport = 'import com.nuvio.app.tv.TVKeyEventModule';
+
+        if (!contents.includes(keyEventImport)) {
+            // Add import after android.os.Bundle
+            contents = contents.replace(
+                'import android.os.Bundle',
+                'import android.os.Bundle\nimport android.view.KeyEvent'
+            );
+            console.log('[android-tv] Added KeyEvent import to MainActivity');
+        }
+
+        if (!contents.includes(tvKeyEventModuleImport)) {
+            // Add import before class declaration
+            const classIndex = contents.indexOf('class MainActivity');
+            contents = contents.slice(0, classIndex) + tvKeyEventModuleImport + '\n\n' + contents.slice(classIndex);
+            console.log('[android-tv] Added TVKeyEventModule import to MainActivity');
+        }
+
+        // Add onKeyDown and onKeyUp overrides before the closing brace
+        if (!contents.includes('override fun onKeyDown')) {
+            const keyEventHandlers = `
+
+  /**
+   * Intercept key events from TV remote and forward to React Native
+   */
+  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+      TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_DOWN)
+      return super.onKeyDown(keyCode, event)
+  }
+
+  override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+      TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_UP)
+      return super.onKeyUp(keyCode, event)
+  }
+}`;
+            // Replace the closing brace of the class
+            contents = contents.replace(/\n\}[\s]*$/, keyEventHandlers);
+            console.log('[android-tv] Added key event handlers to MainActivity');
+        }
+
+        config.modResults.contents = contents;
+        return config;
+    });
+}
+
+/**
  * Copy TV banner drawable
  */
 function copyTVBanner(projectRoot) {
@@ -191,6 +245,9 @@ function withAndroidTV(config) {
 
     // Modify MainApplication to register the TV detection package
     config = withTVMainApplication(config);
+
+    // Modify MainActivity to handle TV key events
+    config = withTVMainActivity(config);
 
     return config;
 }
