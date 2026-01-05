@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'search', icon: 'search', iconLibrary: 'feather', label: 'Search', screen: 'Search' },
   { key: 'library', icon: 'library', iconLibrary: 'ionicons', label: 'Library', screen: 'Library' },
   { key: 'settings', icon: 'settings', iconLibrary: 'feather', label: 'Settings', screen: 'Settings' },
+  { key: 'support', icon: 'heart', iconLibrary: 'feather', label: 'Support Project', screen: 'SupportProject' },
 ];
 
 const COLLAPSED_WIDTH = 60;

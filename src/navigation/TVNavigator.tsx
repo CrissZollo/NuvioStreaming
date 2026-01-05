@@ -12,8 +12,9 @@ import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SearchScreen from '../screens/SearchScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import SupportProjectScreen from '../screens/SupportProjectScreen';
 
-type ScreenKey = 'Home' | 'Library' | 'Search' | 'Settings';
+type ScreenKey = 'Home' | 'Library' | 'Search' | 'Settings' | 'SupportProject';
 
 interface ScreenConfig {
   component: React.ComponentType<any>;
@@ -25,6 +26,7 @@ const SCREENS: Record<ScreenKey, ScreenConfig> = {
   Library: { component: LibraryScreen, name: 'Library' },
   Search: { component: SearchScreen, name: 'Search' },
   Settings: { component: SettingsScreen, name: 'Settings' },
+  SupportProject: { component: SupportProjectScreen, name: 'SupportProject' },
 };
 
 /**

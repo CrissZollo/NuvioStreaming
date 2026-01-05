@@ -27,6 +27,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useIsTV } from '../contexts/TVContext';
 import { Focusable } from '../components/tv/Focusable';
+import QRCode from 'react-native-qrcode-svg';
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,6 +42,7 @@ interface OnboardingSlide {
   title: string;
   subtitle: string;
   description: string;
+  isDonationSlide?: boolean;
 }
 
 const onboardingData: OnboardingSlide[] = [
@@ -70,15 +72,28 @@ const onboardingData: OnboardingSlide[] = [
   },
 ];
 
+// TV-specific slide with donation info
+const tvDonationSlide: OnboardingSlide = {
+  id: '5',
+  title: 'Support\nDevelopment',
+  subtitle: 'Help Keep This Project Alive',
+  description: 'I ported Nuvio to Android TV and continue improving it in my free time. If you enjoy using it on your TV, please consider supporting the development.',
+  isDonationSlide: true,
+};
+
+const KOFI_URL = 'https://ko-fi.com/crisszollo';
+
 // Animated Slide Component with parallax
 const AnimatedSlide = ({
   item,
   index,
-  scrollX
+  scrollX,
+  isTV = false,
 }: {
   item: OnboardingSlide;
   index: number;
   scrollX: SharedValue<number>;
+  isTV?: boolean;
 }) => {
   const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
 
@@ -145,6 +160,66 @@ const AnimatedSlide = ({
     };
   });
 
+  const qrStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollX.value,
+      inputRange,
+      [0, 1, 0],
+      Extrapolation.CLAMP
+    );
+    const scale = interpolate(
+      scrollX.value,
+      inputRange,
+      [0.8, 1, 0.8],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  // Donation slide layout for TV
+  if (item.isDonationSlide && isTV) {
+    return (
+      <View style={styles.slide}>
+        <View style={styles.donationContainer}>
+          {/* Left side - Text content */}
+          <View style={styles.donationTextContainer}>
+            <Animated.Text style={[styles.title, styles.donationTitle, titleStyle]}>
+              {item.title}
+            </Animated.Text>
+
+            <Animated.Text style={[styles.subtitle, styles.donationSubtitle, subtitleStyle]}>
+              {item.subtitle}
+            </Animated.Text>
+
+            <Animated.Text style={[styles.description, styles.donationDescription, descriptionStyle]}>
+              {item.description}
+            </Animated.Text>
+
+            <Animated.Text style={[styles.donationNote, descriptionStyle]}>
+              Scan the QR code with your phone to donate
+            </Animated.Text>
+          </View>
+
+          {/* Right side - QR Code */}
+          <Animated.View style={[styles.qrContainer, qrStyle]}>
+            <View style={styles.qrWrapper}>
+              <QRCode
+                value={KOFI_URL}
+                size={180}
+                color="#0A0A0A"
+                backgroundColor="#FFFFFF"
+              />
+            </View>
+            <Text style={styles.qrLabel}>ko-fi.com/crisszollo</Text>
+          </Animated.View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.slide}>
       <View style={styles.textContainer}>
@@ -172,6 +247,9 @@ const OnboardingScreen = () => {
   const scrollX = useSharedValue(0);
   const isTV = useIsTV();
 
+  // Use TV-specific slides with donation slide appended
+  const slides = isTV ? [...onboardingData, tvDonationSlide] : onboardingData;
+
   const updateIndex = (index: number) => {
     setCurrentIndex(index);
   };
@@ -189,7 +267,7 @@ const OnboardingScreen = () => {
   const progressStyle = useAnimatedStyle(() => {
     const progress = interpolate(
       scrollX.value,
-      [0, (onboardingData.length - 1) * width],
+      [0, (slides.length - 1) * width],
       [0, 100],
       Extrapolation.CLAMP
     );
@@ -199,7 +277,7 @@ const OnboardingScreen = () => {
   });
 
   const handleNext = () => {
-    if (currentIndex < onboardingData.length - 1) {
+    if (currentIndex < slides.length - 1) {
       const nextIndex = currentIndex + 1;
       flatListRef.current?.scrollToOffset({
         offset: nextIndex * width,
@@ -231,7 +309,7 @@ const OnboardingScreen = () => {
   };
 
   const renderSlide = ({ item, index }: { item: OnboardingSlide; index: number }) => (
-    <AnimatedSlide item={item} index={index} scrollX={scrollX} />
+    <AnimatedSlide item={item} index={index} scrollX={scrollX} isTV={isTV} />
   );
 
   // Animated pagination dots
@@ -300,7 +378,7 @@ const OnboardingScreen = () => {
         {isTV && (
           <View style={styles.tvProgressHeader}>
             <Text style={styles.tvProgressText}>
-              {currentIndex + 1} / {onboardingData.length}
+              {currentIndex + 1} / {slides.length}
             </Text>
           </View>
         )}
@@ -308,7 +386,7 @@ const OnboardingScreen = () => {
         {/* Slides */}
         <Animated.FlatList
           ref={flatListRef}
-          data={onboardingData}
+          data={slides}
           renderItem={renderSlide}
           horizontal
           pagingEnabled
@@ -334,7 +412,7 @@ const OnboardingScreen = () => {
         >
           {/* Smooth Pagination */}
           <View style={styles.pagination}>
-            {onboardingData.map((_, index) => (
+            {slides.map((_, index) => (
               <PaginationDot key={index} index={index} />
             ))}
           </View>
@@ -363,7 +441,7 @@ const OnboardingScreen = () => {
               >
                 {(focused) => (
                   <Text style={[styles.tvButtonText, focused && styles.tvButtonTextFocused]}>
-                    {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Continue'}
+                    {currentIndex === slides.length - 1 ? 'Get Started' : 'Continue'}
                   </Text>
                 )}
               </Focusable>
@@ -377,7 +455,7 @@ const OnboardingScreen = () => {
             >
               <Animated.View style={[styles.button, buttonStyle]}>
                 <Text style={styles.buttonText}>
-                  {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Continue'}
+                  {currentIndex === slides.length - 1 ? 'Get Started' : 'Continue'}
                 </Text>
               </Animated.View>
             </TouchableOpacity>
@@ -515,6 +593,58 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.5)',
+  },
+  // Donation slide styles
+  donationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 48,
+    gap: 60,
+  },
+  donationTextContainer: {
+    flex: 1,
+    maxWidth: 500,
+  },
+  donationTitle: {
+    fontSize: 48,
+    lineHeight: 52,
+  },
+  donationSubtitle: {
+    fontSize: 18,
+    marginBottom: 16,
+  },
+  donationDescription: {
+    fontSize: 16,
+    lineHeight: 26,
+    maxWidth: 450,
+    marginBottom: 24,
+  },
+  donationNote: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontStyle: 'italic',
+  },
+  qrContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qrWrapper: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  qrLabel: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.6)',
+    letterSpacing: 0.5,
   },
 });
 
