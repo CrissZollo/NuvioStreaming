@@ -425,6 +425,8 @@ const OnboardingScreen = () => {
                 style={styles.tvButton}
                 borderRadius={16}
                 focusScale={1.05}
+                showFocusBorder={true}
+                animateBackground={false}
               >
                 {(focused) => (
                   <Text style={[styles.tvButtonText, focused && styles.tvButtonTextFocused]}>
@@ -438,6 +440,8 @@ const OnboardingScreen = () => {
                 style={styles.tvButton}
                 borderRadius={16}
                 focusScale={1.05}
+                showFocusBorder={true}
+                animateBackground={false}
               >
                 {(focused) => (
                   <Text style={[styles.tvButtonText, focused && styles.tvButtonTextFocused]}>
@@ -582,7 +586,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
   },
   tvButtonTextFocused: {
-    color: '#0A0A0A',
+    color: '#FFFFFF',
   },
   tvProgressHeader: {
     paddingVertical: 20,
