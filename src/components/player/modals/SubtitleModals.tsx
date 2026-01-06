@@ -390,7 +390,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>Preview</Text>
                     </View>
                     <View style={{ height: previewHeight, justifyContent: 'flex-end' }}>
-                      <View style={{ alignItems: subtitleAlign === 'center' ? 'center' : subtitleAlign === 'left' ? 'flex-start' : 'flex-end', marginBottom: Math.min(80, subtitleBottomOffset) }}>
+                      <View style={{ alignItems: subtitleAlign === 'center' ? 'center' : subtitleAlign === 'left' ? 'flex-start' : 'flex-end', marginBottom: 10 }}>
                         <View style={{
                           backgroundColor: subtitleBackground ? `rgba(0,0,0,${subtitleBgOpacity})` : 'transparent',
                           borderRadius: 8,
@@ -522,8 +522,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad, gap: isCompact ? 10 : 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                       <MaterialIcons name="tune" size={16} color="rgba(255,255,255,0.7)" />
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>Core</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>Settings</Text>
                     </View>
+
+                    {/* Font Size */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <MaterialIcons name="format-size" size={16} color="rgba(255,255,255,0.7)" />
@@ -571,10 +573,42 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         )}
                       </View>
                     </View>
+
+                    {/* Text Color - TV */}
+                    {isTVDevice && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="palette" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Text Color</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          {['#FFFFFF', '#FFD700', '#00E5FF', '#FF5C5C', '#00FF88'].map(c => {
+                            const isSelected = subtitleTextColor === c;
+                            // Use contrasting color for checkmark
+                            const checkColor = (c === '#FFFFFF' || c === '#FFD700' || c === '#00FF88') ? '#000' : '#fff';
+                            return (
+                              <Focusable
+                                key={c}
+                                onPress={() => setSubtitleTextColor(c)}
+                                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c, borderWidth: 3, borderColor: isSelected ? '#fff' : 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' }}
+                                borderRadius={16}
+                                focusScale={1.2}
+                                animateBackground={false}
+                                showFocusBorder={true}
+                              >
+                                {() => isSelected ? <MaterialIcons name="check" size={18} color={checkColor} /> : null}
+                              </Focusable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Show Background */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <MaterialIcons name="layers" size={16} color="rgba(255,255,255,0.7)" />
-                        <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Show Background</Text>
+                        <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Background</Text>
                       </View>
                       {isTVDevice ? (
                         <Focusable
@@ -596,9 +630,230 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       )}
                     </View>
+
+                    {/* Background Opacity - TV */}
+                    {isTVDevice && subtitleBackground && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="opacity" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Background Opacity</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Focusable
+                            onPress={() => setSubtitleBgOpacity(Math.max(0, +(subtitleBgOpacity - 0.1).toFixed(1)))}
+                            style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
+                            borderRadius={controlBtn.radius}
+                            focusScale={1.1}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                          >
+                            {(focused) => <MaterialIcons name="remove" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                          </Focusable>
+                          <View style={{ minWidth: 48, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '700' }}>{subtitleBgOpacity.toFixed(1)}</Text>
+                          </View>
+                          <Focusable
+                            onPress={() => setSubtitleBgOpacity(Math.min(1, +(subtitleBgOpacity + 0.1).toFixed(1)))}
+                            style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
+                            borderRadius={controlBtn.radius}
+                            focusScale={1.1}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                          >
+                            {(focused) => <MaterialIcons name="add" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                          </Focusable>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Text Shadow - TV */}
+                    {isTVDevice && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="blur-on" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Text Shadow</Text>
+                        </View>
+                        <Focusable
+                          onPress={() => setSubtitleTextShadow(!subtitleTextShadow)}
+                          style={{ width: 58, height: 34, backgroundColor: subtitleTextShadow ? 'white' : 'rgba(255,255,255,0.25)', borderRadius: 17, justifyContent: 'center', alignItems: subtitleTextShadow ? 'flex-end' : 'flex-start', paddingHorizontal: 3 }}
+                          borderRadius={17}
+                          focusScale={1.05}
+                          animateBackground={false}
+                          showFocusBorder={true}
+                        >
+                          {() => <View style={{ width: 28, height: 28, backgroundColor: subtitleTextShadow ? 'black' : 'white', borderRadius: 14 }} />}
+                        </Focusable>
+                      </View>
+                    )}
+
+                    {/* Outline - TV */}
+                    {isTVDevice && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="border-color" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Text Outline</Text>
+                        </View>
+                        <Focusable
+                          onPress={() => setSubtitleOutline(!subtitleOutline)}
+                          style={{ width: 58, height: 34, backgroundColor: subtitleOutline ? 'white' : 'rgba(255,255,255,0.25)', borderRadius: 17, justifyContent: 'center', alignItems: subtitleOutline ? 'flex-end' : 'flex-start', paddingHorizontal: 3 }}
+                          borderRadius={17}
+                          focusScale={1.05}
+                          animateBackground={false}
+                          showFocusBorder={true}
+                        >
+                          {() => <View style={{ width: 28, height: 28, backgroundColor: subtitleOutline ? 'black' : 'white', borderRadius: 14 }} />}
+                        </Focusable>
+                      </View>
+                    )}
+
+                    {/* Outline Width - TV (only if outline is enabled) */}
+                    {isTVDevice && subtitleOutline && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="line-weight" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Outline Width</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Focusable
+                            onPress={() => setSubtitleOutlineWidth(Math.max(1, subtitleOutlineWidth - 1))}
+                            style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
+                            borderRadius={controlBtn.radius}
+                            focusScale={1.1}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                          >
+                            {(focused) => <MaterialIcons name="remove" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                          </Focusable>
+                          <View style={{ minWidth: 42, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '700' }}>{subtitleOutlineWidth}</Text>
+                          </View>
+                          <Focusable
+                            onPress={() => setSubtitleOutlineWidth(Math.min(10, subtitleOutlineWidth + 1))}
+                            style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
+                            borderRadius={controlBtn.radius}
+                            focusScale={1.1}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                          >
+                            {(focused) => <MaterialIcons name="add" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                          </Focusable>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Outline Color - TV (only if outline is enabled) */}
+                    {isTVDevice && subtitleOutline && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="format-color-fill" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Outline Color</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          {['#000000', '#FFFFFF', '#00E5FF', '#FF5C5C'].map(c => {
+                            const isSelected = subtitleOutlineColor === c;
+                            // Use contrasting color for checkmark
+                            const checkColor = (c === '#FFFFFF') ? '#000' : '#fff';
+                            return (
+                              <Focusable
+                                key={c}
+                                onPress={() => setSubtitleOutlineColor(c)}
+                                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c, borderWidth: 3, borderColor: isSelected ? '#fff' : 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' }}
+                                borderRadius={16}
+                                focusScale={1.2}
+                                animateBackground={false}
+                                showFocusBorder={true}
+                              >
+                                {() => isSelected ? <MaterialIcons name="check" size={18} color={checkColor} /> : null}
+                              </Focusable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Text Alignment - TV */}
+                    {isTVDevice && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="format-align-center" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Alignment</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          {([{ key: 'left', icon: 'format-align-left' }, { key: 'center', icon: 'format-align-center' }, { key: 'right', icon: 'format-align-right' }] as const).map(a => (
+                            <Focusable
+                              key={a.key}
+                              onPress={() => setSubtitleAlign(a.key)}
+                              style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: subtitleAlign === a.key ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+                              borderRadius={8}
+                              focusScale={1.1}
+                              animateBackground={true}
+                              showFocusBorder={true}
+                            >
+                              {(focused) => <MaterialIcons name={a.icon as any} size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                            </Focusable>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Bottom Offset - TV */}
+                    {isTVDevice && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="vertical-align-bottom" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Bottom Offset</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Focusable
+                            onPress={() => setSubtitleBottomOffset(Math.max(0, subtitleBottomOffset - 5))}
+                            style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
+                            borderRadius={controlBtn.radius}
+                            focusScale={1.1}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                          >
+                            {(focused) => <MaterialIcons name="keyboard-arrow-down" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                          </Focusable>
+                          <View style={{ minWidth: 46, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '700' }}>{subtitleBottomOffset}</Text>
+                          </View>
+                          <Focusable
+                            onPress={() => setSubtitleBottomOffset(Math.min(100, subtitleBottomOffset + 5))}
+                            style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
+                            borderRadius={controlBtn.radius}
+                            focusScale={1.1}
+                            animateBackground={true}
+                            showFocusBorder={true}
+                          >
+                            {(focused) => <MaterialIcons name="keyboard-arrow-up" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                          </Focusable>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Reset to Defaults - TV */}
+                    {isTVDevice && (
+                      <View style={{ alignItems: 'flex-end', marginTop: 8 }}>
+                        <Focusable
+                          onPress={() => {
+                            setSubtitleTextColor('#FFFFFF'); setSubtitleBgOpacity(0.7); setSubtitleTextShadow(true);
+                            setSubtitleOutline(true); setSubtitleOutlineColor('#000000'); setSubtitleOutlineWidth(4);
+                            setSubtitleAlign('center'); setSubtitleBottomOffset(10); setSubtitleLetterSpacing(0);
+                            setSubtitleLineHeightMultiplier(1.2); setSubtitleOffsetSec(0);
+                          }}
+                          style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+                          borderRadius={8}
+                          focusScale={1.05}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => <Text style={{ color: focused ? '#000' : '#fff', fontWeight: '600', fontSize: 14 }}>Reset to Defaults</Text>}
+                        </Focusable>
+                      </View>
+                    )}
                   </View>
 
-                  {/* Advanced controls - hidden on TV for simpler navigation, use presets instead */}
+                  {/* Advanced controls - only on mobile */}
                   {!isTVDevice && (
                     <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad, gap: isCompact ? 10 : 14 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
