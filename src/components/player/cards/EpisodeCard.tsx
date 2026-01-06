@@ -15,6 +15,8 @@ interface EpisodeCardProps {
   onPress: () => void;
   currentTheme: any;
   isCurrent?: boolean;
+  /** Whether the card is focused (for TV navigation) */
+  isFocused?: boolean;
 }
 
 export const EpisodeCard: React.FC<EpisodeCardProps> = ({
@@ -25,6 +27,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
   onPress,
   currentTheme,
   isCurrent = false,
+  isFocused = false,
 }) => {
   const { width } = Dimensions.get('window');
   const isTablet = width >= 768;
@@ -80,16 +83,9 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
     });
   };
 
-  return (
-    <TouchableOpacity
-      key={episode.id}
-      style={[
-        styles.episodeCard,
-        isCurrent && { borderWidth: 2, borderColor: currentTheme.colors.primary }
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
+  // Card content - shared between TV and mobile
+  const cardContent = (
+    <>
       <View style={styles.episodeImageContainer}>
         <FastImage
           source={{ uri: episodeImage }}
@@ -106,11 +102,11 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
         </View>
         {showProgress && (
           <View style={styles.progressBarContainer}>
-            <View 
+            <View
               style={[
                 styles.progressBar,
                 { width: `${progressPercent}%`, backgroundColor: currentTheme.colors.primary }
-              ]} 
+              ]}
             />
           </View>
         )}
@@ -164,6 +160,37 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
           {episode.overview || 'No description available'}
         </Text>
       </View>
+    </>
+  );
+
+  // When used in TV mode with Focusable wrapper, render as View
+  // The Focusable component handles the press event
+  if (isFocused !== undefined && isFocused !== null) {
+    return (
+      <View
+        style={[
+          styles.episodeCard,
+          isCurrent && { borderWidth: 2, borderColor: currentTheme.colors.primary },
+          isFocused && { backgroundColor: 'rgba(255,255,255,0.1)' }
+        ]}
+      >
+        {cardContent}
+      </View>
+    );
+  }
+
+  // Standard mobile TouchableOpacity
+  return (
+    <TouchableOpacity
+      key={episode.id}
+      style={[
+        styles.episodeCard,
+        isCurrent && { borderWidth: 2, borderColor: currentTheme.colors.primary }
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {cardContent}
     </TouchableOpacity>
   );
 };

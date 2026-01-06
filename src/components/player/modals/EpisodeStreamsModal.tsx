@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Platform, useWindowDimensions, BackHandler } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -11,6 +11,8 @@ import { Episode } from '../../../types/metadata';
 import { Stream } from '../../../types/streams';
 import { stremioService } from '../../../services/stremioService';
 import { logger } from '../../../utils/logger';
+import { useIsTV } from '../../../contexts/TVContext';
+import { Focusable } from '../../tv/Focusable';
 
 interface EpisodeStreamsModalProps {
   visible: boolean;
@@ -18,6 +20,8 @@ interface EpisodeStreamsModalProps {
   onClose: () => void;
   onSelectStream: (stream: Stream) => void;
   metadata?: { id?: string; name?: string };
+  /** Called when modal is closed (for TV focus restoration) */
+  onModalClosed?: () => void;
 }
 
 const QualityBadge = ({ quality }: { quality: string | null }) => {
@@ -57,13 +61,43 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
   onClose,
   onSelectStream,
   metadata,
+  onModalClosed,
 }) => {
   const { width } = useWindowDimensions();
-  const MENU_WIDTH = Math.min(width * 0.85, 400);
+  const isTVDevice = useIsTV();
+
+  // TV-specific sizing
+  const MENU_WIDTH = isTVDevice ? Math.min(width * 0.5, 600) : Math.min(width * 0.85, 400);
 
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: Stream[]; addonName: string } }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [hasErrors, setHasErrors] = useState<string[]>([]);
+
+  // Ref for first focusable stream item
+  const firstStreamRef = useRef<View>(null);
+
+  // Close handler with TV focus restoration
+  const handleClose = useCallback(() => {
+    onClose();
+    if (isTVDevice && onModalClosed) {
+      onModalClosed();
+    }
+  }, [onClose, isTVDevice, onModalClosed]);
+
+  // Handle Android TV back button to close modal
+  useEffect(() => {
+    if (!visible) return;
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      if (isTVDevice && onModalClosed) {
+        onModalClosed();
+      }
+      return true; // Prevent default back behavior
+    });
+
+    return () => backHandler.remove();
+  }, [visible, onClose, isTVDevice, onModalClosed]);
 
   useEffect(() => {
     if (visible && episode && metadata?.id) {
@@ -139,13 +173,108 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
 
   const sortedProviders = Object.entries(availableStreams);
 
+  // Flatten all streams for focus navigation indexing
+  const allStreams: { providerId: string; stream: Stream; index: number }[] = [];
+  sortedProviders.forEach(([providerId, providerData]) => {
+    providerData.streams.forEach((stream, index) => {
+      allStreams.push({ providerId, stream, index });
+    });
+  });
+
+  // Render stream item - TV or mobile
+  const renderStreamItem = (
+    providerId: string,
+    stream: Stream,
+    streamIndex: number,
+    globalIndex: number,
+    totalStreams: number
+  ) => {
+    const quality = getQualityFromTitle(stream.title) || stream.quality || null;
+    const isFirst = globalIndex === 0;
+    const isLast = globalIndex === totalStreams - 1;
+
+    const handleSelect = () => {
+      onSelectStream(stream);
+      handleClose();
+    };
+
+    const streamContent = (focused?: boolean) => (
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={{
+              color: focused ? 'black' : 'white',
+              fontWeight: '700',
+              fontSize: isTVDevice ? 16 : 14,
+              flex: 1
+            }} numberOfLines={1}>
+              {stream.name || 'Unknown Source'}
+            </Text>
+            <QualityBadge quality={quality} />
+          </View>
+          {stream.title && (
+            <Text style={{
+              color: focused ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.5)',
+              fontSize: isTVDevice ? 13 : 11
+            }} numberOfLines={2}>
+              {stream.title}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+
+    if (isTVDevice) {
+      return (
+        <Focusable
+          key={`${providerId}-${streamIndex}`}
+          onPress={handleSelect}
+          autoFocus={isFirst}
+          viewRef={isFirst ? firstStreamRef : undefined}
+          blockUp={isFirst}
+          blockDown={isLast}
+          blockLeft={true}
+          blockRight={true}
+          style={{
+            padding: isTVDevice ? 14 : 8,
+            borderRadius: 12,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+          }}
+          borderRadius={12}
+          focusScale={1.02}
+          animateBackground={true}
+          showFocusBorder={true}
+        >
+          {(focused) => streamContent(focused)}
+        </Focusable>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        key={`${providerId}-${streamIndex}`}
+        style={{
+          padding: 8,
+          borderRadius: 12,
+          backgroundColor: 'rgba(255,255,255,0.05)',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.05)'
+        }}
+        onPress={handleSelect}
+        activeOpacity={0.7}
+      >
+        {streamContent()}
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={10000}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 10000 }]}>
       {/* Backdrop */}
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
         activeOpacity={1}
-        onPress={onClose}
+        onPress={handleClose}
       >
         <Animated.View
           entering={FadeIn.duration(200)}
@@ -170,17 +299,17 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
       >
         {/* Header */}
         <View style={{
-          paddingTop: Platform.OS === 'ios' ? 60 : 20,
+          paddingTop: isTVDevice ? 30 : (Platform.OS === 'ios' ? 60 : 20),
           paddingHorizontal: 20,
           paddingBottom: 20,
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={{ color: 'white', fontSize: 20, fontWeight: '700' }} numberOfLines={1}>
+              <Text style={{ color: 'white', fontSize: isTVDevice ? 24 : 20, fontWeight: '700' }} numberOfLines={1}>
                 {episode?.name || 'Sources'}
               </Text>
               {episode && (
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 4 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: isTVDevice ? 15 : 13, marginTop: 4 }}>
                   S{episode.season_number} • E{episode.episode_number}
                 </Text>
               )}
@@ -199,61 +328,37 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
             </View>
           )}
 
-          {sortedProviders.map(([providerId, providerData]) => (
-            <View key={providerId} style={{ marginBottom: 20 }}>
-              <Text style={{
-                color: 'rgba(255, 255, 255, 0.4)',
-                fontSize: 12,
-                fontWeight: '700',
-                marginBottom: 10,
-                marginLeft: 5,
-                textTransform: 'uppercase',
-                letterSpacing: 1,
-              }}>
-                {providerData.addonName}
-              </Text>
+          {(() => {
+            let globalIndex = 0;
+            return sortedProviders.map(([providerId, providerData]) => (
+              <View key={providerId} style={{ marginBottom: 20 }}>
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  fontSize: isTVDevice ? 14 : 12,
+                  fontWeight: '700',
+                  marginBottom: 10,
+                  marginLeft: 5,
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                }}>
+                  {providerData.addonName}
+                </Text>
 
-              <View style={{ gap: 8 }}>
-                {providerData.streams.map((stream, index) => {
-                  const quality = getQualityFromTitle(stream.title) || stream.quality;
-
-                  return (
-                    <TouchableOpacity
-                      key={`${providerId}-${index}`}
-                      style={{
-                        padding: 8,
-                        borderRadius: 12,
-                        backgroundColor: 'rgba(255,255,255,0.05)',
-                        borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.05)'
-                      }}
-                      onPress={() => {
-                        onSelectStream(stream);
-                        onClose();
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                            <Text style={{ color: 'white', fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>
-                              {stream.name || 'Unknown Source'}
-                            </Text>
-                            <QualityBadge quality={quality} />
-                          </View>
-                          {stream.title && (
-                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }} numberOfLines={2}>
-                              {stream.title}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                <View style={{ gap: isTVDevice ? 10 : 8 }}>
+                  {providerData.streams.map((stream, index) => {
+                    const currentGlobalIndex = globalIndex++;
+                    return renderStreamItem(
+                      providerId,
+                      stream,
+                      index,
+                      currentGlobalIndex,
+                      allStreams.length
+                    );
+                  })}
+                </View>
               </View>
-            </View>
-          ))}
+            ));
+          })()}
 
           {!isLoading && sortedProviders.length === 0 && (
             <View style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>

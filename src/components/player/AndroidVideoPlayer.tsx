@@ -1122,6 +1122,7 @@ const AndroidVideoPlayer: React.FC = () => {
           modals.setShowEpisodesModal(false);
           modals.setShowEpisodeStreamsModal(true);
         }}
+        onModalClosed={() => setShouldRestoreFocus(true)}
       />
 
 
@@ -1135,10 +1136,15 @@ const AndroidVideoPlayer: React.FC = () => {
 
       <EpisodeStreamsModal
         visible={modals.showEpisodeStreamsModal}
-        onClose={() => modals.setShowEpisodeStreamsModal(false)}
+        onClose={() => {
+          // Close both stream and episode modals when back is pressed
+          modals.setShowEpisodeStreamsModal(false);
+          modals.setShowEpisodesModal(false);
+        }}
         episode={modals.selectedEpisodeForStreams}
         onSelectStream={handleEpisodeStreamSelect}
         metadata={{ id: id, name: title }}
+        onModalClosed={() => setShouldRestoreFocus(true)}
       />
 
     </View>
