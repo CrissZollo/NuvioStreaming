@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState, memo } from 'react';
+import React, { useEffect, useRef, useCallback, useState, memo, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,20 @@ import {
   Platform,
   BackHandler,
 } from 'react-native';
+import ReanimatedLib, {
+  useSharedValue,
+  useAnimatedStyle,
+  useDerivedValue,
+  runOnJS,
+} from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Focusable, FocusableRef } from '../../tv/Focusable';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useTVKeyEvent } from '../../../hooks/useTVKeyEvent';
+
+const AnimatedView = ReanimatedLib.createAnimatedComponent(View);
 
 interface TVPlayerControlsProps {
   /** Whether controls are currently visible */
@@ -65,6 +73,10 @@ interface TVPlayerControlsProps {
 
 const AUTO_HIDE_DELAY = 3000; // 3 seconds
 const DEBUG_UI = false; // Enable UI debug logging
+
+// Module-level variable to track if seeking is active
+// This is used by the memo comparison function which can't access component state
+let isCurrentlySeeking = false;
 
 /**
  * TV-optimized player controls with remote control support
@@ -143,8 +155,32 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   }, [modalOpen]);
 
   // Seeking state - shows visual feedback and preview time during seek
-  const [seekPreviewTime, setSeekPreviewTime] = useState<number | null>(null);
+  // We use Reanimated shared values which update on the UI thread directly,
+  // bypassing React's batching which blocks rapid state updates
   const seekPreviewTimeRef = useRef<number | null>(null);
+  const seekDisplayTimeShared = useSharedValue<number>(currentTime);
+  const isSeekingShared = useSharedValue<boolean>(false);
+
+  // Update shared value when currentTime changes (but not during seeking)
+  useEffect(() => {
+    if (!isSeekingShared.value) {
+      seekDisplayTimeShared.value = currentTime;
+    }
+  }, [currentTime, seekDisplayTimeShared, isSeekingShared]);
+
+  // For compatibility with existing code that reads seekPreviewTime
+  const seekPreviewTime = seekPreviewTimeRef.current;
+
+  // Update the shared value directly (called from addToSeekPreview)
+  const updateSeekDisplay = useCallback((newTime: number | null) => {
+    if (newTime !== null) {
+      seekDisplayTimeShared.value = newTime;
+      isSeekingShared.value = true;
+    } else {
+      isSeekingShared.value = false;
+      // Let the next currentTime prop update handle the display
+    }
+  }, [seekDisplayTimeShared, isSeekingShared]);
   // Base time - the position when seeking started (so we accumulate from a fixed point)
   const seekBaseTimeRef = useRef<number | null>(null);
   // Last committed seek position - used to continue from where we left off
@@ -253,7 +289,7 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
 
   // Timer to auto-commit seek after no key events for a while
   const seekCommitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const SEEK_COMMIT_DELAY = 300; // Commit seek 300ms after last key press
+  const SEEK_COMMIT_DELAY = 600; // Commit seek 600ms after last key press (increased for key repeat gaps)
 
   // Ref to hold commitSeek so addToSeekPreview can call it without circular dependency
   const commitSeekRef = useRef<() => void>(() => {});
@@ -293,10 +329,11 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     wasPausedBeforeSeekRef.current = null;
 
     // Clear seeking state
-    setSeekPreviewTime(null);
+    isCurrentlySeeking = false;
     seekPreviewTimeRef.current = null;
     seekBaseTimeRef.current = null;
-  }, [onSeekTo, setPaused]);
+    updateSeekDisplay(null);
+  }, [onSeekTo, setPaused, updateSeekDisplay]);
 
   // Update ref whenever commitSeek changes
   useEffect(() => {
@@ -326,10 +363,12 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       newPreviewTime = Math.max(0, Math.min(seekPreviewTimeRef.current! + offset, durationRef.current));
     }
 
-    // Update ref immediately
+    // Update ref immediately - this is synchronous and always up-to-date
     seekPreviewTimeRef.current = newPreviewTime;
-    // Update state immediately - this MUST be the last sync operation
-    setSeekPreviewTime(newPreviewTime);
+    // Update module-level flag for memo comparison
+    isCurrentlySeeking = true;
+    // Update the Reanimated shared value directly (updates on UI thread)
+    updateSeekDisplay(newPreviewTime);
 
     // ===== PART 2: ASYNC - Everything else (runs after React commit) =====
     // Use setImmediate (or setTimeout 0) to run after the current frame
@@ -361,7 +400,7 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     } else {
       setTimeout(asyncWork, 0);
     }
-  }, [setPaused, paused]);
+  }, [setPaused, paused, updateSeekDisplay]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -606,9 +645,54 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     return `${m}:${s.toString().padStart(2, '0')}`;
   }, []);
 
-  // Calculate progress percentage - use preview time when seeking
-  const displayTime = seekPreviewTime ?? currentTime;
-  const progress = duration > 0 ? (displayTime / duration) * 100 : 0;
+  // Store duration in shared value for animated calculations
+  const durationShared = useSharedValue(duration);
+  useEffect(() => {
+    durationShared.value = duration;
+  }, [duration, durationShared]);
+
+  // Calculate progress using derived value (runs on UI thread)
+  const progressShared = useDerivedValue(() => {
+    'worklet';
+    const dur = durationShared.value;
+    if (dur <= 0) return 0;
+    return (seekDisplayTimeShared.value / dur) * 100;
+  });
+
+  // Animated style for progress bar fill
+  const progressFillStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      width: `${progressShared.value}%`,
+    };
+  });
+
+  // Animated style for progress thumb
+  const progressThumbStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      left: `${progressShared.value}%`,
+    };
+  });
+
+  // State for time text display (updated from shared value via runOnJS)
+  const [displayTimeState, setDisplayTimeState] = useState(currentTime);
+
+  // Update display time state when shared value changes
+  // This is throttled by React's batching but that's OK for text
+  const updateDisplayTimeJS = useCallback((time: number) => {
+    setDisplayTimeState(time);
+  }, []);
+
+  // Sync shared value changes to React state for text display
+  useDerivedValue(() => {
+    'worklet';
+    runOnJS(updateDisplayTimeJS)(seekDisplayTimeShared.value);
+    return seekDisplayTimeShared.value;
+  });
+
+  // For non-animated elements that need the current values
+  const displayTime = displayTimeState;
   const bufferedProgress = duration > 0 ? buffered * 100 : 0;
   const isSeeking = seekPreviewTime !== null;
 
@@ -698,25 +782,23 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
                     { width: `${bufferedProgress}%` },
                   ]}
                 />
-                {/* Current progress */}
-                <View
+                {/* Current progress - uses Reanimated for smooth seeking updates */}
+                <AnimatedView
                   style={[
                     styles.progressFill,
-                    {
-                      width: `${progress}%`,
-                      backgroundColor: currentTheme.colors.primary,
-                    },
+                    { backgroundColor: currentTheme.colors.primary },
+                    progressFillStyle,
                   ]}
                 />
-                {/* Progress thumb */}
-                <View
+                {/* Progress thumb - uses Reanimated for smooth seeking updates */}
+                <AnimatedView
                   style={[
                     styles.progressThumb,
                     {
-                      left: `${progress}%`,
                       backgroundColor: timelineFocused ? 'white' : currentTheme.colors.primary,
                       transform: [{ scale: timelineFocused ? 1.5 : 1 }],
                     },
+                    progressThumbStyle,
                   ]}
                 />
               </View>
@@ -742,7 +824,6 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
               focusScale={1.05}
               animateBackground={true}
               showFocusBorder={true}
-              nextFocusUp={timelineRef.current?.getViewRef()}
             >
               {(focused) => (
                 <>
@@ -772,7 +853,6 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
               focusScale={1.05}
               animateBackground={true}
               showFocusBorder={true}
-              nextFocusUp={timelineRef.current?.getViewRef()}
             >
               {(focused) => (
                 <>
@@ -802,7 +882,6 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
               focusScale={1.05}
               animateBackground={true}
               showFocusBorder={true}
-              nextFocusUp={timelineRef.current?.getViewRef()}
             >
               {(focused) => (
                 <>
@@ -831,7 +910,6 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
             focusScale={1.05}
             animateBackground={true}
             showFocusBorder={true}
-            nextFocusUp={timelineRef.current?.getViewRef()}
           >
             {(focused) => (
               <>
@@ -996,8 +1074,7 @@ const styles = StyleSheet.create({
   },
 });
 
-// Memoized version that skips re-renders when only currentTime changes during seeking
-// This prevents lag when the video player sends progress updates while the user is seeking
+// Use default memo - seeking state is managed internally via state
 export const TVPlayerControls = memo(TVPlayerControlsInner);
 
 export default TVPlayerControls;
