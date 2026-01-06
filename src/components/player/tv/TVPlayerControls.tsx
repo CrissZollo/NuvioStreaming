@@ -209,9 +209,9 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     if (visibleRef.current) {
       if (DEBUG_UI) console.log('[TVPlayerControls] Starting auto-hide timer (', AUTO_HIDE_DELAY, 'ms)');
       autoHideTimerRef.current = setTimeout(() => {
-        // Don't hide if currently seeking or restoring focus
-        if (seekPreviewTimeRef.current !== null || isRestoringFocusRef.current) {
-          if (DEBUG_UI) console.log('[TVPlayerControls] Auto-hide blocked - seeking:', seekPreviewTimeRef.current !== null, 'restoring:', isRestoringFocusRef.current);
+        // Don't hide if currently seeking, restoring focus, or modal is open
+        if (seekPreviewTimeRef.current !== null || isRestoringFocusRef.current || modalOpenRef.current) {
+          if (DEBUG_UI) console.log('[TVPlayerControls] Auto-hide blocked - seeking:', seekPreviewTimeRef.current !== null, 'restoring:', isRestoringFocusRef.current, 'modal:', modalOpenRef.current);
           return;
         }
 
@@ -487,9 +487,9 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       // Start new auto-hide timer
       if (DEBUG_UI) console.log('[TVPlayerControls] Starting auto-hide timer from visible effect');
       autoHideTimerRef.current = setTimeout(() => {
-        // Don't hide if currently seeking or restoring focus
-        if (seekPreviewTimeRef.current !== null || isRestoringFocusRef.current) {
-          if (DEBUG_UI) console.log('[TVPlayerControls] visible effect auto-hide blocked - seeking:', seekPreviewTimeRef.current !== null, 'restoring:', isRestoringFocusRef.current);
+        // Don't hide if currently seeking, restoring focus, or modal is open
+        if (seekPreviewTimeRef.current !== null || isRestoringFocusRef.current || modalOpenRef.current) {
+          if (DEBUG_UI) console.log('[TVPlayerControls] visible effect auto-hide blocked - seeking:', seekPreviewTimeRef.current !== null, 'restoring:', isRestoringFocusRef.current, 'modal:', modalOpenRef.current);
           return;
         }
 
