@@ -97,6 +97,12 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
     visibleRef.current = visible;
   }, [visible]);
 
+  // Track timeline focus state in ref for use in callbacks
+  const timelineFocusedRef = useRef(timelineFocused);
+  useEffect(() => {
+    timelineFocusedRef.current = timelineFocused;
+  }, [timelineFocused]);
+
   // Store callbacks in refs to avoid stale closures and dependency issues
   const onHideControlsRef = useRef(onHideControls);
   const onShowControlsRef = useRef(onShowControls);
@@ -199,33 +205,30 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
   }, []);
 
   // Handle TV key events
-  // When visible: handle seeking and reset auto-hide timer
-  // When hidden: show controls on any D-pad press
+  // Left/right seek when UI is hidden OR when timeline is focused
+  // Up/down show controls when hidden
+  // Select toggles playback when hidden
   useTVKeyEvent({
     enabled: true, // Always listen
     onLeft: () => {
       const isVisible = visibleRef.current;
-      if (!isVisible) {
-        if (!justHiddenRef.current) {
-          onShowControlsRef.current?.();
-        }
-      } else {
-        if (timelineFocused) {
-          addSeekOffset(-SEEK_INTERVAL);
-        }
+      const isTimelineFocused = timelineFocusedRef.current;
+      // Only seek if UI is hidden OR timeline is focused
+      if (!isVisible || isTimelineFocused) {
+        addSeekOffset(-SEEK_INTERVAL);
+      }
+      if (isVisible) {
         resetAutoHideTimer();
       }
     },
     onRight: () => {
       const isVisible = visibleRef.current;
-      if (!isVisible) {
-        if (!justHiddenRef.current) {
-          onShowControlsRef.current?.();
-        }
-      } else {
-        if (timelineFocused) {
-          addSeekOffset(SEEK_INTERVAL);
-        }
+      const isTimelineFocused = timelineFocusedRef.current;
+      // Only seek if UI is hidden OR timeline is focused
+      if (!isVisible || isTimelineFocused) {
+        addSeekOffset(SEEK_INTERVAL);
+      }
+      if (isVisible) {
         resetAutoHideTimer();
       }
     },

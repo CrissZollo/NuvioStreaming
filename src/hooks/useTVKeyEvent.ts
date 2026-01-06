@@ -95,7 +95,6 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
 
     const { TVKeyEvent } = NativeModules;
     if (!TVKeyEvent) {
-      console.warn('TVKeyEvent native module not available');
       return;
     }
 

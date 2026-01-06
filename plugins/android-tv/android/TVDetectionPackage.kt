@@ -14,6 +14,6 @@ class TVDetectionPackage : ReactPackage {
     }
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
-        return listOf(ExoPlayerViewManager())
+        return emptyList()
     }
 }

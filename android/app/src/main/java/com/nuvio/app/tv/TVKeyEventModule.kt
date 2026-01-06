@@ -48,9 +48,15 @@ class TVKeyEventModule(reactContext: ReactApplicationContext) : ReactContextBase
             putInt("keyCode", keyCode)
         }
 
-        reactApplicationContext
-            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-            .emit("onTVKeyEvent", params)
+        try {
+            if (reactApplicationContext.hasActiveReactInstance()) {
+                reactApplicationContext
+                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    .emit("onTVKeyEvent", params)
+            }
+        } catch (e: Exception) {
+            // Silently ignore errors
+        }
     }
 
     @ReactMethod

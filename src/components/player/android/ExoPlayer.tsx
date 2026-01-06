@@ -1,10 +1,6 @@
-import React, { useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { View, StyleSheet, requireNativeComponent, Platform, UIManager, findNodeHandle } from 'react-native';
-
-// Only available on Android
-const ExoPlayerNative = Platform.OS === 'android'
-    ? requireNativeComponent<any>('ExoPlayer')
-    : null;
+import React, { useRef, forwardRef, useImperativeHandle, useState } from 'react';
+import { View, StyleSheet, Platform } from 'react-native';
+import Video, { VideoRef, SelectedTrack, SelectedTrackType } from 'react-native-video';
 
 export interface ExoPlayerRef {
     seek: (positionSeconds: number) => void;
@@ -28,79 +24,120 @@ export interface ExoPlayerProps {
 }
 
 const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
-    const nativeRef = useRef<any>(null);
-
-    const dispatchCommand = useCallback((commandName: string, args: any[] = []) => {
-        if (nativeRef.current && Platform.OS === 'android') {
-            const handle = findNodeHandle(nativeRef.current);
-            if (handle) {
-                UIManager.dispatchViewManagerCommand(
-                    handle,
-                    commandName,
-                    args
-                );
-            }
-        }
-    }, []);
+    const videoRef = useRef<VideoRef>(null);
+    const [selectedAudioTrack, setSelectedAudioTrack] = useState<SelectedTrack | undefined>(undefined);
+    const [selectedTextTrack, setSelectedTextTrack] = useState<SelectedTrack | undefined>(undefined);
 
     useImperativeHandle(ref, () => ({
         seek: (positionSeconds: number) => {
-            dispatchCommand('seek', [positionSeconds]);
+            console.log('[ExoPlayer] seek called:', positionSeconds);
+            videoRef.current?.seek(positionSeconds);
         },
         setAudioTrack: (trackId: number) => {
-            dispatchCommand('setAudioTrack', [trackId]);
+            console.log('[ExoPlayer] setAudioTrack called:', trackId);
+            setSelectedAudioTrack({ type: SelectedTrackType.INDEX, value: trackId });
         },
         setSubtitleTrack: (trackId: number) => {
-            dispatchCommand('setSubtitleTrack', [trackId]);
+            console.log('[ExoPlayer] setSubtitleTrack called:', trackId);
+            if (trackId === -1) {
+                setSelectedTextTrack({ type: SelectedTrackType.DISABLED, value: '' });
+            } else {
+                setSelectedTextTrack({ type: SelectedTrackType.INDEX, value: trackId });
+            }
         },
-    }), [dispatchCommand]);
+    }));
 
-    if (Platform.OS !== 'android' || !ExoPlayerNative) {
-        // Fallback for iOS or if native component is not available
+    if (Platform.OS !== 'android') {
         return (
             <View style={[styles.container, props.style, { backgroundColor: 'black' }]} />
         );
     }
 
-    const handleLoad = (event: any) => {
-        console.log('[ExoPlayer] onLoad event:', event?.nativeEvent);
-        props.onLoad?.(event?.nativeEvent);
+    const handleLoad = (data: any) => {
+        console.log('[ExoPlayer] onLoad event:', data);
+
+        // Extract tracks information
+        const audioTracks = data.audioTracks?.map((track: any, index: number) => ({
+            id: index,
+            name: track.title || track.language || `Audio ${index + 1}`,
+            language: track.language || 'und',
+            supported: true,
+        })) || [];
+
+        const subtitleTracks = data.textTracks?.map((track: any, index: number) => ({
+            id: index,
+            name: track.title || track.language || `Subtitle ${index + 1}`,
+            language: track.language || 'und',
+        })) || [];
+
+        // Notify about tracks
+        if (props.onTracksChanged && (audioTracks.length > 0 || subtitleTracks.length > 0)) {
+            props.onTracksChanged({ audioTracks, subtitleTracks });
+        }
+
+        props.onLoad?.({
+            duration: data.duration,
+            width: data.naturalSize?.width || 1920,
+            height: data.naturalSize?.height || 1080,
+        });
     };
 
-    const handleProgress = (event: any) => {
-        props.onProgress?.(event?.nativeEvent);
+    const handleProgress = (data: any) => {
+        props.onProgress?.({
+            currentTime: data.currentTime,
+            duration: data.playableDuration || data.seekableDuration || 0,
+        });
     };
 
-    const handleEnd = (event: any) => {
+    const handleEnd = () => {
         console.log('[ExoPlayer] onEnd event');
         props.onEnd?.();
     };
 
-    const handleError = (event: any) => {
-        console.log('[ExoPlayer] onError event:', event?.nativeEvent);
-        props.onError?.(event?.nativeEvent);
+    const handleError = (error: any) => {
+        console.log('[ExoPlayer] onError event:', error);
+        const errorMessage = error?.error?.errorString || error?.error?.message || error?.error || 'Unknown error';
+        props.onError?.({ error: errorMessage });
     };
 
-    const handleTracksChanged = (event: any) => {
-        console.log('[ExoPlayer] onTracksChanged event:', event?.nativeEvent);
-        props.onTracksChanged?.(event?.nativeEvent);
+    // Build source object
+    const sourceConfig: any = {
+        uri: props.source,
     };
+
+    if (props.headers) {
+        sourceConfig.headers = props.headers;
+    }
+
+    // Detect stream type from URL
+    const lowerUrl = (props.source || '').toLowerCase();
+    if (/\.m3u8(\b|$|\?)/.test(lowerUrl)) {
+        sourceConfig.type = 'm3u8';
+    } else if (/\.mpd(\b|$|\?)/.test(lowerUrl)) {
+        sourceConfig.type = 'mpd';
+    }
 
     return (
-        <ExoPlayerNative
-            ref={nativeRef}
+        <Video
+            ref={videoRef}
+            source={sourceConfig}
             style={[styles.container, props.style]}
-            source={props.source}
-            headers={props.headers}
             paused={props.paused ?? true}
             volume={props.volume ?? 1.0}
             rate={props.rate ?? 1.0}
             resizeMode={props.resizeMode ?? 'contain'}
+            repeat={false}
+            controls={false}
+            playInBackground={false}
+            playWhenInactive={false}
+            ignoreSilentSwitch="ignore"
+            useTextureView={false}
+            selectedAudioTrack={selectedAudioTrack}
+            selectedTextTrack={selectedTextTrack}
             onLoad={handleLoad}
             onProgress={handleProgress}
             onEnd={handleEnd}
             onError={handleError}
-            onTracksChanged={handleTracksChanged}
         />
     );
 });

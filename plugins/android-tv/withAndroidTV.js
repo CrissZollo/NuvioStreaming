@@ -134,13 +134,27 @@ function withTVMainApplication(config) {
         }
 
         // Add TVDetectionPackage to the packages list
-        const packagesPattern = /override fun getPackages\(\): List<ReactPackage> \{[\s\S]*?return PackageList\(this\)\.packages\.apply \{/;
-        if (contents.match(packagesPattern) && !contents.includes('TVDetectionPackage()')) {
-            contents = contents.replace(
-                packagesPattern,
-                (match) => match + '\n          add(TVDetectionPackage())'
-            );
-            console.log('[android-tv] Added TVDetectionPackage to packages list');
+        // Handle both old format (return PackageList...) and new format (= PackageList...)
+        if (!contents.includes('add(TVDetectionPackage())')) {
+            // Try new format first: PackageList(this).packages.apply {
+            const newFormatPattern = /PackageList\(this\)\.packages\.apply\s*\{/;
+            if (contents.match(newFormatPattern)) {
+                contents = contents.replace(
+                    newFormatPattern,
+                    (match) => match + '\n              add(TVDetectionPackage())'
+                );
+                console.log('[android-tv] Added TVDetectionPackage to packages list (new format)');
+            } else {
+                // Try old format: return PackageList(this).packages.apply {
+                const oldFormatPattern = /override fun getPackages\(\): List<ReactPackage> \{[\s\S]*?return PackageList\(this\)\.packages\.apply \{/;
+                if (contents.match(oldFormatPattern)) {
+                    contents = contents.replace(
+                        oldFormatPattern,
+                        (match) => match + '\n          add(TVDetectionPackage())'
+                    );
+                    console.log('[android-tv] Added TVDetectionPackage to packages list (old format)');
+                }
+            }
         }
 
         config.modResults.contents = contents;
