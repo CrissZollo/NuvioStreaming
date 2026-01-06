@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, StyleSheet, Platform, BackHandler } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
@@ -44,26 +44,33 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   const menuWidth = isTVDevice ? Math.min(width * 0.5, 500) : Math.min(width * 0.9, 420);
   const menuMaxHeight = height * 0.9;
 
-  const handleClose = () => {
+  // Ref for focus trapping - first focusable item
+  const firstItemRef = useRef<View>(null);
+
+  // Use useCallback to ensure stable reference for BackHandler
+  const handleClose = useCallback(() => {
     setShowAudioModal(false);
-    // Call onModalClosed after a short delay to allow the modal to close
-    // This helps restore focus to the player controls on TV
+    // Call onModalClosed immediately for TV focus restoration
     if (isTVDevice && onModalClosed) {
-      setTimeout(() => onModalClosed(), 300);
+      onModalClosed();
     }
-  };
+  }, [setShowAudioModal, isTVDevice, onModalClosed]);
 
   // Handle Android TV back button to close modal
   useEffect(() => {
     if (!showAudioModal) return;
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleClose();
+      // Always close on back press when modal is open
+      setShowAudioModal(false);
+      if (isTVDevice && onModalClosed) {
+        onModalClosed();
+      }
       return true; // Prevent default back behavior
     });
 
     return () => backHandler.remove();
-  }, [showAudioModal]);
+  }, [showAudioModal, setShowAudioModal, isTVDevice, onModalClosed]);
 
   if (!showAudioModal) return null;
 
@@ -113,7 +120,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
 
                 const handleSelect = () => {
                   selectAudioTrack(track.id);
-                  setTimeout(handleClose, 200);
+                  handleClose();
                 };
 
                 const trackContent = (focused?: boolean) => (
@@ -138,11 +145,17 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                 );
 
                 if (isTVDevice) {
+                  const isFirst = index === 0;
+                  const isLast = index === ksAudioTracks.length - 1;
+
                   return (
                     <Focusable
                       key={track.id}
                       onPress={handleSelect}
-                      autoFocus={index === 0}
+                      autoFocus={isFirst}
+                      viewRef={isFirst ? firstItemRef : undefined}
+                      blockUp={isFirst}
+                      blockDown={isLast}
                       style={{
                         padding: 14,
                         borderRadius: 12,

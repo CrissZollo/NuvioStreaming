@@ -79,6 +79,9 @@ const AndroidVideoPlayer: React.FC = () => {
   const { settings } = useSettings();
   const isTVDevice = useIsTV();
 
+  // State for TV focus restoration after modal closes
+  const [shouldRestoreFocus, setShouldRestoreFocus] = useState(false);
+
   const videoRef = useRef<any>(null);
   const mpvPlayerRef = useRef<MpvPlayerRef>(null);
   const exoPlayerRef = useRef<ExoPlayerRef>(null);
@@ -671,6 +674,10 @@ const AndroidVideoPlayer: React.FC = () => {
     if (!subtitle.url) return;
 
     modals.setShowSubtitleModal(false);
+    // Trigger focus restoration immediately on TV
+    if (isTVDevice) {
+      setShouldRestoreFocus(true);
+    }
     setIsLoadingSubtitles(true);
     try {
       // Download subtitle file
@@ -836,7 +843,7 @@ const AndroidVideoPlayer: React.FC = () => {
         )}
 
         {/* Pause indicator - shows when video is paused (TV only) */}
-        {isTVDevice && playerState.paused && !playerState.showControls && (
+        {isTVDevice && playerState.paused && (
           <View
             style={{
               position: 'absolute',
@@ -924,6 +931,9 @@ const AndroidVideoPlayer: React.FC = () => {
             onShowEpisodes={type === 'series' ? () => modals.setShowEpisodesModal(true) : undefined}
             playbackSpeed={speedControl.playbackSpeed}
             buffered={playerState.duration > 0 ? playerState.buffered / playerState.duration : 0}
+            restoreFocus={shouldRestoreFocus}
+            onFocusRestored={() => setShouldRestoreFocus(false)}
+            modalOpen={modals.showSubtitleModal || modals.showAudioModal || modals.showEpisodesModal || modals.showSourcesModal || modals.showSpeedModal || modals.showEpisodeStreamsModal}
           />
         ) : (
           <PlayerControls
@@ -1019,10 +1029,7 @@ const AndroidVideoPlayer: React.FC = () => {
             activePlayerRef.current.setAudioTrack(trackId);
           }
         }}
-        onModalClosed={() => {
-          // Re-show controls to restore focus on TV
-          playerState.setShowControls(true);
-        }}
+        onModalClosed={() => setShouldRestoreFocus(true)}
       />
 
       <SubtitleModals
@@ -1051,6 +1058,10 @@ const AndroidVideoPlayer: React.FC = () => {
           // Disable custom subtitles when selecting built-in track
           setUseCustomSubtitles(false);
           modals.setShowSubtitleModal(false);
+          // Trigger focus restoration immediately on TV
+          if (isTVDevice) {
+            setShouldRestoreFocus(true);
+          }
         }}
         disableCustomSubtitles={disableCustomSubtitles}
         increaseSubtitleSize={() => setSubtitleSize(prev => Math.min(prev + 2, 60))}
@@ -1078,10 +1089,7 @@ const AndroidVideoPlayer: React.FC = () => {
         setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
         subtitleOffsetSec={subtitleOffsetSec}
         setSubtitleOffsetSec={setSubtitleOffsetSec}
-        onModalClosed={() => {
-          // Re-show controls to restore focus on TV
-          playerState.setShowControls(true);
-        }}
+        onModalClosed={() => setShouldRestoreFocus(true)}
       />
 
       <SourcesModal

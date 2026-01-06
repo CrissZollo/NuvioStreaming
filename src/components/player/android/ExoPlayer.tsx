@@ -134,6 +134,7 @@ const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
             useTextureView={false}
             selectedAudioTrack={selectedAudioTrack}
             selectedTextTrack={selectedTextTrack}
+            progressUpdateInterval={500}
             onLoad={handleLoad}
             onProgress={handleProgress}
             onEnd={handleEnd}

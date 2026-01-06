@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, useWindowDimensions, StyleSheet, BackHandler } from 'react-native';
+import React, { useEffect, useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Platform, useWindowDimensions, StyleSheet, BackHandler, findNodeHandle } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -62,13 +62,18 @@ interface SubtitleModalsProps {
   onModalClosed?: () => void;
 }
 
-const MorphingTab = ({ label, isSelected, onPress, isTVDevice, autoFocus }: any) => {
+const MorphingTab = ({ label, isSelected, onPress, isTVDevice, autoFocus, viewRef, nextFocusUp, nextFocusDown }: any) => {
   const animatedStyle = useAnimatedStyle(() => ({
     borderRadius: withTiming(isSelected ? 10 : 40, { duration: 250 }),
     backgroundColor: withTiming(isSelected ? 'white' : 'rgba(255,255,255,0.06)', { duration: 250 }),
   }));
 
   if (isTVDevice) {
+    // Build nextFocus props
+    const focusProps: any = {};
+    if (nextFocusUp) focusProps.nextFocusUp = nextFocusUp;
+    if (nextFocusDown) focusProps.nextFocusDown = nextFocusDown;
+
     return (
       <Focusable
         onPress={onPress}
@@ -78,6 +83,8 @@ const MorphingTab = ({ label, isSelected, onPress, isTVDevice, autoFocus }: any)
         focusScale={1.05}
         animateBackground={true}
         showFocusBorder={true}
+        viewRef={viewRef}
+        {...focusProps}
       >
         {(focused) => (
           <View style={[{
@@ -137,30 +144,39 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   const menuWidth = isTVDevice ? Math.min(width * 0.5, 550) : Math.min(width * 0.9, 420);
   const menuMaxHeight = height * 0.95;
 
+  // Refs for focus trapping on TV - tabs at top, last item in content at bottom
+  const builtInTabRef = useRef<View>(null);
+  const addonsTabRef = useRef<View>(null);
+  const styleTabRef = useRef<View>(null);
+
   React.useEffect(() => {
     if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) fetchAvailableSubtitles();
   }, [showSubtitleModal]);
 
-  const handleClose = () => {
+  // Use useCallback to ensure stable reference for BackHandler
+  const handleClose = useCallback(() => {
     setShowSubtitleModal(false);
-    // Call onModalClosed after a short delay to allow the modal to close
-    // This helps restore focus to the player controls on TV
+    // Call onModalClosed immediately for TV focus restoration
     if (isTVDevice && onModalClosed) {
-      setTimeout(() => onModalClosed(), 300);
+      onModalClosed();
     }
-  };
+  }, [setShowSubtitleModal, isTVDevice, onModalClosed]);
 
   // Handle Android TV back button to close modal
   useEffect(() => {
     if (!showSubtitleModal) return;
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleClose();
+      // Always close on back press when modal is open
+      setShowSubtitleModal(false);
+      if (isTVDevice && onModalClosed) {
+        onModalClosed();
+      }
       return true; // Prevent default back behavior
     });
 
     return () => backHandler.remove();
-  }, [showSubtitleModal]);
+  }, [showSubtitleModal, setShowSubtitleModal, isTVDevice, onModalClosed]);
 
   if (!showSubtitleModal) return null;
 
@@ -193,9 +209,31 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
 
           {/* Tab Bar */}
           <View style={{ flexDirection: 'row', gap: 15, paddingHorizontal: isTVDevice ? 40 : 70, marginBottom: 20 }}>
-            <MorphingTab label="Built-in" isSelected={activeTab === 'built-in'} onPress={() => setActiveTab('built-in')} isTVDevice={isTVDevice} autoFocus={activeTab === 'built-in'} />
-            <MorphingTab label="Addons" isSelected={activeTab === 'addon'} onPress={() => setActiveTab('addon')} isTVDevice={isTVDevice} />
-            <MorphingTab label="Style" isSelected={activeTab === 'appearance'} onPress={() => setActiveTab('appearance')} isTVDevice={isTVDevice} />
+            <MorphingTab
+              label="Built-in"
+              isSelected={activeTab === 'built-in'}
+              onPress={() => setActiveTab('built-in')}
+              isTVDevice={isTVDevice}
+              autoFocus={activeTab === 'built-in'}
+              viewRef={builtInTabRef}
+              nextFocusUp={builtInTabRef}
+            />
+            <MorphingTab
+              label="Addons"
+              isSelected={activeTab === 'addon'}
+              onPress={() => setActiveTab('addon')}
+              isTVDevice={isTVDevice}
+              viewRef={addonsTabRef}
+              nextFocusUp={addonsTabRef}
+            />
+            <MorphingTab
+              label="Style"
+              isSelected={activeTab === 'appearance'}
+              onPress={() => setActiveTab('appearance')}
+              isTVDevice={isTVDevice}
+              viewRef={styleTabRef}
+              nextFocusUp={styleTabRef}
+            />
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -206,6 +244,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     <Focusable
                       onPress={() => { selectTextTrack(-1); setSelectedOnlineSubtitleId(null); }}
                       autoFocus={true}
+                      blockDown={ksTextTracks.length === 0}
                       style={{ padding: 14, borderRadius: 12, backgroundColor: selectedTextTrack === -1 ? 'white' : 'rgba(242, 184, 181, 1)' }}
                       borderRadius={12}
                       focusScale={1.02}
@@ -226,6 +265,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   )}
                   {ksTextTracks.map((track, index) => {
                     const isSelected = selectedTextTrack === track.id;
+                    const isLast = index === ksTextTracks.length - 1;
                     const handleSelect = () => { selectTextTrack(track.id); setSelectedOnlineSubtitleId(null); };
 
                     if (isTVDevice) {
@@ -233,6 +273,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         <Focusable
                           key={track.id}
                           onPress={handleSelect}
+                          blockDown={isLast}
                           style={{ padding: 14, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                           borderRadius={12}
                           focusScale={1.02}
@@ -270,6 +311,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       <Focusable
                         onPress={fetchAvailableSubtitles}
                         autoFocus={true}
+                        blockDown={true}
                         style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}
                         borderRadius={12}
                         focusScale={1.02}
@@ -292,6 +334,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   ) : (
                     availableSubtitles.map((sub, index) => {
                       const isSelected = selectedOnlineSubtitleId === sub.id;
+                      const isLast = index === availableSubtitles.length - 1;
                       const handleSelect = () => { setSelectedOnlineSubtitleId(sub.id); loadWyzieSubtitle(sub); };
 
                       if (isTVDevice) {
@@ -300,6 +343,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             key={sub.id}
                             onPress={handleSelect}
                             autoFocus={index === 0}
+                            blockDown={isLast}
                             style={{ padding: 8, paddingLeft: 12, paddingRight: 14, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                             borderRadius={12}
                             focusScale={1.02}
