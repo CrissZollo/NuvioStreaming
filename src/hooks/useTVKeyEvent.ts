@@ -32,10 +32,14 @@ interface UseTVKeyEventConfig {
   onSelect?: () => void;
   onBack?: () => void;
   onPlayPause?: () => void;
+  onLeftUp?: () => void;
+  onRightUp?: () => void;
   enabled?: boolean;
 }
 
-const DEBOUNCE_MS = 150;
+// Debounce times - reduced for faster response
+const DEBOUNCE_MS_DEFAULT = 50; // Reduced from 150ms for faster UI response
+const DEBOUNCE_MS_SEEK = 0; // No debounce for left/right to allow continuous seeking
 
 /**
  * Hook for listening to TV remote key events
@@ -53,6 +57,8 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
     onSelect,
     onBack,
     onPlayPause,
+    onLeftUp,
+    onRightUp,
     enabled = true,
   } = config;
 
@@ -69,6 +75,8 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
     onSelect,
     onBack,
     onPlayPause,
+    onLeftUp,
+    onRightUp,
     enabled,
   });
 
@@ -84,9 +92,11 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
       onSelect,
       onBack,
       onPlayPause,
+      onLeftUp,
+      onRightUp,
       enabled,
     };
-  }, [onKeyDown, onKeyUp, onLeft, onRight, onUp, onDown, onSelect, onBack, onPlayPause, enabled]);
+  }, [onKeyDown, onKeyUp, onLeft, onRight, onUp, onDown, onSelect, onBack, onPlayPause, onLeftUp, onRightUp, enabled]);
 
   useEffect(() => {
     if (!isTV || Platform.OS !== 'android') {
@@ -106,8 +116,11 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
       const now = Date.now();
       const eventKey = `${key}-${action}`;
 
+      // Use shorter debounce for left/right (seeking), longer for others
+      const debounceMs = (key === 'left' || key === 'right') ? DEBOUNCE_MS_SEEK : DEBOUNCE_MS_DEFAULT;
+
       // Debounce rapid key presses
-      if (now - (lastEventTime.current[eventKey] || 0) < DEBOUNCE_MS) {
+      if (now - (lastEventTime.current[eventKey] || 0) < debounceMs) {
         return;
       }
       lastEventTime.current[eventKey] = now;
@@ -141,6 +154,16 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
         }
       } else if (action === 'up') {
         callbacks.onKeyUp?.(key);
+
+        // Call specific key up handlers for left/right (for seeking)
+        switch (key) {
+          case 'left':
+            callbacks.onLeftUp?.();
+            break;
+          case 'right':
+            callbacks.onRightUp?.();
+            break;
+        }
       }
     };
 

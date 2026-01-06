@@ -19,6 +19,8 @@ interface TVPlayerControlsProps {
   visible: boolean;
   /** Whether video is paused */
   paused: boolean;
+  /** Set paused state */
+  setPaused?: (paused: boolean) => void;
   /** Current playback position in seconds */
   currentTime: number;
   /** Total video duration in seconds */
@@ -67,6 +69,7 @@ const AUTO_HIDE_DELAY = 3000; // 3 seconds
 export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
   visible,
   paused,
+  setPaused,
   currentTime,
   duration,
   title,
@@ -115,16 +118,19 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
   const justHiddenRef = useRef(false);
   const justHiddenTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Seek preview state - accumulates seek offset while user is seeking
-  const [seekPreviewOffset, setSeekPreviewOffset] = useState(0);
-  const [isSeeking, setIsSeeking] = useState(false);
-  const seekCommitTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const seekPreviewOffsetRef = useRef(0);
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    seekPreviewOffsetRef.current = seekPreviewOffset;
-  }, [seekPreviewOffset]);
+  // Seeking state - shows visual feedback and preview time during seek
+  const [seekPreviewTime, setSeekPreviewTime] = useState<number | null>(null);
+  const seekPreviewTimeRef = useRef<number | null>(null);
+  // Base time - the position when seeking started (so we accumulate from a fixed point)
+  const seekBaseTimeRef = useRef<number | null>(null);
+  // Last committed seek position - used to continue from where we left off
+  const lastCommittedSeekRef = useRef<number | null>(null);
+  const lastCommitTimeRef = useRef<number>(0);
+  // Track if we paused during seek so we can resume after
+  const wasPausedBeforeSeekRef = useRef<boolean | null>(null);
+  // Interval for continuous seeking when holding button
+  const seekIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isSeekingRef = useRef(false);
 
   // Refs for focus navigation
   const timelineRef = useRef<FocusableRef>(null);
@@ -135,8 +141,8 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
 
   // Seek interval in seconds
   const SEEK_INTERVAL = 10;
-  // Delay before committing seek (ms)
-  const SEEK_COMMIT_DELAY = 800;
+  // How often to repeat seek when holding (ms)
+  const SEEK_REPEAT_INTERVAL = 200;
 
   // Reset auto-hide timer
   const resetAutoHideTimer = useCallback(() => {
@@ -147,6 +153,11 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
     // Use refs to get current state and avoid stale closures
     if (visibleRef.current) {
       autoHideTimerRef.current = setTimeout(() => {
+        // Don't hide if currently seeking
+        if (seekPreviewTimeRef.current !== null) {
+          return;
+        }
+
         // Set justHiddenRef to prevent immediate re-show from focus events
         justHiddenRef.current = true;
         if (justHiddenTimerRef.current) {
@@ -161,104 +172,202 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
     }
   }, []); // No dependencies - uses refs
 
-  // Commit the accumulated seek offset (uses ref to avoid stale closure)
+  // Store duration in ref for use in interval callback
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
+
+  // Store currentTime in ref for initial seek position
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
+
+  // Store onSeek in ref for use in callbacks
+  const onSeekRef = useRef(onSeek);
+  onSeekRef.current = onSeek;
+
+  // Timer to auto-commit seek after no key events for a while
+  const seekCommitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const SEEK_COMMIT_DELAY = 300; // Commit seek 300ms after last key press
+
+  // Ref to hold commitSeek so addToSeekPreview can call it without circular dependency
+  const commitSeekRef = useRef<() => void>(() => {});
+
+  // Commit the seek to the preview position
   const commitSeek = useCallback(() => {
-    const offset = seekPreviewOffsetRef.current;
-    if (offset !== 0) {
-      onSeek(offset);
+    const previewTime = seekPreviewTimeRef.current;
+    const baseTime = seekBaseTimeRef.current;
+
+    if (previewTime !== null && baseTime !== null) {
+      // Save the committed position for potential follow-up seeks
+      lastCommittedSeekRef.current = previewTime;
+      lastCommitTimeRef.current = Date.now();
+
+      // Calculate total offset from where we started
+      const totalOffset = previewTime - baseTime;
+
+      if (totalOffset !== 0) {
+        // Use onSeekTo for absolute positioning if available
+        if (onSeekTo) {
+          onSeekTo(previewTime);
+        } else {
+          // Fall back to relative seek from base position
+          onSeekRef.current(totalOffset);
+        }
+      }
+
+      // Resume playback if we paused it during seek
+      // Do this after seeking so the video starts from the new position
+      if (setPaused && wasPausedBeforeSeekRef.current === false) {
+        setTimeout(() => {
+          setPaused(false);
+        }, 150);
+      }
     }
-    setSeekPreviewOffset(0);
-    setIsSeeking(false);
-  }, [onSeek]);
 
-  // Add to seek preview and schedule commit
-  const addSeekOffset = useCallback((offset: number) => {
-    setIsSeeking(true);
-    setSeekPreviewOffset(prev => {
-      // Calculate the new preview time and clamp it
-      const previewTime = currentTime + prev + offset;
-      const clampedPreviewTime = Math.max(0, Math.min(previewTime, duration));
-      // Return the offset needed to reach the clamped time
-      return clampedPreviewTime - currentTime;
-    });
+    wasPausedBeforeSeekRef.current = null;
 
-    // Clear existing commit timer
-    if (seekCommitTimerRef.current) {
-      clearTimeout(seekCommitTimerRef.current);
+    // Clear seeking state
+    setSeekPreviewTime(null);
+    seekPreviewTimeRef.current = null;
+    seekBaseTimeRef.current = null;
+  }, [onSeekTo, setPaused]);
+
+  // Update ref whenever commitSeek changes
+  useEffect(() => {
+    commitSeekRef.current = commitSeek;
+  }, [commitSeek]);
+
+  // Add to seek preview (called on each key press)
+  // CRITICAL: This must update the UI IMMEDIATELY before anything else
+  // The function is split into two parts:
+  // 1. Synchronous: Calculate and set UI state (instant)
+  // 2. Async: Everything else (pause, commit scheduling)
+  const addToSeekPreview = useCallback((direction: 'forward' | 'backward') => {
+    const offset = direction === 'forward' ? SEEK_INTERVAL : -SEEK_INTERVAL;
+    const now = Date.now();
+    const isFirstPress = seekBaseTimeRef.current === null;
+
+    // ===== PART 1: SYNCHRONOUS - Calculate and update UI =====
+    let newPreviewTime: number;
+    if (isFirstPress) {
+      const timeSinceLastCommit = now - lastCommitTimeRef.current;
+      const startPosition = (lastCommittedSeekRef.current !== null && timeSinceLastCommit < 1500)
+        ? lastCommittedSeekRef.current
+        : currentTimeRef.current;
+      seekBaseTimeRef.current = startPosition;
+      newPreviewTime = Math.max(0, Math.min(startPosition + offset, durationRef.current));
+    } else {
+      newPreviewTime = Math.max(0, Math.min(seekPreviewTimeRef.current! + offset, durationRef.current));
     }
 
-    // Schedule new commit
-    seekCommitTimerRef.current = setTimeout(() => {
-      commitSeek();
-    }, SEEK_COMMIT_DELAY);
+    // Update ref immediately
+    seekPreviewTimeRef.current = newPreviewTime;
+    // Update state immediately - this MUST be the last sync operation
+    setSeekPreviewTime(newPreviewTime);
 
-    resetAutoHideTimer();
-  }, [currentTime, duration, commitSeek, resetAutoHideTimer]);
+    // ===== PART 2: ASYNC - Everything else (runs after React commit) =====
+    // Use setImmediate (or setTimeout 0) to run after the current frame
+    const asyncWork = () => {
+      // Track pause state and pause on first press
+      if (isFirstPress && setPaused && wasPausedBeforeSeekRef.current === null) {
+        wasPausedBeforeSeekRef.current = paused;
+        if (!paused) {
+          setPaused(true);
+        }
+      }
 
-  // Cleanup seek commit timer on unmount
+      // Clear existing commit timeout
+      if (seekCommitTimeoutRef.current) {
+        clearTimeout(seekCommitTimeoutRef.current);
+        seekCommitTimeoutRef.current = null;
+      }
+
+      // Schedule commit after delay (when user stops pressing)
+      seekCommitTimeoutRef.current = setTimeout(() => {
+        commitSeekRef.current();
+      }, SEEK_COMMIT_DELAY);
+    };
+
+    // Run async work after current execution context
+    // setImmediate is more reliable than setTimeout(0) for this purpose
+    if (typeof setImmediate !== 'undefined') {
+      setImmediate(asyncWork);
+    } else {
+      setTimeout(asyncWork, 0);
+    }
+  }, [setPaused, paused]);
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (seekCommitTimerRef.current) {
-        clearTimeout(seekCommitTimerRef.current);
+      if (seekIntervalRef.current) {
+        clearInterval(seekIntervalRef.current);
+      }
+      if (seekCommitTimeoutRef.current) {
+        clearTimeout(seekCommitTimeoutRef.current);
       }
     };
   }, []);
 
   // Handle TV key events
-  // Left/right seek when UI is hidden OR when timeline is focused
-  // Up/down show controls when hidden
-  // Select toggles playback when hidden
+  // Left/right: seek only when timeline is focused or UI is hidden
+  // Up/down/select: show controls when hidden
+  // Select also toggles playback when hidden
   useTVKeyEvent({
     enabled: true, // Always listen
     onLeft: () => {
-      const isVisible = visibleRef.current;
-      const isTimelineFocused = timelineFocusedRef.current;
-      // Only seek if UI is hidden OR timeline is focused
-      if (!isVisible || isTimelineFocused) {
-        addSeekOffset(-SEEK_INTERVAL);
+      // Show UI if hidden (only if not just hidden)
+      if (!visibleRef.current && !justHiddenRef.current) {
+        onShowControlsRef.current?.();
+        // Seek when UI is hidden
+        addToSeekPreview('backward');
+      } else if (visibleRef.current && timelineFocusedRef.current) {
+        // Only seek when timeline is focused (not when navigating bottom buttons)
+        addToSeekPreview('backward');
       }
-      if (isVisible) {
-        resetAutoHideTimer();
-      }
+      // When bottom buttons are focused, let native focus system handle left/right navigation
     },
     onRight: () => {
-      const isVisible = visibleRef.current;
-      const isTimelineFocused = timelineFocusedRef.current;
-      // Only seek if UI is hidden OR timeline is focused
-      if (!isVisible || isTimelineFocused) {
-        addSeekOffset(SEEK_INTERVAL);
+      // Show UI if hidden (only if not just hidden)
+      if (!visibleRef.current && !justHiddenRef.current) {
+        onShowControlsRef.current?.();
+        // Seek when UI is hidden
+        addToSeekPreview('forward');
+      } else if (visibleRef.current && timelineFocusedRef.current) {
+        // Only seek when timeline is focused (not when navigating bottom buttons)
+        addToSeekPreview('forward');
       }
-      if (isVisible) {
-        resetAutoHideTimer();
-      }
+      // When bottom buttons are focused, let native focus system handle left/right navigation
     },
     onUp: () => {
-      const isVisible = visibleRef.current;
-      if (!isVisible) {
-        if (!justHiddenRef.current) {
-          onShowControlsRef.current?.();
-        }
-      } else {
+      if (!visibleRef.current && !justHiddenRef.current) {
+        onShowControlsRef.current?.();
+      }
+      // Only reset timer if visible and not seeking
+      if (visibleRef.current && seekPreviewTimeRef.current === null) {
         resetAutoHideTimer();
       }
     },
     onDown: () => {
-      const isVisible = visibleRef.current;
-      if (!isVisible) {
-        if (!justHiddenRef.current) {
-          onShowControlsRef.current?.();
-        }
-      } else {
+      if (!visibleRef.current && !justHiddenRef.current) {
+        onShowControlsRef.current?.();
+      }
+      // Only reset timer if visible and not seeking
+      if (visibleRef.current && seekPreviewTimeRef.current === null) {
         resetAutoHideTimer();
       }
     },
     onSelect: () => {
-      const isVisible = visibleRef.current;
-      if (!isVisible) {
-        // When hidden, select toggles playback
+      if (!visibleRef.current) {
+        // When hidden, show UI and toggle playback
+        if (!justHiddenRef.current) {
+          onShowControlsRef.current?.();
+        }
         onTogglePlayback();
       } else {
-        resetAutoHideTimer();
+        // When visible, just reset timer (don't toggle during seeking)
+        if (seekPreviewTimeRef.current === null) {
+          resetAutoHideTimer();
+        }
       }
     },
   });
@@ -272,6 +381,11 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
       }
       // Start new auto-hide timer
       autoHideTimerRef.current = setTimeout(() => {
+        // Don't hide if currently seeking
+        if (seekPreviewTimeRef.current !== null) {
+          return;
+        }
+
         // Set justHiddenRef to prevent immediate re-show from focus events
         justHiddenRef.current = true;
         if (justHiddenTimerRef.current) {
@@ -366,10 +480,11 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
     return `${m}:${s.toString().padStart(2, '0')}`;
   }, []);
 
-  // Calculate progress percentage - show preview position while seeking
-  const displayTime = isSeeking ? currentTime + seekPreviewOffset : currentTime;
+  // Calculate progress percentage - use preview time when seeking
+  const displayTime = seekPreviewTime ?? currentTime;
   const progress = duration > 0 ? (displayTime / duration) * 100 : 0;
   const bufferedProgress = duration > 0 ? buffered * 100 : 0;
+  const isSeeking = seekPreviewTime !== null;
 
   // Build title display
   const displayTitle = episodeTitle
@@ -482,11 +597,6 @@ export const TVPlayerControls: React.FC<TVPlayerControlsProps> = ({
               <View style={styles.timeRow}>
                 <Text style={[styles.timeText, isSeeking && styles.timeTextSeeking]}>
                   {formatTime(displayTime)}
-                  {isSeeking && seekPreviewOffset !== 0 && (
-                    <Text style={styles.seekOffsetText}>
-                      {` (${seekPreviewOffset > 0 ? '+' : ''}${Math.round(seekPreviewOffset)}s)`}
-                    </Text>
-                  )}
                 </Text>
                 <Text style={styles.timeText}>{formatTime(duration)}</Text>
               </View>
@@ -701,11 +811,6 @@ const styles = StyleSheet.create({
   timeTextSeeking: {
     color: 'white',
     fontWeight: '700',
-  },
-  seekOffsetText: {
-    color: '#4CAF50',
-    fontSize: 12,
-    fontWeight: '600',
   },
   progressBarContainer: {
     height: 3,

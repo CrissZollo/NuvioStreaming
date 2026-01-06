@@ -906,6 +906,7 @@ const AndroidVideoPlayer: React.FC = () => {
           <TVPlayerControls
             visible={playerState.showControls}
             paused={playerState.paused}
+            setPaused={playerState.setPaused}
             currentTime={playerState.currentTime}
             duration={playerState.duration}
             title={title}
@@ -914,6 +915,7 @@ const AndroidVideoPlayer: React.FC = () => {
             episode={episode}
             onTogglePlayback={controlsHook.togglePlayback}
             onSeek={(seconds) => controlsHook.skip(seconds)}
+            onSeekTo={(seconds) => controlsHook.seekToTime(seconds)}
             onClose={handleClose}
             onShowControls={() => playerState.setShowControls(true)}
             onHideControls={() => playerState.setShowControls(false)}
