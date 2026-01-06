@@ -117,7 +117,9 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   const [timelineFocused, setTimelineFocused] = useState(false);
 
   // Track visible state in ref for use in callbacks
+  // Update synchronously during render AND in effect to ensure ref is always current
   const visibleRef = useRef(visible);
+  visibleRef.current = visible; // Sync update during render
   useEffect(() => {
     if (DEBUG_UI) console.log('[TVPlayerControls] visible changed:', visible, 'prev:', visibleRef.current);
     visibleRef.current = visible;
@@ -125,6 +127,7 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
 
   // Track timeline focus state in ref for use in callbacks
   const timelineFocusedRef = useRef(timelineFocused);
+  timelineFocusedRef.current = timelineFocused; // Sync update during render
   useEffect(() => {
     timelineFocusedRef.current = timelineFocused;
   }, [timelineFocused]);
@@ -132,6 +135,9 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   // Store callbacks in refs to avoid stale closures and dependency issues
   const onHideControlsRef = useRef(onHideControls);
   const onShowControlsRef = useRef(onShowControls);
+  // Sync update during render for immediate access
+  onHideControlsRef.current = onHideControls;
+  onShowControlsRef.current = onShowControls;
   useEffect(() => {
     onHideControlsRef.current = onHideControls;
     onShowControlsRef.current = onShowControls;
@@ -147,8 +153,15 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   // Track if focus restoration is in progress to prevent spurious show/hide cycles
   const isRestoringFocusRef = useRef(false);
 
+  // Track if back was already handled by useTVKeyEvent to prevent double-handling
+  const backHandledRef = useRef(false);
+
+  // Track if a show/hide action is already in progress to prevent duplicate calls
+  const actionInProgressRef = useRef(false);
+
   // Track modal open state in ref for use in callbacks
   const modalOpenRef = useRef(modalOpen);
+  modalOpenRef.current = modalOpen; // Sync update during render
   useEffect(() => {
     if (DEBUG_UI) console.log('[TVPlayerControls] modalOpen changed:', modalOpen);
     modalOpenRef.current = modalOpen;
@@ -259,11 +272,11 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
         if (justHiddenTimerRef.current) {
           clearTimeout(justHiddenTimerRef.current);
         }
-        // Use longer timeout (1000ms) to ensure the hidden overlay's focus event doesn't trigger re-show
+        // Short timeout (200ms) - timestamp check is primary mechanism now
         justHiddenTimerRef.current = setTimeout(() => {
           if (DEBUG_UI) console.log('[TVPlayerControls] justHiddenRef cleared');
           justHiddenRef.current = false;
-        }, 1000);
+        }, 200);
 
         onHideControlsRef.current?.();
       }, AUTO_HIDE_DELAY);
@@ -418,57 +431,48 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   // Left/right: seek only when timeline is focused or UI is hidden
   // Up/down/select: show controls when hidden
   // Select also toggles playback when hidden
-  // Helper to check if recently hidden (using timestamp instead of ref flag for reliability)
-  const wasRecentlyHidden = () => {
-    const timeSinceHide = Date.now() - lastHideTimeRef.current;
-    return timeSinceHide < 500;
-  };
-
   useTVKeyEvent({
     enabled: true, // Always listen
     onLeft: () => {
-      const recentlyHidden = wasRecentlyHidden();
-      if (DEBUG_UI) console.log('[TVPlayerControls] onLeft - modal:', modalOpenRef.current, 'restoring:', isRestoringFocusRef.current, 'visible:', visibleRef.current, 'recentlyHidden:', recentlyHidden);
-      // Don't process if modal is open or focus restoration is in progress
-      if (modalOpenRef.current || isRestoringFocusRef.current) return;
+      if (DEBUG_UI) console.log('[TVPlayerControls] onLeft - modal:', modalOpenRef.current, 'visible:', visibleRef.current);
+      // Don't process if modal is open
+      if (modalOpenRef.current) return;
 
-      // Show UI if hidden (only if not recently hidden)
-      if (!visibleRef.current && !recentlyHidden) {
+      // Show UI if hidden (don't block on isRestoringFocusRef - that only affects where focus goes)
+      if (!visibleRef.current) {
         if (DEBUG_UI) console.log('[TVPlayerControls] onLeft - showing controls');
         onShowControlsRef.current?.();
         // Seek when UI is hidden
         addToSeekPreview('backward');
-      } else if (visibleRef.current && timelineFocusedRef.current) {
+      } else if (timelineFocusedRef.current) {
         // Only seek when timeline is focused (not when navigating bottom buttons)
         addToSeekPreview('backward');
       }
       // When bottom buttons are focused, let native focus system handle left/right navigation
     },
     onRight: () => {
-      const recentlyHidden = wasRecentlyHidden();
-      if (DEBUG_UI) console.log('[TVPlayerControls] onRight - modal:', modalOpenRef.current, 'restoring:', isRestoringFocusRef.current, 'visible:', visibleRef.current, 'recentlyHidden:', recentlyHidden);
-      // Don't process if modal is open or focus restoration is in progress
-      if (modalOpenRef.current || isRestoringFocusRef.current) return;
+      if (DEBUG_UI) console.log('[TVPlayerControls] onRight - modal:', modalOpenRef.current, 'visible:', visibleRef.current);
+      // Don't process if modal is open
+      if (modalOpenRef.current) return;
 
-      // Show UI if hidden (only if not recently hidden)
-      if (!visibleRef.current && !recentlyHidden) {
+      // Show UI if hidden (don't block on isRestoringFocusRef - that only affects where focus goes)
+      if (!visibleRef.current) {
         if (DEBUG_UI) console.log('[TVPlayerControls] onRight - showing controls');
         onShowControlsRef.current?.();
         // Seek when UI is hidden
         addToSeekPreview('forward');
-      } else if (visibleRef.current && timelineFocusedRef.current) {
+      } else if (timelineFocusedRef.current) {
         // Only seek when timeline is focused (not when navigating bottom buttons)
         addToSeekPreview('forward');
       }
       // When bottom buttons are focused, let native focus system handle left/right navigation
     },
     onUp: () => {
-      const recentlyHidden = wasRecentlyHidden();
-      if (DEBUG_UI) console.log('[TVPlayerControls] onUp - modal:', modalOpenRef.current, 'restoring:', isRestoringFocusRef.current, 'visible:', visibleRef.current, 'recentlyHidden:', recentlyHidden);
-      // Don't process if modal is open or focus restoration is in progress
-      if (modalOpenRef.current || isRestoringFocusRef.current) return;
+      if (DEBUG_UI) console.log('[TVPlayerControls] onUp - modal:', modalOpenRef.current, 'visible:', visibleRef.current);
+      // Don't process if modal is open
+      if (modalOpenRef.current) return;
 
-      if (!visibleRef.current && !recentlyHidden) {
+      if (!visibleRef.current) {
         if (DEBUG_UI) console.log('[TVPlayerControls] onUp - showing controls');
         onShowControlsRef.current?.();
       }
@@ -478,12 +482,11 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       }
     },
     onDown: () => {
-      const recentlyHidden = wasRecentlyHidden();
-      if (DEBUG_UI) console.log('[TVPlayerControls] onDown - modal:', modalOpenRef.current, 'restoring:', isRestoringFocusRef.current, 'visible:', visibleRef.current, 'recentlyHidden:', recentlyHidden);
-      // Don't process if modal is open or focus restoration is in progress
-      if (modalOpenRef.current || isRestoringFocusRef.current) return;
+      if (DEBUG_UI) console.log('[TVPlayerControls] onDown - modal:', modalOpenRef.current, 'visible:', visibleRef.current);
+      // Don't process if modal is open
+      if (modalOpenRef.current) return;
 
-      if (!visibleRef.current && !recentlyHidden) {
+      if (!visibleRef.current) {
         if (DEBUG_UI) console.log('[TVPlayerControls] onDown - showing controls');
         onShowControlsRef.current?.();
       }
@@ -493,23 +496,49 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       }
     },
     onSelect: () => {
-      const recentlyHidden = wasRecentlyHidden();
-      if (DEBUG_UI) console.log('[TVPlayerControls] onSelect - modal:', modalOpenRef.current, 'restoring:', isRestoringFocusRef.current, 'visible:', visibleRef.current, 'recentlyHidden:', recentlyHidden);
-      // Don't process if modal is open or focus restoration is in progress
-      if (modalOpenRef.current || isRestoringFocusRef.current) return;
+      if (DEBUG_UI) console.log('[TVPlayerControls] onSelect - modal:', modalOpenRef.current, 'visible:', visibleRef.current);
+      // Don't process if modal is open
+      if (modalOpenRef.current) return;
 
       if (!visibleRef.current) {
         // When hidden, show UI and toggle playback
-        if (!recentlyHidden) {
-          if (DEBUG_UI) console.log('[TVPlayerControls] onSelect - showing controls');
-          onShowControlsRef.current?.();
-        }
+        if (DEBUG_UI) console.log('[TVPlayerControls] onSelect - showing controls');
+        onShowControlsRef.current?.();
         onTogglePlayback();
       } else {
         // When visible, just reset timer (don't toggle during seeking)
         if (seekPreviewTimeRef.current === null) {
           resetAutoHideTimer();
         }
+      }
+    },
+    onBack: () => {
+      if (DEBUG_UI) console.log('[TVPlayerControls] onBack - modal:', modalOpenRef.current, 'visible:', visibleRef.current);
+      // If a modal is open, don't handle here - let the modal's BackHandler handle it
+      if (modalOpenRef.current) return;
+
+      // Set flag to prevent BackHandler from also handling this event
+      backHandledRef.current = true;
+      setTimeout(() => {
+        backHandledRef.current = false;
+      }, 100);
+
+      if (visibleRef.current) {
+        // If controls are visible, hide them
+        if (DEBUG_UI) console.log('[TVPlayerControls] onBack - hiding controls');
+        lastHideTimeRef.current = Date.now();
+        justHiddenRef.current = true;
+        if (justHiddenTimerRef.current) {
+          clearTimeout(justHiddenTimerRef.current);
+        }
+        justHiddenTimerRef.current = setTimeout(() => {
+          justHiddenRef.current = false;
+        }, 200);
+        onHideControlsRef.current?.();
+      } else {
+        // If controls are hidden, exit the player
+        if (DEBUG_UI) console.log('[TVPlayerControls] onBack - exiting player');
+        onClose();
       }
     },
   });
@@ -540,11 +569,11 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
         if (justHiddenTimerRef.current) {
           clearTimeout(justHiddenTimerRef.current);
         }
-        // Use longer timeout (1000ms) to ensure the hidden overlay's focus event doesn't trigger re-show
+        // Short timeout (200ms) - timestamp check is primary mechanism now
         justHiddenTimerRef.current = setTimeout(() => {
           if (DEBUG_UI) console.log('[TVPlayerControls] justHiddenRef cleared (from visible effect)');
           justHiddenRef.current = false;
-        }, 1000);
+        }, 200);
 
         onHideControlsRef.current?.();
       }, AUTO_HIDE_DELAY);
@@ -563,22 +592,36 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     };
   }, [visible]); // Only depend on visible - use ref for callback
 
-  // Animate controls visibility
+  // Animate controls visibility - fast fade for responsive feel
   useEffect(() => {
     Animated.timing(opacityAnim, {
       toValue: visible ? 1 : 0,
-      duration: 200,
+      duration: 100, // Reduced from 200ms for faster response
       useNativeDriver: true,
     }).start();
   }, [visible, opacityAnim]);
 
-  // Handle back button via BackHandler
+  // Handle back button via BackHandler (fallback, useTVKeyEvent.onBack is primary)
   useEffect(() => {
     if (Platform.OS !== 'android') return;
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // If already handled by useTVKeyEvent.onBack, skip
+      if (backHandledRef.current) {
+        if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler - already handled by useTVKeyEvent');
+        return true; // Consume the event to prevent default behavior
+      }
+
       const isVisible = visibleRef.current;
-      if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler pressed - visible:', isVisible, 'modal:', modalOpenRef.current);
+      const isModalOpen = modalOpenRef.current;
+      if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler pressed - visible:', isVisible, 'modal:', isModalOpen);
+
+      // If a modal is open, let the modal's BackHandler handle it
+      if (isModalOpen) {
+        if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler - modal open, letting modal handle it');
+        return false; // Let the event propagate to modal's BackHandler
+      }
+
       if (isVisible) {
         // If controls are visible, hide them
         // Set flag to prevent immediate re-show from focus/key events
@@ -588,11 +631,11 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
         if (justHiddenTimerRef.current) {
           clearTimeout(justHiddenTimerRef.current);
         }
-        // Use longer timeout to ensure all events have settled
+        // Short timeout (200ms) - timestamp check is primary mechanism now
         justHiddenTimerRef.current = setTimeout(() => {
           if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler - justHiddenRef cleared');
           justHiddenRef.current = false;
-        }, 1000);
+        }, 200);
 
         onHideControlsRef.current?.();
         return true;
@@ -610,22 +653,6 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       // to ensure justHiddenRef gets reset even if component re-renders
     };
   }, []); // No dependencies - uses refs for callbacks
-
-  // Handle interaction to show controls (D-pad navigation when hidden)
-  const handleOverlayInteraction = useCallback(() => {
-    const now = Date.now();
-    const timeSinceHide = now - lastHideTimeRef.current;
-    const recentlyHidden = timeSinceHide < 500; // 500ms debounce
-    if (DEBUG_UI) console.log('[TVPlayerControls] handleOverlayInteraction - visible:', visibleRef.current, 'justHidden:', justHiddenRef.current, 'restoring:', isRestoringFocusRef.current, 'modal:', modalOpenRef.current, 'timeSinceHide:', timeSinceHide, 'recentlyHidden:', recentlyHidden);
-    // Don't show controls if:
-    // 1. We just hid them (within 500ms)
-    // 2. Focus restoration is in progress (prevents spurious show/hide cycles)
-    // 3. A modal is open
-    if (!visibleRef.current && !recentlyHidden && !isRestoringFocusRef.current && !modalOpenRef.current) {
-      if (DEBUG_UI) console.log('[TVPlayerControls] handleOverlayInteraction - showing controls');
-      onShowControlsRef.current?.();
-    }
-  }, []); // No dependencies - uses refs
 
   // Handle timeline press - toggle playback
   const handleTimelinePress = useCallback(() => {
@@ -702,13 +729,13 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     : title;
 
   // When controls are hidden, render a transparent focusable overlay
-  // that captures D-pad events to show controls
+  // Key events are handled by useTVKeyEvent - no need for onFocus handler
+  // (onFocus was causing controls to immediately re-show after hiding)
   if (!visible) {
     return (
       <View style={styles.hiddenOverlay} pointerEvents="box-only">
         <Focusable
           onPress={handleTimelinePress}
-          onFocus={handleOverlayInteraction}
           autoFocus
           style={styles.hiddenFocusable}
           borderRadius={0}
