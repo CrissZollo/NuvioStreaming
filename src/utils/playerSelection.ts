@@ -20,7 +20,7 @@ export const shouldUseKSPlayer = ({
   headers,
   platform = Platform.OS
 }: PlayerSelectionOptions): boolean => {
-  // Android always uses AndroidVideoPlayer (MPV)
+  // Android always uses AndroidVideoPlayer (ExoPlayer)
   if (platform === 'android') {
     return false;
   }

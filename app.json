@@ -100,7 +100,6 @@
           "iosStartDiscoveryAfterFirstTapOnCastButton": true
         }
       ],
-      "./plugins/mpv-bridge/withMpvBridge",
       "./plugins/android-tv/withAndroidTV"
     ],
     "updates": {

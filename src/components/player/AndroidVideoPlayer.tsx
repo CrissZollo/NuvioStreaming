@@ -46,7 +46,6 @@ import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 
 // Android-specific components
 import { VideoSurface } from './android/components/VideoSurface';
-import { MpvPlayerRef } from './android/MpvPlayer';
 import { ExoPlayerRef } from './android/ExoPlayer';
 
 // Utils
@@ -83,13 +82,12 @@ const AndroidVideoPlayer: React.FC = () => {
   const [shouldRestoreFocus, setShouldRestoreFocus] = useState(false);
 
   const videoRef = useRef<any>(null);
-  const mpvPlayerRef = useRef<MpvPlayerRef>(null);
   const exoPlayerRef = useRef<ExoPlayerRef>(null);
   const pinchRef = useRef(null);
   const tracksHook = usePlayerTracks();
 
-  // Get the active player ref based on device type
-  const activePlayerRef = isTVDevice ? exoPlayerRef : mpvPlayerRef;
+  // Player ref - always ExoPlayer
+  const activePlayerRef = exoPlayerRef;
 
   // Track if we've already applied default track preferences for this session
   const hasAppliedDefaultTracksRef = useRef(false);
@@ -442,32 +440,8 @@ const AndroidVideoPlayer: React.FC = () => {
     subtitleAlign, subtitleBottomOffset, subtitleLetterSpacing, subtitleLineHeightMultiplier
   ]);
 
-  // Apply subtitle styles to MPV when they change (for built-in subtitles)
   // Note: ExoPlayer doesn't support subtitle styling - it uses system defaults
-  useEffect(() => {
-    if (!isTVDevice && mpvPlayerRef.current && !useCustomSubtitles) {
-      mpvPlayerRef.current.setSubtitleStyle({
-        fontSize: subtitleSize,
-        color: subtitleTextColor,
-        borderColor: subtitleOutline ? subtitleOutlineColor : '#00000000',
-        borderSize: subtitleOutline ? subtitleOutlineWidth : 0,
-        shadowOffset: subtitleTextShadow ? 2 : 0,
-        shadowColor: subtitleTextShadow ? '#000000' : '#00000000',
-        backgroundOpacity: subtitleBackground ? subtitleBgOpacity : 0,
-      });
-    }
-  }, [
-    subtitleSize, subtitleTextColor, subtitleOutline, subtitleOutlineColor,
-    subtitleOutlineWidth, subtitleTextShadow, subtitleBackground, subtitleBgOpacity,
-    useCustomSubtitles, isTVDevice
-  ]);
-
-  // Apply subtitle timing offset to MPV (not supported on ExoPlayer)
-  useEffect(() => {
-    if (!isTVDevice && mpvPlayerRef.current && !useCustomSubtitles) {
-      mpvPlayerRef.current.setSubtitleDelay(subtitleOffsetSec);
-    }
-  }, [subtitleOffsetSec, useCustomSubtitles, isTVDevice]);
+  // Custom subtitles are rendered via CustomSubtitles component instead
 
   const handleLoad = useCallback((data: any) => {
     if (!playerState.isMounted.current) return;
@@ -573,7 +547,7 @@ const AndroidVideoPlayer: React.FC = () => {
     modals.setShowSourcesModal(false);
     playerState.setPaused(true);
 
-    // Unmount VideoSurface first to ensure MPV is fully destroyed
+    // Unmount VideoSurface first to ensure player is fully destroyed
     setIsTransitioningStream(true);
 
     const newQuality = newStream.quality || newStream.title?.match(/(\d+)p/)?.[0];
@@ -599,7 +573,7 @@ const AndroidVideoPlayer: React.FC = () => {
     modals.setShowEpisodeStreamsModal(false);
     playerState.setPaused(true);
 
-    // Unmount VideoSurface first to ensure MPV is fully destroyed
+    // Unmount VideoSurface first to ensure player is fully destroyed
     setIsTransitioningStream(true);
 
     const ep = modals.selectedEpisodeForStreams;
@@ -831,7 +805,6 @@ const AndroidVideoPlayer: React.FC = () => {
                 applyDefaultTrackPreferences(formattedAudioTracks, formattedSubtitleTracks);
               }, 500);
             }}
-            mpvPlayerRef={mpvPlayerRef}
             exoPlayerRef={exoPlayerRef}
             pinchRef={pinchRef}
             onPinchGestureEvent={() => { }}
@@ -980,7 +953,7 @@ const AndroidVideoPlayer: React.FC = () => {
             }}
             buffered={playerState.buffered}
             formatTime={formatTime}
-            playerBackend={'MPV'}
+            playerBackend={'ExoPlayer'}
           />
         )}
 

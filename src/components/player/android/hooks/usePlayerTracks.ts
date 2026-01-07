@@ -8,7 +8,7 @@ interface Track {
 }
 
 export const usePlayerTracks = () => {
-    // Tracks from native player (MPV/RN-Video)
+    // Tracks from native player (ExoPlayer)
     const [rnVideoAudioTracks, setRnVideoAudioTracks] = useState<Track[]>([]);
     const [rnVideoTextTracks, setRnVideoTextTracks] = useState<Track[]>([]);
 

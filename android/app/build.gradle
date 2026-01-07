@@ -104,6 +104,29 @@ android {
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
+
+    // Generate separate APKs per ABI (architecture)
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            universalApk false // Set to true if you also want a universal APK
+        }
+    }
+
+    // Assign unique version codes to each APK based on ABI
+    // This ensures each APK has a unique version code for Play Store
+    project.ext.abiCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
+    applicationVariants.all { variant ->
+        variant.outputs.each { output ->
+            def baseAbiVersionCode = project.ext.abiCodes.get(output.getFilter(com.android.build.OutputFile.ABI))
+            if (baseAbiVersionCode != null) {
+                output.versionCodeOverride = baseAbiVersionCode * 1000000 + variant.versionCode
+            }
+        }
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -159,17 +182,10 @@ android {
     }
 }
 
-// Exclude duplicate androidsvg library (androidsvg vs androidsvg-aar conflict)
-configurations.all {
-    exclude group: 'com.caverock', module: 'androidsvg'
-}
-
 dependencies {
 // @generated begin react-native-google-cast-dependencies - expo prebuild (DO NOT MODIFY) sync-3822a3c86222e7aca74039b551612aab7e75365d
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"
 // @generated end react-native-google-cast-dependencies
-    // MPV library for video playback
-    implementation 'dev.jdtech.mpv:libmpv:0.2.0'
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 

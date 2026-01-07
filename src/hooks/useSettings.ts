@@ -88,8 +88,8 @@ export interface AppSettings {
   streamCacheTTL: number; // Stream cache duration in milliseconds (default: 1 hour)
   enableStreamsBackdrop: boolean; // Enable blurred backdrop background on StreamsScreen mobile
   useExternalPlayerForDownloads: boolean; // Enable/disable external player for downloaded content
-  // Android MPV player settings
-  useHardwareDecoding: boolean; // Enable hardware decoding for MPV player on Android (default: false for software decoding)
+  // Android ExoPlayer settings
+  useHardwareDecoding: boolean; // Enable hardware decoding for ExoPlayer on Android (default: false for software decoding)
   // Default track preferences
   defaultAudioLanguage: string; // Preferred audio language (ISO 639-1 code, e.g., 'en', 'es', 'ru')
   defaultSubtitleLanguage: string; // Preferred subtitle language (ISO 639-1 code, e.g., 'en', 'es', 'off')
@@ -157,7 +157,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   openMetadataScreenWhenCacheDisabled: true, // Default to StreamsScreen when cache disabled
   streamCacheTTL: 60 * 60 * 1000, // Default: 1 hour in milliseconds
   enableStreamsBackdrop: true, // Enable by default (new behavior)
-  // Android MPV player settings
+  // Android ExoPlayer settings
   useHardwareDecoding: false, // Default to software decoding (more compatible)
   // Default track preferences
   defaultAudioLanguage: '', // Empty means auto-select (first available)

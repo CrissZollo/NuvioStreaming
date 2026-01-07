@@ -16,6 +16,7 @@ export interface ExoPlayerProps {
     rate?: number;
     resizeMode?: 'contain' | 'cover' | 'stretch';
     style?: any;
+    enableAudioPassthrough?: boolean;
     onLoad?: (data: { duration: number; width: number; height: number }) => void;
     onProgress?: (data: { currentTime: number; duration: number }) => void;
     onEnd?: () => void;

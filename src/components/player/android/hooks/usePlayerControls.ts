@@ -1,12 +1,10 @@
 import { useRef, useCallback } from 'react';
-import { Platform } from 'react-native';
-import { logger } from '../../../../utils/logger';
 
 const DEBUG_MODE = true; // Temporarily enable for debugging seek
 const END_EPSILON = 0.3;
 
 export const usePlayerControls = (
-    mpvPlayerRef: any,
+    playerRef: any,
     paused: boolean,
     setPaused: (paused: boolean) => void,
     currentTime: number,
@@ -27,17 +25,17 @@ export const usePlayerControls = (
         console.log('[usePlayerControls] seekToTime called:', {
             rawSeconds,
             timeInSeconds,
-            hasMpvRef: !!mpvPlayerRef?.current,
+            hasPlayerRef: !!playerRef?.current,
             duration,
             isSeeking: isSeeking.current
         });
 
-        // MPV Player
-        if (mpvPlayerRef.current && duration > 0) {
-            console.log(`[usePlayerControls][MPV] Seeking to ${timeInSeconds}`);
+        // ExoPlayer
+        if (playerRef.current && duration > 0) {
+            console.log(`[usePlayerControls][ExoPlayer] Seeking to ${timeInSeconds}`);
 
             isSeeking.current = true;
-            mpvPlayerRef.current.seek(timeInSeconds);
+            playerRef.current.seek(timeInSeconds);
 
             // Reset seeking flag after a delay
             setTimeout(() => {
@@ -46,12 +44,12 @@ export const usePlayerControls = (
                 }
             }, 500);
         } else {
-            console.log('[usePlayerControls][MPV] Cannot seek - ref or duration invalid:', {
-                hasRef: !!mpvPlayerRef?.current,
+            console.log('[usePlayerControls][ExoPlayer] Cannot seek - ref or duration invalid:', {
+                hasRef: !!playerRef?.current,
                 duration
             });
         }
-    }, [duration, paused, setPaused, mpvPlayerRef, isSeeking, isMounted]);
+    }, [duration, paused, setPaused, playerRef, isSeeking, isMounted]);
 
     const skip = useCallback((seconds: number) => {
         console.log('[usePlayerControls] skip called:', { seconds, currentTime, newTime: currentTime + seconds });

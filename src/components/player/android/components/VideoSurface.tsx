@@ -1,17 +1,15 @@
-import React, { useCallback, memo, useMemo } from 'react';
+import React, { useCallback, memo } from 'react';
 import { View, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { PinchGestureHandler } from 'react-native-gesture-handler';
-import MpvPlayer, { MpvPlayerRef } from '../MpvPlayer';
 import ExoPlayer, { ExoPlayerRef } from '../ExoPlayer';
 import { styles } from '../../utils/playerStyles';
 import { ResizeModeType } from '../../utils/playerTypes';
-import { useIsTV } from '../../../../contexts/TVContext';
 
 // Log once per session to avoid spam
 let hasLoggedPlayerType = false;
 
-// Union type for player refs - both have similar interfaces
-export type PlayerRef = MpvPlayerRef | ExoPlayerRef;
+// Player ref type - only ExoPlayer
+export type PlayerRef = ExoPlayerRef;
 
 interface VideoSurfaceProps {
     processedStreamUrl: string;
@@ -31,8 +29,7 @@ interface VideoSurfaceProps {
     onError: (err: any) => void;
     onBuffer: (buf: any) => void;
 
-    // Refs - supports both MPV and ExoPlayer
-    mpvPlayerRef?: React.RefObject<MpvPlayerRef>;
+    // Refs - ExoPlayer only
     exoPlayerRef?: React.RefObject<ExoPlayerRef>;
     pinchRef: any;
 
@@ -60,7 +57,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
     onEnd,
     onError,
     onBuffer,
-    mpvPlayerRef,
     exoPlayerRef,
     pinchRef,
     onPinchGestureEvent,
@@ -72,9 +68,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
 }) => {
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
-
-    // Detect if running on TV - use ExoPlayer for better hardware decoding
-    const isTV = useIsTV();
 
     const handleLoad = useCallback((data: { duration: number; width: number; height: number }) => {
         console.log('[VideoSurface] onLoad received:', data);
@@ -108,39 +101,15 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
         onEnd();
     }, [onEnd]);
 
-    // Choose player based on device type
-    // TV uses ExoPlayer for better hardware decoding, HDR, and Dolby Vision support
-    // Mobile uses MPV for its advanced features and codec support
+    // Always use ExoPlayer
     const renderPlayer = () => {
-        if (isTV) {
-            if (!hasLoggedPlayerType) {
-                console.log('[VideoSurface] Using ExoPlayer for Android TV');
-                hasLoggedPlayerType = true;
-            }
-            return (
-                <ExoPlayer
-                    ref={exoPlayerRef || mpvPlayerRef as any}
-                    source={streamUrl}
-                    headers={headers}
-                    paused={paused}
-                    volume={volume}
-                    rate={playbackSpeed}
-                    resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
-                    style={localStyles.player}
-                    enableAudioPassthrough={enableAudioPassthrough}
-                    onLoad={handleLoad}
-                    onProgress={handleProgress}
-                    onEnd={handleEnd}
-                    onError={handleError}
-                    onTracksChanged={onTracksChanged}
-                />
-            );
+        if (!hasLoggedPlayerType) {
+            console.log('[VideoSurface] Using ExoPlayer');
+            hasLoggedPlayerType = true;
         }
-
-        // Mobile uses MPV
         return (
-            <MpvPlayer
-                ref={mpvPlayerRef}
+            <ExoPlayer
+                ref={exoPlayerRef}
                 source={streamUrl}
                 headers={headers}
                 paused={paused}
@@ -148,12 +117,12 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
                 rate={playbackSpeed}
                 resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
                 style={localStyles.player}
+                enableAudioPassthrough={enableAudioPassthrough}
                 onLoad={handleLoad}
                 onProgress={handleProgress}
                 onEnd={handleEnd}
                 onError={handleError}
                 onTracksChanged={onTracksChanged}
-                useHardwareDecoding={useHardwareDecoding}
             />
         );
     };
@@ -163,7 +132,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
             width: screenDimensions.width,
             height: screenDimensions.height,
         }]}>
-            {/* Player - ExoPlayer on TV, MPV on mobile */}
+            {/* Player - ExoPlayer */}
             {renderPlayer()}
 
             {/* Gesture overlay - transparent, on top of the player */}
