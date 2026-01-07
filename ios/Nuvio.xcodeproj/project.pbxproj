@@ -106,7 +106,7 @@
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				CAB0C1A418FC45BDB6572E02 /* Upload Debug Symbols to Sentry */,
+				A828305540CD43B59BB1E365 /* Upload Debug Symbols to Sentry */,
 			);
 			buildRules = (
 			);
@@ -223,7 +223,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Nuvio/Pods-Nuvio-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		CAB0C1A418FC45BDB6572E02 /* Upload Debug Symbols to Sentry */ = {
+		A828305540CD43B59BB1E365 /* Upload Debug Symbols to Sentry */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
