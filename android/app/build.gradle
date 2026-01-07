@@ -182,6 +182,11 @@ android {
     }
 }
 
+// Exclude duplicate androidsvg library (androidsvg vs androidsvg-aar conflict)
+configurations.all {
+    exclude group: 'com.caverock', module: 'androidsvg'
+}
+
 dependencies {
 // @generated begin react-native-google-cast-dependencies - expo prebuild (DO NOT MODIFY) sync-3822a3c86222e7aca74039b551612aab7e75365d
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"

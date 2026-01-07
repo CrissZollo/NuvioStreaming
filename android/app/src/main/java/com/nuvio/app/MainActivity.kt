@@ -68,13 +68,9 @@ class MainActivity : ReactActivity() {
 
   /**
    * Intercept key events from TV remote and forward to React Native
-   * For D-pad navigation keys, we let React Native's focus system handle them
-   * along with our custom module to allow both native focus and custom handling
    */
   override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-      // Send to our module first
       TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_DOWN)
-      // Always pass to super to let the native focus system work
       return super.onKeyDown(keyCode, event)
   }
 

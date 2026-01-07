@@ -24,9 +24,9 @@ class MainApplication : Application(), ReactApplication {
       object : DefaultReactNativeHost(this) {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
+              add(TVDetectionPackage())
               // Packages that cannot be autolinked yet can be added manually here, for example:
               // add(MyReactNativePackage())
-              add(TVDetectionPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
