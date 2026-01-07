@@ -45,6 +45,10 @@ interface FocusableProps {
   nextFocusLeft?: React.RefObject<View>;
   /** Reference to element that should receive focus when pressing right */
   nextFocusRight?: React.RefObject<View>;
+  /** Direct node handle for up focus (alternative to nextFocusUp ref) */
+  nextFocusUpId?: number | null;
+  /** Direct node handle for down focus (alternative to nextFocusDown ref) */
+  nextFocusDownId?: number | null;
   /** Block up navigation (focus stays on this element) */
   blockUp?: boolean;
   /** Block down navigation (focus stays on this element) */
@@ -57,6 +61,10 @@ interface FocusableProps {
   onBlockedLeft?: () => void;
   /** Callback when right is pressed while blocked (for custom handling like seeking) */
   onBlockedRight?: () => void;
+  /** Callback when up is pressed while blocked (for custom handling) */
+  onBlockedUp?: () => void;
+  /** Callback when down is pressed while blocked (for custom handling) */
+  onBlockedDown?: () => void;
   /** Test ID for testing */
   testID?: string;
   /** Whether to show focus border (default true on TV) */
@@ -107,6 +115,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       nextFocusDown,
       nextFocusLeft,
       nextFocusRight,
+      nextFocusUpId,
+      nextFocusDownId,
       blockUp = false,
       blockDown = false,
       blockLeft = false,
@@ -249,9 +259,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       onBlur: handleBlur,
     };
 
-    // Add directional focus if refs are provided
-    const upHandle = blockUp ? selfNodeHandle : getNodeHandle(nextFocusUp);
-    const downHandle = blockDown ? selfNodeHandle : getNodeHandle(nextFocusDown);
+    // Add directional focus if refs or IDs are provided
+    // Priority: block > direct ID > ref
+    const upHandle = blockUp ? selfNodeHandle : (nextFocusUpId ?? getNodeHandle(nextFocusUp));
+    const downHandle = blockDown ? selfNodeHandle : (nextFocusDownId ?? getNodeHandle(nextFocusDown));
     const leftHandle = blockLeft ? selfNodeHandle : getNodeHandle(nextFocusLeft);
     const rightHandle = blockRight ? selfNodeHandle : getNodeHandle(nextFocusRight);
 

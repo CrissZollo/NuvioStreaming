@@ -17,6 +17,7 @@ import {
   Pressable,
   Platform,
   Easing,
+  findNodeHandle,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -46,6 +47,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import ScreenHeader from '../components/common/ScreenHeader';
 import { useIsTV } from '../contexts/TVContext';
 import { Focusable } from '../components/tv/Focusable';
+import { useTVKeyEvent } from '../hooks/useTVKeyEvent';
 
 const { width, height } = Dimensions.get('window');
 
@@ -230,8 +232,13 @@ const SearchScreen = () => {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(true);
   const inputRef = useRef<TextInput>(null);
+  const searchButtonRef = useRef<View>(null);
+  // Store the node handle of the search button for TV navigation
+  const [searchButtonNodeHandle, setSearchButtonNodeHandle] = useState<number | null>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
+  // Track if a first-row search result is focused (for TV navigation)
+  const isFirstRowFocusedRef = useRef(false);
   // Live search handle
   const liveSearchHandle = useRef<{ cancel: () => void; done: Promise<void> } | null>(null);
   // Addon installation order map for stable section ordering
@@ -271,6 +278,52 @@ const SearchScreen = () => {
   const searchBarWidth = useSharedValue(width - 32);
   const searchBarOpacity = useSharedValue(1);
   const backButtonOpacity = useSharedValue(0);
+
+  // TV key event handler to navigate up to search bar from first row
+  useTVKeyEvent({
+    enabled: isTVDevice,
+    onUp: () => {
+      // When a first-row item is focused and user presses up, focus the search input
+      if (isFirstRowFocusedRef.current) {
+        inputRef.current?.focus();
+      }
+    },
+  });
+
+  // Callbacks for first-row focus tracking (stable references for memo)
+  const handleFirstRowFocus = useCallback(() => {
+    isFirstRowFocusedRef.current = true;
+  }, []);
+
+  const handleFirstRowBlur = useCallback(() => {
+    isFirstRowFocusedRef.current = false;
+  }, []);
+
+  // Capture node handle of search button for TV navigation
+  // This needs to run after the search button mounts
+  useEffect(() => {
+    if (isTVDevice && searchButtonRef.current) {
+      const handle = findNodeHandle(searchButtonRef.current);
+      if (handle) {
+        setSearchButtonNodeHandle(handle);
+      }
+    }
+  }, [isTVDevice]);
+
+  // Also capture when viewRef gets updated (via a small delay to ensure mount)
+  useEffect(() => {
+    if (isTVDevice) {
+      const timer = setTimeout(() => {
+        if (searchButtonRef.current) {
+          const handle = findNodeHandle(searchButtonRef.current);
+          if (handle && handle !== searchButtonNodeHandle) {
+            setSearchButtonNodeHandle(handle);
+          }
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isTVDevice, searchButtonNodeHandle]);
 
   // Force consistent status bar settings
   useEffect(() => {
@@ -588,7 +641,6 @@ const SearchScreen = () => {
                 focusScale={1.02}
                 animateBackground={false}
                 showFocusBorder={true}
-                blockUp={isFirst}
                 blockDown={isLast}
                 autoFocus={isFirst}
               >
@@ -646,7 +698,7 @@ const SearchScreen = () => {
     );
   };
 
-  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme, isTVDevice, isFirst, isLast }: {
+  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme, isTVDevice, isFirst, isLast, isFirstRow, searchButtonRef, searchButtonNodeHandle, onFirstRowFocus, onFirstRowBlur }: {
     item: StreamingContent;
     index: number;
     navigation: any;
@@ -656,6 +708,11 @@ const SearchScreen = () => {
     isTVDevice?: boolean;
     isFirst?: boolean;
     isLast?: boolean;
+    isFirstRow?: boolean;
+    searchButtonRef?: React.RefObject<View>;
+    searchButtonNodeHandle?: number | null;
+    onFirstRowFocus?: () => void;
+    onFirstRowBlur?: () => void;
   }) => {
     const [inLibrary, setInLibrary] = React.useState(!!item.inLibrary);
     const [watched, setWatched] = React.useState(false);
@@ -759,12 +816,15 @@ const SearchScreen = () => {
               setSelectedItem(item);
               setMenuVisible(true);
             }}
+            onFocus={isFirstRow ? onFirstRowFocus : undefined}
+            onBlur={isFirstRow ? onFirstRowBlur : undefined}
             style={{ width: itemWidth, aspectRatio: aspectRatio }}
             borderRadius={16}
             focusScale={1.05}
             animateBackground={false}
             showFocusBorder={true}
             blockRight={isLast}
+            nextFocusUpId={isFirstRow ? searchButtonNodeHandle : undefined}
           >
             <View style={[styles.horizontalItemPosterContainer, {
               width: itemWidth,
@@ -846,10 +906,20 @@ const SearchScreen = () => {
   // Memoized addon section to prevent re-rendering unchanged sections
   const AddonSection = React.memo(({
     addonGroup,
-    addonIndex
+    addonIndex,
+    isFirstAddon,
+    searchButtonRef,
+    searchButtonNodeHandle,
+    onFirstRowFocus,
+    onFirstRowBlur
   }: {
     addonGroup: AddonSearchResults;
     addonIndex: number;
+    isFirstAddon?: boolean;
+    searchButtonRef?: React.RefObject<View>;
+    searchButtonNodeHandle?: number | null;
+    onFirstRowFocus?: () => void;
+    onFirstRowBlur?: () => void;
   }) => {
     const movieResults = useMemo(() =>
       addonGroup.results.filter(item => item.type === 'movie'),
@@ -905,6 +975,11 @@ const SearchScreen = () => {
                   isTVDevice={isTVDevice}
                   isFirst={index === 0}
                   isLast={index === movieResults.length - 1}
+                  isFirstRow={isFirstAddon}
+                  searchButtonRef={searchButtonRef}
+                  searchButtonNodeHandle={searchButtonNodeHandle}
+                  onFirstRowFocus={onFirstRowFocus}
+                  onFirstRowBlur={onFirstRowBlur}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-movie-${item.id}`}
@@ -943,6 +1018,11 @@ const SearchScreen = () => {
                   isTVDevice={isTVDevice}
                   isFirst={index === 0}
                   isLast={index === seriesResults.length - 1}
+                  isFirstRow={isFirstAddon && movieResults.length === 0}
+                  searchButtonRef={searchButtonRef}
+                  searchButtonNodeHandle={searchButtonNodeHandle}
+                  onFirstRowFocus={onFirstRowFocus}
+                  onFirstRowBlur={onFirstRowBlur}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-series-${item.id}`}
@@ -981,6 +1061,11 @@ const SearchScreen = () => {
                   isTVDevice={isTVDevice}
                   isFirst={index === 0}
                   isLast={index === otherResults.length - 1}
+                  isFirstRow={isFirstAddon && movieResults.length === 0 && seriesResults.length === 0}
+                  searchButtonRef={searchButtonRef}
+                  searchButtonNodeHandle={searchButtonNodeHandle}
+                  onFirstRowFocus={onFirstRowFocus}
+                  onFirstRowBlur={onFirstRowBlur}
                 />
               )}
               keyExtractor={item => `${addonGroup.addonId}-${item.type}-${item.id}`}
@@ -995,7 +1080,7 @@ const SearchScreen = () => {
     );
   }, (prev, next) => {
     // Only re-render if this section's reference changed
-    return prev.addonGroup === next.addonGroup && prev.addonIndex === next.addonIndex;
+    return prev.addonGroup === next.addonGroup && prev.addonIndex === next.addonIndex && prev.isFirstAddon === next.isFirstAddon && prev.searchButtonRef === next.searchButtonRef && prev.searchButtonNodeHandle === next.searchButtonNodeHandle && prev.onFirstRowFocus === next.onFirstRowFocus && prev.onFirstRowBlur === next.onFirstRowBlur;
   });
 
   // Set up listeners for watched status and library updates
@@ -1037,66 +1122,118 @@ const SearchScreen = () => {
             styles.searchBarWrapper,
             { width: '100%' }
           ]}>
-            <View style={[
-              styles.searchBar,
-              {
-                backgroundColor: currentTheme.colors.elevation2,
-                borderColor: 'rgba(255,255,255,0.1)',
-                borderWidth: 1,
-              },
-              isTVDevice && { height: 56, borderRadius: 16 }
-            ]}>
-              <MaterialIcons
-                name="search"
-                size={isTVDevice ? 28 : 24}
-                color={currentTheme.colors.lightGray}
-                style={styles.searchIcon}
-              />
-              <TextInput
+            {isTVDevice ? (
+              <View
                 style={[
-                  styles.searchInput,
-                  { color: currentTheme.colors.white },
-                  isTVDevice && { fontSize: 18 }
+                  styles.searchBar,
+                  {
+                    backgroundColor: currentTheme.colors.elevation2,
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    height: 56,
+                    borderRadius: 16,
+                  }
                 ]}
-                placeholder="Search movies, shows..."
-                placeholderTextColor={currentTheme.colors.lightGray}
-                value={query}
-                onChangeText={setQuery}
-                returnKeyType="search"
-                keyboardAppearance="dark"
-                ref={inputRef}
-                autoFocus={isTVDevice}
-              />
-              {query.length > 0 && !isTVDevice && (
-                <TouchableOpacity
-                  onPress={handleClearSearch}
-                  style={styles.clearButton}
-                  hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                >
-                  <MaterialIcons
-                    name="close"
-                    size={20}
-                    color={currentTheme.colors.lightGray}
-                  />
-                </TouchableOpacity>
-              )}
-              {query.length > 0 && isTVDevice && (
+              >
                 <Focusable
-                  onPress={handleClearSearch}
-                  style={[styles.clearButton, { padding: 8 }]}
-                  borderRadius={20}
-                  focusScale={1.1}
+                  onPress={() => {
+                    inputRef.current?.focus();
+                  }}
+                  onFocus={() => {
+                    // Auto-focus the TextInput when the search button receives focus
+                    inputRef.current?.focus();
+                  }}
+                  style={styles.tvSearchButton}
+                  borderRadius={12}
+                  focusScale={1.05}
                   animateBackground={false}
                   showFocusBorder={true}
+                  blockUp={true}
+                  viewRef={searchButtonRef}
                 >
                   <MaterialIcons
-                    name="close"
-                    size={24}
+                    name="search"
+                    size={28}
                     color={currentTheme.colors.lightGray}
                   />
                 </Focusable>
-              )}
-            </View>
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    { color: currentTheme.colors.white, fontSize: 18 }
+                  ]}
+                  placeholder="Search movies, shows..."
+                  placeholderTextColor={currentTheme.colors.lightGray}
+                  value={query}
+                  onChangeText={setQuery}
+                  returnKeyType="search"
+                  keyboardAppearance="dark"
+                  ref={inputRef}
+                  autoFocus
+                />
+                {query.length > 0 && (
+                  <Focusable
+                    onPress={handleClearSearch}
+                    style={[styles.clearButton, { padding: 8 }]}
+                    borderRadius={20}
+                    focusScale={1.1}
+                    animateBackground={false}
+                    showFocusBorder={true}
+                    blockUp={true}
+                  >
+                    <MaterialIcons
+                      name="close"
+                      size={24}
+                      color={currentTheme.colors.lightGray}
+                    />
+                  </Focusable>
+                )}
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.searchBar,
+                  {
+                    backgroundColor: currentTheme.colors.elevation2,
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                  }
+                ]}
+              >
+                <MaterialIcons
+                  name="search"
+                  size={24}
+                  color={currentTheme.colors.lightGray}
+                  style={styles.searchIcon}
+                />
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    { color: currentTheme.colors.white }
+                  ]}
+                  placeholder="Search movies, shows..."
+                  placeholderTextColor={currentTheme.colors.lightGray}
+                  value={query}
+                  onChangeText={setQuery}
+                  returnKeyType="search"
+                  keyboardAppearance="dark"
+                  ref={inputRef}
+                />
+                {query.length > 0 && (
+                  <TouchableOpacity
+                    onPress={handleClearSearch}
+                    style={styles.clearButton}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                  >
+                    <MaterialIcons
+                      name="close"
+                      size={20}
+                      color={currentTheme.colors.lightGray}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
         </View>
       </ScreenHeader>
@@ -1157,6 +1294,11 @@ const SearchScreen = () => {
                 key={addonGroup.addonId}
                 addonGroup={addonGroup}
                 addonIndex={addonIndex}
+                isFirstAddon={addonIndex === 0}
+                searchButtonRef={searchButtonRef}
+                searchButtonNodeHandle={searchButtonNodeHandle}
+                onFirstRowFocus={handleFirstRowFocus}
+                onFirstRowBlur={handleFirstRowBlur}
               />
             ))}
           </ScrollView>
@@ -1245,6 +1387,10 @@ const styles = StyleSheet.create({
   },
   searchIcon: {
     marginRight: 12,
+  },
+  tvSearchButton: {
+    padding: 8,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
