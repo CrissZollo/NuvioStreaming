@@ -1,12 +1,11 @@
-import React, { useCallback, useRef, useMemo } from 'react';
+import React, { useCallback, useRef, useMemo, memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { CatalogContent, StreamingContent } from '../../services/catalogService';
 import { useTheme } from '../../contexts/ThemeContext';
 import ContentItem from './ContentItem';
-import Animated, { FadeIn, Layout } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useIsTV } from '../../contexts/TVContext';
 import { Focusable } from '../tv/Focusable';
@@ -81,6 +80,123 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
+// Calculate poster width matching ContentItem's logic
+const calculateContentItemPosterWidth = (screenWidth: number, isTVDevice: boolean) => {
+  const deviceType = getDeviceType(screenWidth);
+
+  // Match ContentItem's calculatePosterLayout constants
+  const MIN_POSTER_WIDTH = deviceType === 'tv' ? 120 : deviceType === 'largeTablet' ? 160 : deviceType === 'tablet' ? 140 : 100;
+  const MAX_POSTER_WIDTH = deviceType === 'tv' ? 150 : deviceType === 'largeTablet' ? 200 : deviceType === 'tablet' ? 180 : 130;
+  const LEFT_PADDING = deviceType === 'tv' ? 24 : deviceType === 'largeTablet' ? 28 : deviceType === 'tablet' ? 24 : 16;
+  const SPACING = deviceType === 'tv' ? 10 : deviceType === 'largeTablet' ? 10 : deviceType === 'tablet' ? 8 : 8;
+
+  const availableWidth = screenWidth - LEFT_PADDING;
+  let bestPosterWidth = deviceType === 'tv' ? 200 : deviceType === 'largeTablet' ? 180 : deviceType === 'tablet' ? 160 : 120;
+
+  for (let n = 3; n <= 6; n++) {
+    const usableWidth = availableWidth - 8;
+    const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
+    if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
+      bestPosterWidth = posterWidth;
+    }
+  }
+
+  // Apply same sizeMultiplier as ContentItem (0.7 for TV)
+  const sizeMultiplier = isTVDevice ? 0.7 : deviceType === 'largeTablet' ? 1.1 : deviceType === 'tablet' ? 1.0 : 0.9;
+  return bestPosterWidth * sizeMultiplier;
+};
+
+// ViewAllCard component - looks like a movie poster but opens the full catalog
+interface ViewAllCardProps {
+  onPress: () => void;
+  onItemFocus?: () => void;
+  isLastInRow?: boolean;
+  isLastRow?: boolean;
+  focusRef?: React.RefObject<View>;
+  isTVDevice: boolean;
+  colors: any;
+}
+
+const ViewAllCard = memo<ViewAllCardProps>(({
+  onPress,
+  onItemFocus,
+  isLastInRow,
+  isLastRow,
+  focusRef,
+  isTVDevice,
+  colors,
+}) => {
+  // Calculate poster dimensions matching ContentItem exactly
+  const posterWidth = calculateContentItemPosterWidth(width, isTVDevice);
+  const posterHeight = posterWidth * 1.5; // 2:3 aspect ratio
+  const borderRadius = isTV ? 12 : isLargeTablet ? 14 : isTablet ? 12 : 12;
+
+  const cardContent = (
+    <View style={[
+      styles.viewAllCardContent,
+      {
+        width: posterWidth,
+        height: posterHeight,
+        borderRadius,
+        backgroundColor: colors.elevation2 || 'rgba(255,255,255,0.08)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.15)',
+      }
+    ]}>
+      <MaterialIcons
+        name="arrow-forward"
+        size={isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 28}
+        color={colors.textMuted || '#888'}
+      />
+      <Text style={[
+        styles.viewAllCardText,
+        {
+          color: colors.text || '#fff',
+          fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13,
+          marginTop: 8,
+        }
+      ]}>
+        View All
+      </Text>
+    </View>
+  );
+
+  if (isTVDevice) {
+    return (
+      <Animated.View style={{ width: posterWidth }} entering={FadeIn.duration(300)}>
+        <Focusable
+          style={{ width: posterWidth, aspectRatio: 2/3, borderRadius }}
+          onPress={onPress}
+          onFocus={onItemFocus}
+          borderRadius={borderRadius}
+          animateBackground={false}
+          focusScale={1.08}
+          viewRef={focusRef}
+          blockRight={isLastInRow}
+          blockDown={isLastRow}
+        >
+          {cardContent}
+        </Focusable>
+      </Animated.View>
+    );
+  }
+
+  return (
+    <Animated.View style={{ width: posterWidth }} entering={FadeIn.duration(300)}>
+      <TouchableOpacity
+        style={{ width: posterWidth, aspectRatio: 2/3, borderRadius }}
+        activeOpacity={0.7}
+        onPress={onPress}
+      >
+        {cardContent}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
+// Special marker for "View All" item
+const VIEW_ALL_ITEM_ID = '__VIEW_ALL__';
+
 const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
@@ -107,9 +223,44 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
   }, [navigation, catalog.addon]);
 
+  const handleViewAllPress = useCallback(() => {
+    navigation.navigate('Catalog', {
+      id: catalog.id,
+      type: catalog.type,
+      addonId: catalog.addon
+    });
+  }, [navigation, catalog.id, catalog.type, catalog.addon]);
+
+  // Create data array with "View All" item at the end
+  const dataWithViewAll = useMemo(() => {
+    const viewAllItem: StreamingContent = {
+      id: VIEW_ALL_ITEM_ID,
+      type: catalog.type,
+      name: 'View All',
+      poster: '', // Empty string for type safety, not used since we render a custom card
+    };
+    return [...catalog.items, viewAllItem];
+  }, [catalog.items, catalog.type]);
+
   const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
     const isFirst = index === 0;
-    const isLast = index === catalog.items.length - 1;
+    const isLast = index === dataWithViewAll.length - 1;
+    const isViewAllItem = item.id === VIEW_ALL_ITEM_ID;
+
+    // Render "View All" card
+    if (isViewAllItem) {
+      return (
+        <ViewAllCard
+          onPress={handleViewAllPress}
+          onItemFocus={handleSectionItemFocus}
+          isLastInRow={isTVDevice}
+          isLastRow={isTVDevice ? isLastSection : undefined}
+          focusRef={isTVDevice ? lastItemRef : undefined}
+          isTVDevice={isTVDevice}
+          colors={currentTheme.colors}
+        />
+      );
+    }
 
     return (
       <ContentItem
@@ -117,19 +268,22 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         onPress={handleContentPress}
         onItemFocus={handleSectionItemFocus}
         isFirstInRow={isTVDevice ? isFirst : undefined}
-        isLastInRow={isTVDevice ? isLast : undefined}
+        isLastInRow={false} // Never last since View All is after
         isLastRow={isTVDevice ? isLastSection : undefined}
-        focusRef={isTVDevice ? (isFirst ? firstItemRef : isLast ? lastItemRef : undefined) : undefined}
+        focusRef={isTVDevice ? (isFirst ? firstItemRef : undefined) : undefined}
       />
     );
-  }, [handleContentPress, handleSectionItemFocus, isTVDevice, catalog.items.length, isLastSection]);
+  }, [handleContentPress, handleViewAllPress, handleSectionItemFocus, isTVDevice, dataWithViewAll.length, isLastSection, currentTheme.colors]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation (responsive spacing)
   const separatorWidth = isTVLayout ? 8 : isLargeTablet ? 10 : isTablet ? 8 : 8;
   const ItemSeparator = useCallback(() => <View style={{ width: separatorWidth }} />, [separatorWidth]);
 
   // Memoize the keyExtractor to prevent re-creation
-  const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
+  const keyExtractor = useCallback((item: StreamingContent) => {
+    if (item.id === VIEW_ALL_ITEM_ID) return `view-all-${catalog.id}`;
+    return `${item.id}-${item.type}`;
+  }, [catalog.id]);
 
   // Calculate item width including separator for getItemLayout
   const itemWidth = useMemo(() => {
@@ -184,85 +338,10 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
             ]}
           />
         </View>
-        {isTVDevice ? (
-          <Focusable
-            onPress={() =>
-              navigation.navigate('Catalog', {
-                id: catalog.id,
-                type: catalog.type,
-                addonId: catalog.addon
-              })
-            }
-            style={[
-              styles.viewAllButton,
-              {
-                paddingVertical: 6,
-                paddingHorizontal: 12,
-                backgroundColor: 'rgba(255,255,255,0.15)',
-              }
-            ]}
-            focusStyle={{
-              backgroundColor: '#FFFFFF',
-            }}
-            borderRadius={16}
-            focusScale={1.05}
-          >
-            {(focused) => (
-              <>
-                <Text style={[
-                  styles.viewAllText,
-                  {
-                    color: focused ? '#0A0A0A' : '#FFFFFF',
-                    fontSize: 14,
-                    fontWeight: '600',
-                    marginRight: 4,
-                  }
-                ]}>View All</Text>
-                <MaterialIcons
-                  name="chevron-right"
-                  size={18}
-                  color={focused ? '#0A0A0A' : '#FFFFFF'}
-                />
-              </>
-            )}
-          </Focusable>
-        ) : (
-          <TouchableOpacity
-            onPress={() =>
-              navigation.navigate('Catalog', {
-                id: catalog.id,
-                type: catalog.type,
-                addonId: catalog.addon
-              })
-            }
-            style={[
-              styles.viewAllButton,
-              {
-                paddingVertical: isLargeTablet ? 9 : isTablet ? 8 : 8,
-                paddingHorizontal: isLargeTablet ? 11 : isTablet ? 10 : 10,
-                borderRadius: isLargeTablet ? 20 : isTablet ? 20 : 20,
-              }
-            ]}
-          >
-            <Text style={[
-              styles.viewAllText,
-              {
-                color: currentTheme.colors.textMuted,
-                fontSize: isLargeTablet ? 15 : isTablet ? 14 : 14,
-                marginRight: isLargeTablet ? 5 : 4,
-              }
-            ]}>View All</Text>
-            <MaterialIcons
-              name="chevron-right"
-              size={isLargeTablet ? 22 : isTablet ? 20 : 20}
-              color={currentTheme.colors.textMuted}
-            />
-          </TouchableOpacity>
-        )}
       </View>
 
       <FlatList
-        data={catalog.items}
+        data={dataWithViewAll}
         renderItem={renderContentItem}
         keyExtractor={keyExtractor}
         horizontal
@@ -327,18 +406,15 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     opacity: 0.8,
   },
-  viewAllButton: {
-    flexDirection: 'row',
+  viewAllCardContent: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 8, // overridden responsively
-    paddingHorizontal: 10, // overridden responsively
-    borderRadius: 20, // overridden responsively
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
   },
-  viewAllText: {
-    fontSize: 14, // overridden responsively
+  viewAllCardText: {
     fontWeight: '600',
-    marginRight: 4, // overridden responsively
+    textAlign: 'center',
   },
   catalogList: {
     // padding will be applied responsively in JSX
