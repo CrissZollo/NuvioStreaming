@@ -29,6 +29,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../../hooks/useSettings';
 import { useIsTV } from '../../contexts/TVContext';
+import { useTVFocus } from '../../contexts/TVFocusContext';
 import { Focusable, FocusableRef } from '../tv/Focusable';
 
 // Memoized background component - defined outside to prevent recreation
@@ -187,6 +188,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
   const { settings } = useSettings();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isTVDevice = useIsTV();
+  const { menuFirstItemNodeHandle } = useTVFocus();
 
   // Responsive sizing computed per-render so rotation updates layout
   const isTablet = useMemo(
@@ -703,14 +705,23 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
             // TV: Use ultra-simple static card - NO Reanimated at all
             // Critical for 2-core CPUs (Fire TV Stick, budget Android TV)
             if (isTVDevice) {
-              // Calculate wrap-around indices for circular navigation
-              const prevIndex = logicalIndex === 0 ? data.length - 1 : logicalIndex - 1;
-              const nextIndex = logicalIndex === data.length - 1 ? 0 : logicalIndex + 1;
+              // Calculate indices for navigation (no wrap-around)
+              const prevIndex = logicalIndex > 0 ? logicalIndex - 1 : -1;
+              const nextIndex = logicalIndex < data.length - 1 ? logicalIndex + 1 : -1;
+              const isFirstItem = logicalIndex === 0;
+              const isLastItem = logicalIndex === data.length - 1;
 
               // Get refs for directional focus (only after refs are ready)
               const currentViewRef = tvCardViewRefs.current[logicalIndex];
-              const leftRef = tvRefsReady ? tvCardViewRefs.current[prevIndex] : undefined;
-              const rightRef = tvRefsReady ? tvCardViewRefs.current[nextIndex] : undefined;
+              // For non-first items: use previous card ref for left navigation
+              const leftRef = !isFirstItem && prevIndex >= 0 && tvRefsReady
+                ? tvCardViewRefs.current[prevIndex]
+                : undefined;
+              // Last item: don't set rightRef and block right navigation
+              const rightRef = nextIndex >= 0 && tvRefsReady ? tvCardViewRefs.current[nextIndex] : undefined;
+
+              // For first item: block left if menu handle not available yet, otherwise navigate to menu
+              const shouldBlockLeft = isFirstItem && !menuFirstItemNodeHandle;
 
               return (
                 <TVHeroCardWrapper
@@ -725,6 +736,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
                   leftRef={leftRef}
                   rightRef={rightRef}
                   downRef={continueWatchingFirstRef}
+                  blockRight={isLastItem}
+                  blockLeft={shouldBlockLeft}
+                  nextFocusLeftId={isFirstItem ? menuFirstItemNodeHandle : undefined}
                 />
               );
             }
@@ -1028,6 +1042,10 @@ interface TVHeroCardWrapperProps {
   leftRef: React.RefObject<View> | undefined;
   rightRef: React.RefObject<View> | undefined;
   downRef: React.RefObject<View> | undefined;
+  blockRight?: boolean;
+  blockLeft?: boolean;
+  /** Direct node handle for left focus (used for first item to navigate to menu) */
+  nextFocusLeftId?: number | null;
 }
 
 const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
@@ -1041,6 +1059,9 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
   leftRef,
   rightRef,
   downRef,
+  blockRight = false,
+  blockLeft = false,
+  nextFocusLeftId,
 }) => {
   // Border padding - space between poster and focus border frame
   const borderPadding = 4;
@@ -1068,6 +1089,9 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
         nextFocusLeft={leftRef}
         nextFocusRight={rightRef}
         nextFocusDown={downRef}
+        blockRight={blockRight}
+        blockLeft={blockLeft}
+        nextFocusLeftId={nextFocusLeftId}
       >
         <TVSimpleCard
           item={item}
@@ -1079,12 +1103,14 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
     </View>
   );
 }, (prevProps, nextProps) => {
-  // Only re-render if item or dimensions change
+  // Only re-render if item, dimensions, or navigation handles change
   // Focus visuals are handled by Focusable internally via animated styles (no re-render)
   return prevProps.item.id === nextProps.item.id &&
          prevProps.cardWidth === nextProps.cardWidth &&
          prevProps.cardHeight === nextProps.cardHeight &&
-         prevProps.viewRef === nextProps.viewRef;
+         prevProps.viewRef === nextProps.viewRef &&
+         prevProps.nextFocusLeftId === nextProps.nextFocusLeftId &&
+         prevProps.blockLeft === nextProps.blockLeft;
 });
 
 const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet, isTVDevice = false }) => {

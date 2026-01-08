@@ -12,6 +12,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTVFocus } from '../../contexts/TVFocusContext';
 
 // Nuvio logo
 const NuvioLogo = require('../../assets/IMG_0762.png');
@@ -63,6 +64,7 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   firstContentRef,
 }) => {
   const { currentTheme } = useTheme();
+  const { setMenuFirstItemView } = useTVFocus();
   const insets = useSafeAreaInsets();
   const [isExpanded, setIsExpanded] = useState(false);
   const [railHasFocus, setRailHasFocus] = useState(false);
@@ -78,13 +80,18 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   // Force re-render when refs are populated to apply directional focus
   const [refsReady, setRefsReady] = useState(false);
 
-  // Mark refs as ready after mount
+  // Mark refs as ready after mount and expose the first menu item view
   useEffect(() => {
     const timer = setTimeout(() => {
       setRefsReady(true);
+      // Expose the first nav item view (Home) to the context
+      // The context will get the node handle from it
+      if (navItemViewRefs[0]?.current) {
+        setMenuFirstItemView(navItemViewRefs[0].current);
+      }
     }, 150);
     return () => clearTimeout(timer);
-  }, []);
+  }, [navItemViewRefs, setMenuFirstItemView]);
 
 
   // Animate rail width and gradient on expand/collapse

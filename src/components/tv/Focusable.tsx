@@ -50,6 +50,10 @@ interface FocusableProps {
   nextFocusUpId?: number | null;
   /** Direct node handle for down focus (alternative to nextFocusDown ref) */
   nextFocusDownId?: number | null;
+  /** Direct node handle for left focus (alternative to nextFocusLeft ref) */
+  nextFocusLeftId?: number | null;
+  /** Direct node handle for right focus (alternative to nextFocusRight ref) */
+  nextFocusRightId?: number | null;
   /** Block up navigation (focus stays on this element) */
   blockUp?: boolean;
   /** Block down navigation (focus stays on this element) */
@@ -118,6 +122,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       nextFocusRight,
       nextFocusUpId,
       nextFocusDownId,
+      nextFocusLeftId,
+      nextFocusRightId,
       blockUp = false,
       blockDown = false,
       blockLeft = false,
@@ -315,8 +321,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     // Priority: block > direct ID > ref
     const upHandle = blockUp ? selfNodeHandle : (nextFocusUpId ?? getNodeHandle(nextFocusUp));
     const downHandle = blockDown ? selfNodeHandle : (nextFocusDownId ?? getNodeHandle(nextFocusDown));
-    const leftHandle = blockLeft ? selfNodeHandle : getNodeHandle(nextFocusLeft);
-    const rightHandle = blockRight ? selfNodeHandle : getNodeHandle(nextFocusRight);
+    const leftHandle = blockLeft ? selfNodeHandle : (nextFocusLeftId ?? getNodeHandle(nextFocusLeft));
+    const rightHandle = blockRight ? selfNodeHandle : (nextFocusRightId ?? getNodeHandle(nextFocusRight));
 
     if (upHandle) tvProps.nextFocusUp = upHandle;
     if (downHandle) tvProps.nextFocusDown = downHandle;
