@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  ListRenderItemInfo,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import Animated, {
@@ -113,6 +114,166 @@ export const CastSection: React.FC<CastSectionProps> = ({
     }
   }, [deviceType]);
 
+  // Memoized styles to prevent re-creation on each render
+  const cardStyle = useMemo(() => [
+    styles.castCard,
+    {
+      width: castCardWidth,
+      marginRight: castCardSpacing
+    }
+  ], [castCardWidth, castCardSpacing]);
+
+  const imageContainerStyle = useMemo(() => ({
+    width: castImageSize,
+    height: castImageSize,
+    borderRadius: castImageSize / 2,
+    marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+  }), [castImageSize, isTV, isLargeTablet, isTablet]);
+
+  const placeholderStyle = useMemo(() => [
+    styles.castImagePlaceholder,
+    {
+      backgroundColor: currentTheme.colors.darkBackground,
+      borderRadius: castImageSize / 2
+    }
+  ], [currentTheme.colors.darkBackground, castImageSize]);
+
+  const placeholderTextStyle = useMemo(() => [
+    styles.placeholderText,
+    {
+      color: currentTheme.colors.textMuted,
+      fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
+    }
+  ], [currentTheme.colors.textMuted, isTV, isLargeTablet, isTablet]);
+
+  const castNameStyle = useMemo(() => [
+    styles.castName,
+    {
+      color: currentTheme.colors.text,
+      fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+      width: castCardWidth
+    }
+  ], [currentTheme.colors.text, isTV, isLargeTablet, isTablet, castCardWidth]);
+
+  const characterNameStyle = useMemo(() => [
+    styles.characterName,
+    {
+      color: currentTheme.colors.textMuted,
+      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12,
+      width: castCardWidth,
+      marginTop: isTV ? 4 : isLargeTablet ? 3 : isTablet ? 2 : 2
+    }
+  ], [currentTheme.colors.textMuted, isTV, isLargeTablet, isTablet, castCardWidth]);
+
+  const focusableStyle = useMemo(() => ({
+    width: castImageSize,
+    height: castImageSize,
+    borderRadius: castImageSize / 2,
+    marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+  }), [castImageSize, isTV, isLargeTablet, isTablet]);
+
+  const tvCardStyle = useMemo(() => [
+    cardStyle,
+    { overflow: 'visible' as const, paddingTop: 6 }
+  ], [cardStyle]);
+
+  const castImageStyle = useMemo(() => [
+    styles.castImage,
+    { borderRadius: castImageSize / 2 }
+  ], [castImageSize]);
+
+  // Memoized keyExtractor
+  const keyExtractor = useCallback((item: any) => item.id.toString(), []);
+
+  // getItemLayout for optimized scrolling
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: castCardWidth + castCardSpacing,
+    offset: (castCardWidth + castCardSpacing) * index,
+    index,
+  }), [castCardWidth, castCardSpacing]);
+
+  // Memoized renderItem
+  const renderItem = useCallback(({ item, index }: ListRenderItemInfo<any>) => {
+    const initials = item.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2);
+
+    const imageContent = item.profile_path ? (
+      <FastImage
+        source={{
+          uri: `https://image.tmdb.org/t/p/w185${item.profile_path}`,
+        }}
+        style={castImageStyle}
+        resizeMode={FastImage.resizeMode.cover}
+      />
+    ) : (
+      <View style={placeholderStyle}>
+        <Text style={placeholderTextStyle}>{initials}</Text>
+      </View>
+    );
+
+    const textContent = (
+      <>
+        <Text style={castNameStyle} numberOfLines={1}>{item.name}</Text>
+        {isTmdbEnrichmentEnabled && item.character && (
+          <Text style={characterNameStyle} numberOfLines={1}>{item.character}</Text>
+        )}
+      </>
+    );
+
+    const cardContent = (
+      <>
+        <View style={[styles.castImageContainer, imageContainerStyle]}>
+          {imageContent}
+        </View>
+        {textContent}
+      </>
+    );
+
+    return (
+      <Animated.View entering={FadeIn.duration(300).delay(50 + index * 30)}>
+        {isTVDevice ? (
+          <View style={tvCardStyle}>
+            <Focusable
+              onPress={() => onSelectCastMember(item)}
+              style={focusableStyle}
+              borderRadius={castImageSize / 2}
+              focusScale={1.05}
+              animateBackground={false}
+              showFocusBorder={true}
+              blockLeft={index === 0}
+              blockRight={index === cast.length - 1}
+            >
+              {imageContent}
+            </Focusable>
+            {textContent}
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={cardStyle}
+            onPress={() => onSelectCastMember(item)}
+            activeOpacity={0.7}
+          >
+            {cardContent}
+          </TouchableOpacity>
+        )}
+      </Animated.View>
+    );
+  }, [
+    cast.length,
+    castImageStyle,
+    placeholderStyle,
+    placeholderTextStyle,
+    castNameStyle,
+    characterNameStyle,
+    isTmdbEnrichmentEnabled,
+    imageContainerStyle,
+    isTVDevice,
+    tvCardStyle,
+    focusableStyle,
+    castImageSize,
+    onSelectCastMember,
+    cardStyle,
+  ]);
+
   if (loadingCast) {
     return (
       <View style={styles.loadingContainer}>
@@ -153,165 +314,13 @@ export const CastSection: React.FC<CastSectionProps> = ({
           styles.castList,
           { paddingHorizontal: horizontalPadding }
         ]}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item, index }) => {
-          const cardStyle = [
-            styles.castCard,
-            {
-              width: castCardWidth,
-              marginRight: castCardSpacing
-            }
-          ];
-
-          const cardContent = (
-            <>
-              <View style={[
-                styles.castImageContainer,
-                {
-                  width: castImageSize,
-                  height: castImageSize,
-                  borderRadius: castImageSize / 2,
-                  marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
-                }
-              ]}>
-                {item.profile_path ? (
-                  <FastImage
-                    source={{
-                      uri: `https://image.tmdb.org/t/p/w185${item.profile_path}`,
-                    }}
-                    style={styles.castImage}
-                    resizeMode={FastImage.resizeMode.cover}
-                  />
-                ) : (
-                  <View style={[
-                    styles.castImagePlaceholder,
-                    {
-                      backgroundColor: currentTheme.colors.darkBackground,
-                      borderRadius: castImageSize / 2
-                    }
-                  ]}>
-                    <Text style={[
-                      styles.placeholderText,
-                      {
-                        color: currentTheme.colors.textMuted,
-                        fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
-                      }
-                    ]}>
-                      {item.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text style={[
-                styles.castName,
-                {
-                  color: currentTheme.colors.text,
-                  fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
-                  width: castCardWidth
-                }
-              ]} numberOfLines={1}>{item.name}</Text>
-              {isTmdbEnrichmentEnabled && item.character && (
-                <Text style={[
-                  styles.characterName,
-                  {
-                    color: currentTheme.colors.textMuted,
-                    fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12,
-                    width: castCardWidth,
-                    marginTop: isTV ? 4 : isLargeTablet ? 3 : isTablet ? 2 : 2
-                  }
-                ]} numberOfLines={1}>{item.character}</Text>
-              )}
-            </>
-          );
-
-          // Text content shown below the image (used for both TV and mobile)
-          const textContent = (
-            <>
-              <Text style={[
-                styles.castName,
-                {
-                  color: currentTheme.colors.text,
-                  fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
-                  width: castCardWidth
-                }
-              ]} numberOfLines={1}>{item.name}</Text>
-              {isTmdbEnrichmentEnabled && item.character && (
-                <Text style={[
-                  styles.characterName,
-                  {
-                    color: currentTheme.colors.textMuted,
-                    fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12,
-                    width: castCardWidth,
-                    marginTop: isTV ? 4 : isLargeTablet ? 3 : isTablet ? 2 : 2
-                  }
-                ]} numberOfLines={1}>{item.character}</Text>
-              )}
-            </>
-          );
-
-          return (
-            <Animated.View
-              entering={FadeIn.duration(300).delay(50 + index * 30)}
-            >
-              {isTVDevice ? (
-                <View style={[cardStyle, { overflow: 'visible', paddingTop: 6 }]}>
-                  <Focusable
-                    onPress={() => onSelectCastMember(item)}
-                    style={{
-                      width: castImageSize,
-                      height: castImageSize,
-                      borderRadius: castImageSize / 2,
-                      marginBottom: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-                    }}
-                    borderRadius={castImageSize / 2}
-                    focusScale={1.05}
-                    animateBackground={false}
-                    showFocusBorder={true}
-                    blockLeft={index === 0}
-                    blockRight={index === cast.length - 1}
-                  >
-                    {item.profile_path ? (
-                      <FastImage
-                        source={{
-                          uri: `https://image.tmdb.org/t/p/w185${item.profile_path}`,
-                        }}
-                        style={[styles.castImage, { borderRadius: castImageSize / 2 }]}
-                        resizeMode={FastImage.resizeMode.cover}
-                      />
-                    ) : (
-                      <View style={[
-                        styles.castImagePlaceholder,
-                        {
-                          backgroundColor: currentTheme.colors.darkBackground,
-                          borderRadius: castImageSize / 2
-                        }
-                      ]}>
-                        <Text style={[
-                          styles.placeholderText,
-                          {
-                            color: currentTheme.colors.textMuted,
-                            fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
-                          }
-                        ]}>
-                          {item.name.split(' ').reduce((prev: string, current: string) => prev + current[0], '').substring(0, 2)}
-                        </Text>
-                      </View>
-                    )}
-                  </Focusable>
-                  {textContent}
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={cardStyle}
-                  onPress={() => onSelectCastMember(item)}
-                  activeOpacity={0.7}
-                >
-                  {cardContent}
-                </TouchableOpacity>
-              )}
-            </Animated.View>
-          );
-        }}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        windowSize={5}
+        initialNumToRender={8}
+        maxToRenderPerBatch={4}
       />
     </Animated.View>
     </TVFocusSection>

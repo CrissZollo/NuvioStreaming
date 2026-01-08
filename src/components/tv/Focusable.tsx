@@ -12,6 +12,7 @@ import Animated, {
   withTiming,
   useSharedValue,
   interpolate,
+  interpolateColor,
 } from 'react-native-reanimated';
 import { useIsTV } from '../../contexts/TVContext';
 
@@ -137,7 +138,12 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     const innerRef = useRef<View>(null);
     // Use external viewRef if provided, otherwise use internal ref
     const actualRef = viewRef || innerRef;
-    const [isFocused, setIsFocused] = useState(false);
+    // Only use state for isFocused when children is a render prop function
+    // This avoids re-renders when children is static
+    const needsFocusState = typeof children === 'function';
+    const [isFocusedState, setIsFocusedState] = useState(false);
+    // Use ref for focus tracking when state is not needed
+    const isFocusedRef = useRef(false);
     const focusProgress = useSharedValue(0);
     // Track if autoFocus has been consumed (only apply once on mount)
     const autoFocusConsumed = useRef(false);
@@ -184,22 +190,33 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     };
 
     const handleFocus = useCallback(() => {
-      setIsFocused(true);
+      isFocusedRef.current = true;
+      // Only update state if we have a render prop that needs it
+      if (needsFocusState) {
+        setIsFocusedState(true);
+      }
       // Use fast timing instead of spring for better performance
       focusProgress.value = withTiming(1, { duration: 100 });
       onFocus?.();
-    }, [onFocus, focusProgress]);
+    }, [onFocus, focusProgress, needsFocusState]);
 
     const handleBlur = useCallback(() => {
-      setIsFocused(false);
+      isFocusedRef.current = false;
+      // Only update state if we have a render prop that needs it
+      if (needsFocusState) {
+        setIsFocusedState(false);
+      }
       focusProgress.value = withTiming(0, { duration: 150 });
       onBlur?.();
-    }, [onBlur, focusProgress]);
+    }, [onBlur, focusProgress, needsFocusState]);
 
     // Expose focus methods via ref
     useImperativeHandle(ref, () => ({
       focus: () => {
-        setIsFocused(true);
+        isFocusedRef.current = true;
+        if (needsFocusState) {
+          setIsFocusedState(true);
+        }
         focusProgress.value = withTiming(1, { duration: 100 });
         if (actualRef.current) {
           (actualRef.current as any).setNativeProps?.({
@@ -208,15 +225,19 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         }
       },
       blur: () => {
-        setIsFocused(false);
+        isFocusedRef.current = false;
+        if (needsFocusState) {
+          setIsFocusedState(false);
+        }
         focusProgress.value = withTiming(0, { duration: 100 });
       },
-      isFocused: () => isFocused,
+      isFocused: () => isFocusedRef.current,
       getViewRef: () => actualRef,
     }));
 
     // Animated styles for focus effect - simplified for performance
     // When unfocusedScale < 1, items start smaller and grow to focusScale when focused
+    // Border color is now animated to avoid state-driven re-renders
     const animatedContainerStyle = useAnimatedStyle(() => {
       'worklet';
       const scale = interpolate(focusProgress.value, [0, 1], [unfocusedScale, focusScale]);
@@ -225,10 +246,41 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       };
     });
 
+    // Animated border style - avoids re-render on focus change
+    const animatedBorderStyle = useAnimatedStyle(() => {
+      'worklet';
+      if (!showFocusBorder) {
+        return {};
+      }
+      const borderColor = interpolateColor(
+        focusProgress.value,
+        [0, 1],
+        ['transparent', TV_FOCUS_BORDER_COLOR]
+      );
+      return {
+        borderWidth: 3,
+        borderColor,
+      };
+    });
+
+    // Animated background style when animateBackground is true
+    const animatedBackgroundStyle = useAnimatedStyle(() => {
+      'worklet';
+      if (!animateBackground) {
+        return {};
+      }
+      const backgroundColor = interpolateColor(
+        focusProgress.value,
+        [0, 1],
+        ['transparent', '#FFFFFF']
+      );
+      return { backgroundColor };
+    });
+
     // Render children - support render prop for focus-aware content
     const renderChildren = () => {
       if (typeof children === 'function') {
-        return children(isFocused);
+        return children(isFocusedState);
       }
       return children;
     };
@@ -271,18 +323,6 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     if (leftHandle) tvProps.nextFocusLeft = leftHandle;
     if (rightHandle) tvProps.nextFocusRight = rightHandle;
 
-    // Static focus border style - no animation for performance
-    const focusBorderStyle = showFocusBorder
-      ? (isFocused
-          ? { borderWidth: 3, borderColor: TV_FOCUS_BORDER_COLOR }
-          : { borderWidth: 3, borderColor: 'transparent' })
-      : undefined;
-
-    // Background style when animateBackground is true
-    const backgroundStyle = animateBackground && isFocused
-      ? { backgroundColor: '#FFFFFF' }
-      : undefined;
-
     return (
       <AnimatedPressable
         ref={refCallback}
@@ -294,9 +334,11 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
           style,
           animatedContainerStyle,
           { borderRadius },
-          focusBorderStyle,
-          backgroundStyle,
-          isFocused && focusStyle,
+          animatedBorderStyle,
+          animatedBackgroundStyle,
+          // focusStyle is conditionally applied based on render prop state
+          // since it may contain non-animatable properties
+          needsFocusState && isFocusedState && focusStyle,
         ]}
         testID={testID}
         {...tvProps}

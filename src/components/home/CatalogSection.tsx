@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -130,6 +130,22 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
 
   // Memoize the keyExtractor to prevent re-creation
   const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
+
+  // Calculate item width including separator for getItemLayout
+  const itemWidth = useMemo(() => {
+    // ContentItem poster width varies by device, but we can use the computed layout
+    // For TV: poster width is ~180px, for others use the calculated posterLayout
+    const posterW = isTVLayout ? 180 : POSTER_WIDTH;
+    const aspectRatio = 1.5; // poster height / width ratio
+    return posterW;
+  }, [isTVLayout]);
+
+  // getItemLayout for optimized scrolling
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: itemWidth + separatorWidth,
+    offset: (itemWidth + separatorWidth) * index,
+    index,
+  }), [itemWidth, separatorWidth]);
 
 
 
@@ -265,6 +281,7 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         ])}
         style={isTVDevice ? { overflow: 'visible' } : undefined}
         ItemSeparatorComponent={ItemSeparator}
+        getItemLayout={getItemLayout}
         removeClippedSubviews={!isTVDevice} // Disable on TV to prevent clipping focused items
         initialNumToRender={isTVLayout ? 10 : isLargeTablet ? 5 : isTablet ? 4 : 3}
         maxToRenderPerBatch={isTVLayout ? 5 : isLargeTablet ? 4 : 3}

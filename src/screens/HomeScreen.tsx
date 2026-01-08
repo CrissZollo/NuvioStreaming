@@ -124,8 +124,9 @@ const HomeScreen = () => {
   const { showInfo } = useToast();
   const { setTrailerPlaying } = useTrailer();
   const isTVDevice = useIsTV();
-  const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
-  const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
+  // Use settings directly instead of duplicating state - reduces re-renders
+  const showHeroSection = settings.showHeroSection;
+  const featuredContentSource = settings.featuredContentSource;
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
@@ -369,14 +370,6 @@ const HomeScreen = () => {
     setHomeLoading(isLoading);
   }, [isLoading, setHomeLoading]);
 
-  // React to settings changes (memoized to prevent unnecessary effects)
-  const settingsShowHero = settings.showHeroSection;
-  const settingsFeaturedSource = settings.featuredContentSource;
-  useEffect(() => {
-    setShowHeroSection(settingsShowHero);
-    setFeaturedContentSource(settingsFeaturedSource);
-  }, [settingsShowHero, settingsFeaturedSource]);
-
   // Load catalogs progressively on mount and when settings change
   useEffect(() => {
     loadCatalogsProgressively();
@@ -427,18 +420,8 @@ const HomeScreen = () => {
     return loadCatalogsProgressively();
   }, [loadCatalogsProgressively]);
 
-  // Subscribe directly to settings emitter for immediate updates
-  useEffect(() => {
-    const handleSettingsChange = () => {
-      setShowHeroSection(settings.showHeroSection);
-      setFeaturedContentSource(settings.featuredContentSource);
-    };
-
-    // Subscribe to settings changes
-    const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
-
-    return unsubscribe;
-  }, [settings.showHeroSection, settings.featuredContentSource]);
+  // Settings are now read directly from useSettings() hook - no need for separate subscription
+  // The useSettings hook already handles reactivity to settings changes
 
   useFocusEffect(
     useCallback(() => {
@@ -745,7 +728,7 @@ const HomeScreen = () => {
         </>
       );
     }
-  }, [isTablet, isTVDevice, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading]);
+  }, [isTablet, isTVDevice, settings.heroStyle, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading, currentTheme.colors.darkBackground]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => (
@@ -778,18 +761,43 @@ const HomeScreen = () => {
   const isTVScrollingRef = useRef(false);
   // Track visible range to avoid unnecessary scrolls
   const visibleRangeRef = useRef<{ first: number; last: number }>({ first: 0, last: 5 });
+  // Ref to track listData without causing callback recreation
+  const listDataRef = useRef<HomeScreenListItem[]>([]);
+  // Pre-computed catalog indices to avoid O(n) searches in renderListItem
+  const catalogIndicesRef = useRef<{ firstCatalogIndex: number; lastCatalogIndex: number; hasLoadMore: boolean }>({
+    firstCatalogIndex: -1,
+    lastCatalogIndex: -1,
+    hasLoadMore: false,
+  });
+  // Update refs when listData changes
+  listDataRef.current = listData;
+  // Pre-compute indices once when listData changes (in the same render)
+  let firstIdx = -1;
+  let lastIdx = -1;
+  let hasLoadMoreFlag = false;
+  for (let i = 0; i < listData.length; i++) {
+    if (listData[i].type === 'catalog') {
+      if (firstIdx === -1) firstIdx = i;
+      lastIdx = i;
+    } else if (listData[i].type === 'loadMore') {
+      hasLoadMoreFlag = true;
+    }
+  }
+  catalogIndicesRef.current = { firstCatalogIndex: firstIdx, lastCatalogIndex: lastIdx, hasLoadMore: hasLoadMoreFlag };
 
   const handleCatalogFocus = useCallback((index: number) => {
     if (!isTVDevice || !flashListRef.current) return;
+
+    const currentListData = listDataRef.current;
 
     // Skip if same index to avoid unnecessary scrolls
     if (lastFocusedIndexRef.current === index) return;
 
     // Validate index is within bounds
-    if (index < 0 || index >= listData.length) return;
+    if (index < 0 || index >= currentListData.length) return;
 
     // Skip scrolling for placeholder items (catalogs still loading)
-    const item = listData[index];
+    const item = currentListData[index];
     if (!item || item.type === 'placeholder') return;
 
     const prevIndex = lastFocusedIndexRef.current;
@@ -826,8 +834,9 @@ const HomeScreen = () => {
     // Small delay to batch rapid focus changes (e.g., holding down key)
     scrollTimeoutRef.current = setTimeout(() => {
       try {
+        const latestListData = listDataRef.current;
         // Double-check the ref and data are still valid
-        if (flashListRef.current && index < listData.length && listData[index]?.type !== 'placeholder') {
+        if (flashListRef.current && index < latestListData.length && latestListData[index]?.type !== 'placeholder') {
           // Determine scroll position based on direction
           // When going up, position item lower; when going down, position it higher
           const isMovingDown = index > prevIndex;
@@ -849,7 +858,7 @@ const HomeScreen = () => {
         }, 200);
       }
     }, 16); // Single frame delay for batching
-  }, [isTVDevice, listData]);
+  }, [isTVDevice]); // Removed listData dependency - using ref instead
 
   // Track visible items to optimize scroll decisions
   const handleViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
@@ -871,12 +880,9 @@ const HomeScreen = () => {
       case 'continueWatching':
         return null; // Moved to ListHeaderComponent to avoid remounts on scroll
       case 'catalog':
-        // Check if this is the first catalog in the list (for TV side menu navigation)
-        const isFirstCatalog = isTVDevice && listData.findIndex(d => d.type === 'catalog') === index;
-        // Check if this is the last catalog in the list (to prevent down navigation wrap-around)
-        // Only block if we've loaded ALL catalogs (no "Load More" button exists)
-        const hasLoadMore = listData.some(d => d.type === 'loadMore');
-        const lastCatalogIndex = listData.map((d, i) => d.type === 'catalog' ? i : -1).filter(i => i >= 0).pop();
+        // Use pre-computed indices from ref (O(1) instead of O(n) searches)
+        const { firstCatalogIndex, lastCatalogIndex, hasLoadMore } = catalogIndicesRef.current;
+        const isFirstCatalog = isTVDevice && index === firstCatalogIndex;
         const isLastCatalog = isTVDevice && !hasLoadMore && index === lastCatalogIndex;
         return (
           <CatalogSection
@@ -929,7 +935,7 @@ const HomeScreen = () => {
       default:
         return null;
     }
-  }, [memoizedThisWeekSection, currentTheme.colors.elevation1, currentTheme.colors.primary, currentTheme.colors.white, handleLoadMoreCatalogs, isTVDevice, handleCatalogFocus, listData]);
+  }, [memoizedThisWeekSection, currentTheme.colors.elevation1, currentTheme.colors.primary, currentTheme.colors.white, handleLoadMoreCatalogs, isTVDevice, handleCatalogFocus]); // Removed listData - using ref
 
   // FlashList: using minimal props per installed version
 

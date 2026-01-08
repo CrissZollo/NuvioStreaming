@@ -1040,14 +1040,14 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               </View>
             );
           }}
-          keyExtractor={season => season.toString()}
+          keyExtractor={seasonKeyExtractor}
         />
       </View>
     );
   };
 
-  // Vertical layout episode card (traditional)
-  const renderVerticalEpisodeCard = (episode: Episode) => {
+  // Vertical layout episode card (traditional) - memoized for performance
+  const renderVerticalEpisodeCard = useCallback((episode: Episode) => {
     // Resolve episode image with addon-first logic
     const resolveEpisodeImage = (): string => {
       const candidates: Array<string | undefined | null> = [
@@ -1354,10 +1354,27 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         {episodeCardContent}
       </TouchableOpacity>
     );
-  };
+  }, [
+    isTV,
+    isLargeTablet,
+    isTablet,
+    isLargeScreen,
+    currentTheme.colors.elevation1,
+    currentTheme.colors.mediumEmphasis,
+    currentTheme.colors.textMuted,
+    currentTheme.colors.primary,
+    settings?.enrichMetadataWithTMDB,
+    metadata?.poster,
+    metadata?.id,
+    tmdbEpisodeOverrides,
+    getIMDbRating,
+    episodeProgress,
+    onSelectEpisode,
+    handleEpisodeLongPress,
+  ]);
 
-  // Horizontal layout episode card (Netflix-style)
-  const renderHorizontalEpisodeCard = (episode: Episode, index: number, totalEpisodes: number) => {
+  // Horizontal layout episode card (Netflix-style) - memoized for TV performance
+  const renderHorizontalEpisodeCard = useCallback((episode: Episode, index: number, totalEpisodes: number) => {
     const resolveEpisodeImage = (): string => {
       const candidates: Array<string | undefined | null> = [
         (episode as any).thumbnail,
@@ -1695,9 +1712,69 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         {horizontalCardContent}
       </TouchableOpacity>
     );
-  };
+  }, [
+    isTVDevice,
+    isTV,
+    isLargeTablet,
+    isTablet,
+    isLargeScreen,
+    horizontalCardHeight,
+    currentTheme.colors.mediumEmphasis,
+    currentTheme.colors.primary,
+    currentTheme.colors.textMuted,
+    settings?.enrichMetadataWithTMDB,
+    metadata?.poster,
+    metadata?.id,
+    tmdbEpisodeOverrides,
+    getIMDbRating,
+    episodeProgress,
+    onSelectEpisode,
+    handleEpisodeLongPress,
+    handleTVEpisodeFocus,
+  ]);
 
   const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
+
+  // Memoized renderItem for horizontal episode FlatList - prevents recreation on every render
+  const renderHorizontalEpisodeItem = useCallback(({ item: episode, index }: { item: Episode; index: number }) => (
+    <Animated.View
+      entering={enableItemAnimations ? FadeIn.duration(300).delay(100 + index * 30) : undefined as any}
+      style={[
+        styles.episodeCardWrapperHorizontal,
+        {
+          width: horizontalCardWidth,
+          marginRight: horizontalItemSpacing
+        }
+      ]}
+    >
+      {renderHorizontalEpisodeCard(episode, index, currentSeasonEpisodes.length)}
+    </Animated.View>
+  ), [enableItemAnimations, horizontalCardWidth, horizontalItemSpacing, currentSeasonEpisodes.length, renderHorizontalEpisodeCard]);
+
+  // Memoized renderItem for vertical episode FlashList
+  const renderVerticalEpisodeItem = useCallback(({ item: episode, index }: { item: Episode; index: number }) => (
+    <Animated.View
+      entering={enableItemAnimations ? FadeIn.duration(300).delay(100 + index * 30) : undefined as any}
+    >
+      {renderVerticalEpisodeCard(episode)}
+    </Animated.View>
+  ), [enableItemAnimations, renderVerticalEpisodeCard]);
+
+  // Memoized keyExtractor for episodes
+  const episodeKeyExtractor = useCallback((episode: Episode) => episode.id.toString(), []);
+
+  // Memoized keyExtractor for seasons
+  const seasonKeyExtractor = useCallback((season: number) => season.toString(), []);
+
+  // Memoized getItemLayout for horizontal episode FlatList - enables fast scrolling
+  const getHorizontalEpisodeItemLayout = useCallback((_: any, index: number) => {
+    const length = horizontalCardWidth + horizontalItemSpacing;
+    return {
+      length,
+      offset: horizontalPadding + (length * index),
+      index,
+    };
+  }, [horizontalCardWidth, horizontalItemSpacing, horizontalPadding]);
 
   return (
     <View style={styles.container}>
@@ -1746,21 +1823,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               key={`episodes-${effectiveEpisodeLayout}-${selectedSeason}`}
               ref={horizontalEpisodeScrollViewRef}
               data={currentSeasonEpisodes}
-              renderItem={({ item: episode, index }) => (
-                <Animated.View
-                  entering={enableItemAnimations ? FadeIn.duration(300).delay(100 + index * 30) : undefined as any}
-                  style={[
-                    styles.episodeCardWrapperHorizontal,
-                    {
-                      width: horizontalCardWidth,
-                      marginRight: horizontalItemSpacing
-                    }
-                  ]}
-                >
-                  {renderHorizontalEpisodeCard(episode, index, currentSeasonEpisodes.length)}
-                </Animated.View>
-              )}
-              keyExtractor={episode => episode.id.toString()}
+              renderItem={renderHorizontalEpisodeItem}
+              keyExtractor={episodeKeyExtractor}
               horizontal
               showsHorizontalScrollIndicator={false}
               // On TV, disable scroll so D-pad controls focus instead of scrolling
@@ -1780,14 +1844,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               snapToInterval={isTVDevice ? undefined : horizontalCardWidth + horizontalItemSpacing}
               snapToAlignment={isTVDevice ? undefined : "start"}
               decelerationRate={isTVDevice ? undefined : "fast"}
-              getItemLayout={(data, index) => {
-                const length = horizontalCardWidth + horizontalItemSpacing;
-                return {
-                  length,
-                  offset: horizontalPadding + (length * index), // Account for left padding
-                  index,
-                };
-              }}
+              getItemLayout={getHorizontalEpisodeItemLayout}
               onScrollToIndexFailed={(info) => {
                 // Fallback if scrollToIndex fails - use scrollToOffset with calculated position
                 const wait = new Promise(resolve => setTimeout(resolve, 500));
@@ -1809,14 +1866,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               key={`episodes-${effectiveEpisodeLayout}-${selectedSeason}`}
               ref={episodeScrollViewRef}
               data={currentSeasonEpisodes}
-              renderItem={({ item: episode, index }) => (
-                <Animated.View
-                  entering={enableItemAnimations ? FadeIn.duration(300).delay(100 + index * 30) : undefined as any}
-                >
-                  {renderVerticalEpisodeCard(episode)}
-                </Animated.View>
-              )}
-              keyExtractor={episode => episode.id.toString()}
+              renderItem={renderVerticalEpisodeItem}
+              keyExtractor={episodeKeyExtractor}
               contentContainerStyle={[
                 styles.episodeListContentVertical,
                 {

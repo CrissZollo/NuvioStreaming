@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  ListRenderItemInfo,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, StackActions } from '@react-navigation/native';
@@ -93,19 +94,19 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
   const [alertMessage, setAlertMessage] = React.useState('');
   const [alertActions, setAlertActions] = React.useState<any[]>([]);
 
-  const handleItemPress = async (item: StreamingContent) => {
+  const handleItemPress = useCallback(async (item: StreamingContent) => {
     try {
       // Extract TMDB ID from the tmdb:123456 format
       const tmdbId = item.id.replace('tmdb:', '');
-      
+
       // Get Stremio ID directly using catalogService
       const stremioId = await catalogService.getStremioId(item.type, tmdbId);
-      
+
       if (stremioId) {
         navigation.dispatch(
-          StackActions.push('Metadata', { 
-            id: stremioId, 
-            type: item.type 
+          StackActions.push('Metadata', {
+            id: stremioId,
+            type: item.type
           })
         );
       } else {
@@ -118,15 +119,15 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
       setAlertActions([{ label: 'OK', onPress: () => {} }]);
       setAlertVisible(true);
     }
-  };
+  }, [navigation]);
 
   // Sort collection movies by year (oldest to newest)
   // Upcoming/unreleased movies without a year will be sorted last
-  const sortedCollectionMovies = React.useMemo(() => {
+  const sortedCollectionMovies = useMemo(() => {
     if (!collectionMovies) return [];
-    
+
     const FUTURE_YEAR_PLACEHOLDER = 9999; // Very large number to sort unreleased movies last
-    
+
     return [...collectionMovies].sort((a, b) => {
       // Treat missing years as future year placeholder (sorts last)
       const yearA = a.year ? parseInt(a.year.toString()) : FUTURE_YEAR_PLACEHOLDER;
@@ -135,39 +136,72 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
     });
   }, [collectionMovies]);
 
-  const renderItem = ({ item, index }: { item: StreamingContent; index: number }) => {
-    const itemStyle = [styles.itemContainer, { width: backdropWidth, marginRight: itemSpacing }];
-    const borderRadius = isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8;
+  // Memoized border radius calculation
+  const borderRadius = useMemo(() => {
+    return isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8;
+  }, [isTV, isLargeTablet, isTablet]);
+
+  // Memoized item style
+  const itemStyle = useMemo(() => {
+    return [styles.itemContainer, { width: backdropWidth, marginRight: itemSpacing }];
+  }, [backdropWidth, itemSpacing]);
+
+  // Memoized backdrop style
+  const backdropStyle = useMemo(() => {
+    return [styles.backdrop, {
+      backgroundColor: currentTheme.colors.elevation1,
+      width: backdropWidth,
+      height: backdropHeight,
+      borderRadius
+    }];
+  }, [currentTheme.colors.elevation1, backdropWidth, backdropHeight, borderRadius]);
+
+  // Memoized title style
+  const titleStyle = useMemo(() => {
+    return [styles.title, {
+      color: currentTheme.colors.mediumEmphasis,
+      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13,
+      lineHeight: isTV ? 20 : 18
+    }];
+  }, [currentTheme.colors.mediumEmphasis, isTV, isLargeTablet, isTablet]);
+
+  // Memoized year style
+  const yearStyle = useMemo(() => {
+    return [styles.year, {
+      color: currentTheme.colors.textMuted,
+      fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 11 : 11
+    }];
+  }, [currentTheme.colors.textMuted, isTV, isLargeTablet, isTablet]);
+
+  // Memoized focusable style
+  const focusableStyle = useMemo(() => {
+    return { width: backdropWidth, height: backdropHeight, marginBottom: 8 };
+  }, [backdropWidth, backdropHeight]);
+
+  // Memoized TV item container style
+  const tvItemContainerStyle = useMemo(() => {
+    return [itemStyle, { overflow: 'visible' as const, paddingTop: 6 }];
+  }, [itemStyle]);
+
+  const renderItem = useCallback(({ item, index }: ListRenderItemInfo<StreamingContent>) => {
     const isFirst = index === 0;
     const isLast = index === sortedCollectionMovies.length - 1;
 
     const backdropImage = (
       <FastImage
         source={{ uri: item.banner || item.poster }}
-        style={[styles.backdrop, {
-          backgroundColor: currentTheme.colors.elevation1,
-          width: backdropWidth,
-          height: backdropHeight,
-          borderRadius
-        }]}
+        style={backdropStyle}
         resizeMode={FastImage.resizeMode.cover}
       />
     );
 
     const textContent = (
       <>
-        <Text style={[styles.title, {
-          color: currentTheme.colors.mediumEmphasis,
-          fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13,
-          lineHeight: isTV ? 20 : 18
-        }]} numberOfLines={2}>
+        <Text style={titleStyle} numberOfLines={2}>
           {item.name}
         </Text>
         {item.year && (
-          <Text style={[styles.year, {
-            color: currentTheme.colors.textMuted,
-            fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 11 : 11
-          }]}>
+          <Text style={yearStyle}>
             {item.year}
           </Text>
         )}
@@ -176,10 +210,10 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
 
     if (isTVDevice) {
       return (
-        <View style={[itemStyle, { overflow: 'visible', paddingTop: 6 }]}>
+        <View style={tvItemContainerStyle}>
           <Focusable
             onPress={() => handleItemPress(item)}
-            style={{ width: backdropWidth, height: backdropHeight, marginBottom: 8 }}
+            style={focusableStyle}
             borderRadius={borderRadius}
             focusScale={1.05}
             animateBackground={false}
@@ -203,7 +237,17 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
         {textContent}
       </TouchableOpacity>
     );
-  };
+  }, [sortedCollectionMovies.length, backdropStyle, titleStyle, yearStyle, isTVDevice, tvItemContainerStyle, focusableStyle, borderRadius, handleItemPress, itemStyle]);
+
+  // getItemLayout for optimized scrolling
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: backdropWidth + itemSpacing,
+    offset: (backdropWidth + itemSpacing) * index,
+    index,
+  }), [backdropWidth, itemSpacing]);
+
+  // Memoized keyExtractor
+  const keyExtractor = useCallback((item: StreamingContent) => item.id, []);
 
   if (loadingCollection) {
     return (
@@ -230,7 +274,7 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
       <FlatList
         data={sortedCollectionMovies}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         scrollEnabled={!isTVDevice}
@@ -238,6 +282,11 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
           paddingHorizontal: horizontalPadding,
           paddingRight: horizontalPadding + itemSpacing
         }]}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        windowSize={5}
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
       />
       <CustomAlert
         visible={alertVisible}

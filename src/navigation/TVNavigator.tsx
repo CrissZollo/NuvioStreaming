@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -36,29 +36,28 @@ const TVNavigatorInner: React.FC = () => {
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeScreen, setActiveScreen] = useState<ScreenKey>('Home');
-  const [screenHistory, setScreenHistory] = useState<ScreenKey[]>(['Home']);
+  // Use ref instead of state for history to avoid re-renders and BackHandler re-subscription
+  const screenHistoryRef = useRef<ScreenKey[]>(['Home']);
   const { lastFocusedRowRef } = useTVFocus();
 
   // Handle navigation between main sections
   const handleNavigate = useCallback((screen: string) => {
     const screenKey = screen as ScreenKey;
     if (screenKey !== activeScreen && SCREENS[screenKey]) {
+      screenHistoryRef.current.push(screenKey);
       setActiveScreen(screenKey);
-      setScreenHistory((prev) => [...prev, screenKey]);
     }
   }, [activeScreen]);
 
-  // Handle hardware back button
+  // Handle hardware back button - no deps needed since we use ref
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        if (screenHistory.length > 1) {
+        if (screenHistoryRef.current.length > 1) {
           // Go to previous screen in history
-          const newHistory = [...screenHistory];
-          newHistory.pop();
-          const previousScreen = newHistory[newHistory.length - 1];
+          screenHistoryRef.current.pop();
+          const previousScreen = screenHistoryRef.current[screenHistoryRef.current.length - 1];
           setActiveScreen(previousScreen);
-          setScreenHistory(newHistory);
           return true;
         }
         // Let default behavior handle (exit app or go back in stack)
@@ -71,7 +70,7 @@ const TVNavigatorInner: React.FC = () => {
       );
 
       return () => subscription.remove();
-    }, [screenHistory])
+    }, [])
   );
 
   // Get the active screen component

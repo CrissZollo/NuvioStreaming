@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  ListRenderItemInfo,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, StackActions } from '@react-navigation/native';
@@ -91,20 +92,20 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   const [alertMessage, setAlertMessage] = React.useState('');
   const [alertActions, setAlertActions] = React.useState<any[]>([]);
 
-  const handleItemPress = async (item: StreamingContent) => {
+  const handleItemPress = useCallback(async (item: StreamingContent) => {
     try {
       // Extract TMDB ID from the tmdb:123456 format
       const tmdbId = item.id.replace('tmdb:', '');
-      
+
       // Get Stremio ID directly using catalogService
       // The catalogService.getStremioId method already handles the conversion internally
       const stremioId = await catalogService.getStremioId(item.type, tmdbId);
-      
+
       if (stremioId) {
         navigation.dispatch(
-          StackActions.push('Metadata', { 
-            id: stremioId, 
-            type: item.type 
+          StackActions.push('Metadata', {
+            id: stremioId,
+            type: item.type
           })
         );
       } else {
@@ -117,34 +118,62 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
       setAlertActions([{ label: 'OK', onPress: () => {} }]);
       setAlertVisible(true);
     }
-  };
+  }, [navigation]);
 
-  const renderItem = ({ item, index }: { item: StreamingContent; index: number }) => {
-    const itemStyle = [styles.itemContainer, { width: posterWidth, marginRight: itemSpacing }];
-    const borderRadius = isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8;
+  // Memoized border radius calculation
+  const borderRadius = useMemo(() => {
+    return isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8;
+  }, [isTV, isLargeTablet, isTablet]);
+
+  // Memoized item style
+  const itemStyle = useMemo(() => {
+    return [styles.itemContainer, { width: posterWidth, marginRight: itemSpacing }];
+  }, [posterWidth, itemSpacing]);
+
+  // Memoized poster style
+  const posterStyle = useMemo(() => {
+    return [styles.poster, { backgroundColor: currentTheme.colors.elevation1, width: posterWidth, height: posterHeight, borderRadius }];
+  }, [currentTheme.colors.elevation1, posterWidth, posterHeight, borderRadius]);
+
+  // Memoized title style
+  const titleStyle = useMemo(() => {
+    return [styles.title, { color: currentTheme.colors.mediumEmphasis, fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13, lineHeight: isTV ? 20 : 18 }];
+  }, [currentTheme.colors.mediumEmphasis, isTV, isLargeTablet, isTablet]);
+
+  // Memoized focusable style
+  const focusableStyle = useMemo(() => {
+    return { width: posterWidth, height: posterHeight, marginBottom: 8 };
+  }, [posterWidth, posterHeight]);
+
+  // Memoized TV item container style
+  const tvItemContainerStyle = useMemo(() => {
+    return [itemStyle, { overflow: 'visible' as const, paddingTop: 6 }];
+  }, [itemStyle]);
+
+  const renderItem = useCallback(({ item, index }: ListRenderItemInfo<StreamingContent>) => {
     const isFirst = index === 0;
     const isLast = index === recommendations.length - 1;
 
     const posterImage = (
       <FastImage
         source={{ uri: item.poster }}
-        style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, width: posterWidth, height: posterHeight, borderRadius }]}
+        style={posterStyle}
         resizeMode={FastImage.resizeMode.cover}
       />
     );
 
     const titleText = (
-      <Text style={[styles.title, { color: currentTheme.colors.mediumEmphasis, fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13, lineHeight: isTV ? 20 : 18 }]} numberOfLines={2}>
+      <Text style={titleStyle} numberOfLines={2}>
         {item.name}
       </Text>
     );
 
     if (isTVDevice) {
       return (
-        <View style={[itemStyle, { overflow: 'visible', paddingTop: 6 }]}>
+        <View style={tvItemContainerStyle}>
           <Focusable
             onPress={() => handleItemPress(item)}
-            style={{ width: posterWidth, height: posterHeight, marginBottom: 8 }}
+            style={focusableStyle}
             borderRadius={borderRadius}
             focusScale={1.05}
             animateBackground={false}
@@ -168,7 +197,17 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
         {titleText}
       </TouchableOpacity>
     );
-  };
+  }, [recommendations.length, posterStyle, titleStyle, isTVDevice, tvItemContainerStyle, focusableStyle, borderRadius, handleItemPress, itemStyle]);
+
+  // getItemLayout for optimized scrolling
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: posterWidth + itemSpacing,
+    offset: (posterWidth + itemSpacing) * index,
+    index,
+  }), [posterWidth, itemSpacing]);
+
+  // Memoized keyExtractor
+  const keyExtractor = useCallback((item: StreamingContent) => item.id, []);
 
   if (loadingRecommendations) {
     return (
@@ -189,11 +228,16 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
       <FlatList
         data={recommendations}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         scrollEnabled={!isTVDevice}
         contentContainerStyle={[styles.listContentContainer, { paddingHorizontal: horizontalPadding, paddingRight: horizontalPadding + itemSpacing }]}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        windowSize={5}
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
       />
       <CustomAlert
         visible={alertVisible}

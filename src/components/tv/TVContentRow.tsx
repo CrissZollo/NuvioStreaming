@@ -1,10 +1,11 @@
-import React, { useRef, useCallback, memo } from 'react';
+import React, { useRef, useCallback, memo, useMemo } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   Dimensions,
+  ListRenderItemInfo,
 } from 'react-native';
 import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -17,6 +18,75 @@ interface ContentItem {
   title?: string;
   poster?: string;
 }
+
+// Memoized item component to prevent re-renders from inline callback recreation
+interface TVContentRowItemProps {
+  item: ContentItem;
+  index: number;
+  itemWidth: number;
+  itemHeight: number;
+  rowIndex: number;
+  onItemPress: (id: string, type: string) => void;
+  onItemFocus: (index: number) => void;
+  renderItem?: (item: ContentItem, isFocused: boolean) => React.ReactNode;
+  backgroundColor: string;
+}
+
+const TVContentRowItem = memo<TVContentRowItemProps>(({
+  item,
+  index,
+  itemWidth,
+  itemHeight,
+  rowIndex,
+  onItemPress,
+  onItemFocus,
+  renderItem,
+  backgroundColor,
+}) => {
+  const isFirst = index === 0;
+
+  // Memoize callbacks to prevent unnecessary re-renders
+  const handlePress = useCallback(() => {
+    onItemPress(item.id, item.type);
+  }, [onItemPress, item.id, item.type]);
+
+  const handleFocus = useCallback(() => {
+    onItemFocus(index);
+  }, [onItemFocus, index]);
+
+  // Memoize placeholder style
+  const placeholderStyle = useMemo(() => [
+    styles.posterPlaceholder,
+    {
+      width: itemWidth,
+      height: itemHeight,
+      backgroundColor,
+    },
+  ], [itemWidth, itemHeight, backgroundColor]);
+
+  return (
+    <Focusable
+      onPress={handlePress}
+      onFocus={handleFocus}
+      autoFocus={isFirst && rowIndex === 0}
+      style={[styles.itemContainer, { width: itemWidth }]}
+      borderRadius={8}
+      animateBackground={false}
+    >
+      {(focused) =>
+        renderItem ? (
+          renderItem(item, focused)
+        ) : (
+          <View style={placeholderStyle}>
+            <Text style={styles.posterText} numberOfLines={2}>
+              {item.name || item.title || 'Untitled'}
+            </Text>
+          </View>
+        )
+      }
+    </Focusable>
+  );
+});
 
 interface TVContentRowProps {
   /** Title of the row */
@@ -93,41 +163,23 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
     return itemRefs.current.get(index);
   }, []);
 
-  const renderContentItem = useCallback(
-    ({ item, index }: { item: ContentItem; index: number }) => {
-      const isFirst = index === 0;
+  // Memoize the background color to prevent re-renders
+  const backgroundColor = currentTheme.colors.elevation1 || '#1a1a1a';
 
+  const renderContentItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<ContentItem>) => {
       return (
-        <Focusable
-          onPress={() => onItemPress(item.id, item.type)}
-          onFocus={() => handleItemFocus(index)}
-          autoFocus={isFirst && rowIndex === 0}
-          style={[styles.itemContainer, { width: itemWidth }]}
-          borderRadius={8}
-          // Don't animate background for poster cards - only show white outline
-          animateBackground={false}
-        >
-          {(focused) =>
-            renderItem ? (
-              renderItem(item, focused)
-            ) : (
-              <View
-                style={[
-                  styles.posterPlaceholder,
-                  {
-                    width: itemWidth,
-                    height: itemHeight,
-                    backgroundColor: currentTheme.colors.elevation1 || '#1a1a1a',
-                  },
-                ]}
-              >
-                <Text style={styles.posterText} numberOfLines={2}>
-                  {item.name || item.title || 'Untitled'}
-                </Text>
-              </View>
-            )
-          }
-        </Focusable>
+        <TVContentRowItem
+          item={item}
+          index={index}
+          itemWidth={itemWidth}
+          itemHeight={itemHeight}
+          rowIndex={rowIndex}
+          onItemPress={onItemPress}
+          onItemFocus={handleItemFocus}
+          renderItem={renderItem}
+          backgroundColor={backgroundColor}
+        />
       );
     },
     [
@@ -137,7 +189,7 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
       renderItem,
       itemWidth,
       itemHeight,
-      currentTheme.colors.elevation1,
+      backgroundColor,
     ]
   );
 
