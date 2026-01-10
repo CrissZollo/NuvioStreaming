@@ -1354,10 +1354,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     </TouchableOpacity>
   ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, computedItemWidth, computedItemHeight, isTV, isLargeTablet, isTablet]);
 
-  // Handle View All press - navigate to a screen showing all continue watching items
+  // Handle View All press - navigate to the Continue Watching list screen
   const handleViewAllPress = useCallback(() => {
-    // Navigate to Library tab which shows continue watching or a dedicated screen
-    navigation.navigate('Library' as any);
+    navigation.navigate('ContinueWatchingList' as any);
   }, [navigation]);
 
   // Memoized key extractor
