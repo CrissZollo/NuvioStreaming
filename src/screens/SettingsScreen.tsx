@@ -33,7 +33,7 @@ import { fetchTotalDownloads } from '../services/githubReleaseService';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
-import { getDisplayedAppVersion } from '../utils/version';
+import { getDisplayedAppVersion, getNuvioTVVersion } from '../utils/version';
 import CustomAlert from '../components/CustomAlert';
 import ScreenHeader from '../components/common/ScreenHeader';
 import PluginIcon from '../components/icons/PluginIcon';
@@ -918,7 +918,14 @@ const SettingsScreen: React.FC = () => {
               </>
             )}
             <SettingItem
-              title="Version"
+              title="Nuvio TV Version"
+              description={getNuvioTVVersion()}
+              icon="tv"
+              isTablet={isTablet}
+              isTV={isTVDevice}
+            />
+            <SettingItem
+              title="Nuvio Build Version"
               description={getDisplayedAppVersion()}
               icon="info"
               isTablet={isTablet}
