@@ -12,6 +12,7 @@ import {
   ScrollView,
   findNodeHandle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -166,9 +167,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
 
   // Enhanced responsive sizing for continue watching items
   const computedItemWidth = useMemo(() => {
+    // Use isTVDevice hook for TV detection (more reliable than screen width)
+    if (isTVDevice) {
+      return 250; // Fixed smaller width for TV to fit 3 items
+    }
     switch (deviceType) {
       case 'tv':
-        return 400; // Larger items for TV
       case 'largeTablet':
         return 350; // Medium-large items for large tablets
       case 'tablet':
@@ -176,12 +180,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
       default:
         return 280; // Original phone size
     }
-  }, [deviceType]);
+  }, [deviceType, isTVDevice]);
 
   const computedItemHeight = useMemo(() => {
+    // Use isTVDevice hook for TV detection (more reliable than screen width)
+    if (isTVDevice) {
+      return 100; // Height for TV grid items
+    }
     switch (deviceType) {
       case 'tv':
-        return 160; // Taller items for TV
       case 'largeTablet':
         return 140; // Medium-tall items for large tablets
       case 'tablet':
@@ -189,7 +196,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
       default:
         return 120; // Original phone height
     }
-  }, [deviceType]);
+  }, [deviceType, isTVDevice]);
 
   // Enhanced spacing and padding
   const horizontalPadding = useMemo(() => {
@@ -208,7 +215,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
   const itemSpacing = useMemo(() => {
     switch (deviceType) {
       case 'tv':
-        return 20;
+        return 12; // Reduced spacing for grid layout
       case 'largeTablet':
         return 18;
       case 'tablet':
@@ -217,6 +224,46 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
         return 16; // phone
     }
   }, [deviceType]);
+
+  // TV grid layout - fixed to 3 items per row, 2 rows max (6 total on screen)
+  const tvGridLayout = useMemo(() => {
+    if (!isTVDevice) return { itemsPerRow: 0, rowCount: 0, rowSpacing: 0 };
+
+    return {
+      itemsPerRow: 3, // 3 items per row
+      rowCount: 2, // Two rows = 6 items total on screen
+      rowSpacing: 12,
+    };
+  }, [isTVDevice]);
+
+  // Calculate if we need a View All button (more items than can fit)
+  const tvGridInfo = useMemo(() => {
+    if (!isTVDevice || tvGridLayout.itemsPerRow === 0) {
+      return { rows: [], hasViewAll: false, totalItems: 0 };
+    }
+
+    const maxItems = tvGridLayout.itemsPerRow * tvGridLayout.rowCount;
+    const hasViewAll = continueWatchingItems.length > maxItems;
+
+    // If we have more items than can fit, reserve the last slot for View All
+    const itemsToShow = hasViewAll ? maxItems - 1 : Math.min(continueWatchingItems.length, maxItems);
+    const limitedItems = continueWatchingItems.slice(0, itemsToShow);
+
+    const rows: ContinueWatchingItem[][] = [];
+    for (let i = 0; i < limitedItems.length; i += tvGridLayout.itemsPerRow) {
+      rows.push(limitedItems.slice(i, i + tvGridLayout.itemsPerRow));
+    }
+
+    return {
+      rows,
+      hasViewAll,
+      totalItems: continueWatchingItems.length,
+      hiddenCount: hasViewAll ? continueWatchingItems.length - itemsToShow : 0
+    };
+  }, [isTVDevice, continueWatchingItems, tvGridLayout.itemsPerRow, tvGridLayout.rowCount]);
+
+  // For backwards compatibility
+  const tvGridRows = tvGridInfo.rows;
 
   // Initialize TV refs when items change
   useEffect(() => {
@@ -1310,30 +1357,45 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     </TouchableOpacity>
   ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, computedItemWidth, computedItemHeight, isTV, isLargeTablet, isTablet]);
 
+  // Handle View All press - navigate to a screen showing all continue watching items
+  const handleViewAllPress = useCallback(() => {
+    // Navigate to Library tab which shows continue watching or a dedicated screen
+    navigation.navigate('Library' as any);
+  }, [navigation]);
+
   // Memoized key extractor
   const keyExtractor = useCallback((item: ContinueWatchingItem) => `continue-${item.id}-${item.type}`, []);
 
   // Memoized item separator
   const ItemSeparator = useCallback(() => <View style={{ width: itemSpacing }} />, [itemSpacing]);
 
-  // TV-specific render function with Focusable wrapper
-  const renderTVItem = useCallback((item: ContinueWatchingItem, index: number) => {
-    const itemCount = continueWatchingItems.length;
-    const isFirstItem = index === 0;
-    const isLastItem = index === itemCount - 1;
-    // For the first item, use the passed-in firstItemRef so HeroCarousel can navigate to it
-    const currentViewRef = isFirstItem && firstItemRef ? firstItemRef : tvItemViewRefs.current[index];
-    // Block right on last item (no wrap-around)
-    const nextIndex = isLastItem ? -1 : index + 1;
-    const rightRef = nextIndex >= 0 && tvRefsReady ? tvItemViewRefs.current[nextIndex] : undefined;
+  // TV grid render function with row/column awareness for proper navigation
+  const renderTVGridItem = useCallback((item: ContinueWatchingItem, flatIndex: number, rowIndex: number, colIndex: number) => {
+    const itemsPerRow = tvGridLayout.itemsPerRow;
+    const totalRows = tvGridRows.length;
+    const currentRowLength = tvGridRows[rowIndex]?.length || 0;
 
-    // Get previous item's node handle for left navigation constraint
-    // First item goes to menu, others go to previous item in row
+    // Navigation constraints
+    const isFirstInRow = colIndex === 0;
+    const isLastInRow = colIndex === currentRowLength - 1;
+    const isFirstRow = rowIndex === 0;
+    const isLastRowInSection = rowIndex === totalRows - 1;
+
+    // If View All card is shown in this row, the last item should NOT block right
+    const hasViewAllInThisRow = tvGridInfo.hasViewAll && isLastRowInSection;
+    const shouldBlockRight = isLastInRow && !hasViewAllInThisRow;
+
+    // For the first item overall, use the passed-in firstItemRef so HeroCarousel can navigate to it
+    const isFirstItemOverall = flatIndex === 0;
+    const currentViewRef = isFirstItemOverall && firstItemRef ? firstItemRef : tvItemViewRefs.current[flatIndex];
+
+    // Get previous item's node handle for left navigation (within same row)
+    // First item in row: goes to menu; others: go to previous item in same row
     let prevItemNodeHandle: number | null | undefined;
-    if (isFirstItem) {
+    if (isFirstInRow) {
       prevItemNodeHandle = menuFirstItemNodeHandle;
     } else if (tvRefsReady) {
-      const prevRef = tvItemViewRefs.current[index - 1];
+      const prevRef = tvItemViewRefs.current[flatIndex - 1];
       if (prevRef?.current) {
         prevItemNodeHandle = findNodeHandle(prevRef.current);
       }
@@ -1348,14 +1410,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
             borderColor: currentTheme.colors.border,
             shadowColor: currentTheme.colors.black,
             width: computedItemWidth,
-            height: computedItemHeight
+            height: computedItemHeight,
+            borderRadius: 10,
           }
         ]}
       >
         {/* Poster Image */}
         <View style={[
           styles.posterContainer,
-          { width: 100 }
+          { width: 65 }
         ]}>
           <FastImage
             source={{
@@ -1368,104 +1431,92 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
           />
           {deletingItemId === item.id && (
             <View style={styles.deletingOverlay}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             </View>
           )}
         </View>
 
         {/* Content Details */}
-        <View style={[styles.contentDetails, { padding: 16 }]}>
-          <View style={styles.titleRow}>
-            {(() => {
-              const isUpNext = item.type === 'series' && item.progress === 0;
-              return (
-                <View style={styles.titleRow}>
-                  <Text
-                    style={[
-                      styles.contentTitle,
-                      { color: currentTheme.colors.highEmphasis, fontSize: 20 }
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.name}
-                  </Text>
-                  {isUpNext && (
-                    <View style={[
-                      styles.progressBadge,
-                      { backgroundColor: currentTheme.colors.primary, paddingHorizontal: 12, paddingVertical: 6 }
-                    ]}>
-                      <Text style={[styles.progressText, { fontSize: 14 }]}>Up Next</Text>
-                    </View>
-                  )}
-                </View>
-              );
-            })()}
-          </View>
+        <View style={[styles.contentDetails, { padding: 10 }]}>
+          <Text
+            style={[
+              styles.contentTitle,
+              { color: currentTheme.colors.highEmphasis, fontSize: 14 }
+            ]}
+            numberOfLines={1}
+          >
+            {item.name}
+          </Text>
 
           {/* Episode Info or Year */}
           {item.type === 'series' && item.season && item.episode ? (
-            <View style={styles.episodeRow}>
-              <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis, fontSize: 16 }]}>
-                Season {item.season}
-              </Text>
-              {item.episodeTitle && (
-                <Text
-                  style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis, fontSize: 15 }]}
-                  numberOfLines={1}
-                >
-                  {item.episodeTitle}
-                </Text>
-              )}
-            </View>
+            <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis, fontSize: 12 }]}>
+              S{item.season} E{item.episode}
+            </Text>
           ) : (
-            <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis, fontSize: 16 }]}>
-              {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
+            <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis, fontSize: 12 }]}>
+              {item.year}
             </Text>
           )}
 
-          {/* Progress Bar */}
-          {item.progress > 0 && (
-            <View style={styles.wideProgressContainer}>
-              <View style={[styles.wideProgressTrack, { height: 6 }]}>
-                <View
-                  style={[
-                    styles.wideProgressBar,
-                    { width: `${item.progress}%`, backgroundColor: currentTheme.colors.primary }
-                  ]}
-                />
+          {/* Progress Bar or Up Next badge at bottom */}
+          <View style={{ marginTop: 'auto' }}>
+            {item.progress > 0 ? (
+              <View style={styles.wideProgressContainer}>
+                <View style={[styles.wideProgressTrack, { height: 3 }]}>
+                  <View
+                    style={[
+                      styles.wideProgressBar,
+                      { width: `${item.progress}%`, backgroundColor: currentTheme.colors.primary }
+                    ]}
+                  />
+                </View>
+                <Text style={[
+                  styles.progressLabel,
+                  { color: currentTheme.colors.textMuted, fontSize: 10 }
+                ]}>
+                  {Math.round(item.progress)}%
+                </Text>
               </View>
-              <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted, fontSize: 14 }]}>
-                {Math.round(item.progress)}% watched
-              </Text>
-            </View>
-          )}
+            ) : item.type === 'series' && (
+              <View style={{ alignItems: 'flex-end' }}>
+                <View style={[
+                  styles.progressBadge,
+                  { backgroundColor: currentTheme.colors.primary, paddingHorizontal: 6, paddingVertical: 2 }
+                ]}>
+                  <Text style={[styles.progressText, { fontSize: 10 }]}>Up Next</Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
       </View>
     );
 
     return (
       <Focusable
-        key={`tv-cw-${item.id}-${index}-${tvRefsReady ? 'ready' : 'init'}`}
+        key={`tv-cw-${item.id}-${flatIndex}-${tvRefsReady ? 'ready' : 'init'}`}
         viewRef={currentViewRef}
         onPress={() => handleContentPress(item)}
         onLongPress={() => handleLongPress(item)}
-        onFocus={() => handleTVItemFocus(index)}
-        style={{ marginRight: index < itemCount - 1 ? itemSpacing : 0 }}
+        onFocus={() => handleTVItemFocus(flatIndex)}
         focusScale={1.03}
-        borderRadius={14}
+        borderRadius={10}
         showFocusBorder={true}
         animateBackground={false}
-        nextFocusRight={rightRef}
-        nextFocusUp={heroSectionRef}
-        blockRight={isLastItem}
-        // Constrain left navigation: first item goes to menu, others go to previous item
+        // Only first row items can navigate up to hero section
+        nextFocusUp={isFirstRow ? heroSectionRef : undefined}
+        // Block right on last item in row, unless View All card follows
+        blockRight={shouldBlockRight}
+        // Constrain left navigation: first item in row goes to menu, others go to previous item
         nextFocusLeftId={prevItemNodeHandle}
       >
         {card}
       </Focusable>
     );
   }, [
-    continueWatchingItems.length,
+    tvGridLayout.itemsPerRow,
+    tvGridRows.length,
     tvRefsReady,
     currentTheme.colors,
     computedItemWidth,
@@ -1474,10 +1525,93 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     handleContentPress,
     handleLongPress,
     handleTVItemFocus,
-    itemSpacing,
     heroSectionRef,
     firstItemRef,
     menuFirstItemNodeHandle,
+    tvGridInfo.hasViewAll,
+  ]);
+
+  // View All card ref for TV focus navigation
+  const viewAllCardRef = useRef<View>(null);
+
+  // Render the View All card for TV grid
+  const renderTVViewAllCard = useCallback((flatIndex: number, rowIndex: number, colIndex: number) => {
+    const totalRows = tvGridRows.length;
+    const currentRowLength = tvGridRows[rowIndex]?.length || 0;
+
+    // Navigation constraints
+    const isFirstInRow = colIndex === 0;
+    const isFirstRow = rowIndex === 0;
+
+    // Get previous item's node handle for left navigation
+    let prevItemNodeHandle: number | null | undefined;
+    if (isFirstInRow) {
+      prevItemNodeHandle = menuFirstItemNodeHandle;
+    } else if (tvRefsReady) {
+      const prevRef = tvItemViewRefs.current[flatIndex - 1];
+      if (prevRef?.current) {
+        prevItemNodeHandle = findNodeHandle(prevRef.current);
+      }
+    }
+
+    return (
+      <Focusable
+        key={`tv-cw-view-all-${tvRefsReady ? 'ready' : 'init'}`}
+        viewRef={viewAllCardRef}
+        onPress={handleViewAllPress}
+        focusScale={1.03}
+        borderRadius={10}
+        showFocusBorder={true}
+        animateBackground={false}
+        nextFocusUp={isFirstRow ? heroSectionRef : undefined}
+        blockRight={true}
+        nextFocusLeftId={prevItemNodeHandle}
+      >
+        <View
+          style={[
+            styles.viewAllCard,
+            {
+              backgroundColor: currentTheme.colors.elevation1,
+              borderColor: currentTheme.colors.border,
+              width: computedItemWidth,
+              height: computedItemHeight,
+            }
+          ]}
+        >
+          <Ionicons
+            name="arrow-forward-circle"
+            size={28}
+            color={currentTheme.colors.primary}
+          />
+          <Text
+            style={[
+              styles.viewAllText,
+              { color: currentTheme.colors.text, fontSize: 14 }
+            ]}
+          >
+            View All
+          </Text>
+          <Text
+            style={[
+              styles.viewAllCount,
+              { color: currentTheme.colors.mediumEmphasis, fontSize: 12 }
+            ]}
+          >
+            {tvGridInfo.hiddenCount}+ more
+          </Text>
+        </View>
+      </Focusable>
+    );
+  }, [
+    tvGridRows.length,
+    tvRefsReady,
+    menuFirstItemNodeHandle,
+    handleViewAllPress,
+    heroSectionRef,
+    currentTheme.colors,
+    computedItemWidth,
+    computedItemHeight,
+    tvGridInfo.hiddenCount,
   ]);
 
   // If no continue watching items, don't render anything
@@ -1489,42 +1623,81 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     <View
       style={styles.container}
     >
-      <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
+      <View style={[styles.header, { paddingHorizontal: horizontalPadding, marginBottom: isTVDevice ? 6 : 16 }]}>
         <View style={styles.titleContainer}>
           <Text style={[
             styles.title,
             {
               color: currentTheme.colors.text,
-              fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
+              fontSize: isTVDevice ? 18 : isLargeTablet ? 28 : isTablet ? 26 : 24
             }
           ]}>Continue Watching</Text>
           <View style={[
             styles.titleUnderline,
             {
               backgroundColor: currentTheme.colors.primary,
-              width: isTV ? 50 : isLargeTablet ? 45 : isTablet ? 40 : 40,
-              height: isTV ? 4 : isLargeTablet ? 3.5 : isTablet ? 3 : 3
+              width: isTVDevice ? 40 : isLargeTablet ? 45 : isTablet ? 40 : 40,
+              height: isTVDevice ? 2 : isLargeTablet ? 3.5 : isTablet ? 3 : 3
             }
           ]} />
         </View>
       </View>
 
       {isTVDevice ? (
-        <ScrollView
-          ref={tvScrollViewRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          scrollEnabled={false}
-          contentContainerStyle={[
-            styles.wideList,
+        // TV: Fixed multi-row grid layout - no scrolling
+        <View
+          style={[
+            styles.tvGridContainer,
             {
-              paddingLeft: horizontalPadding,
-              paddingRight: horizontalPadding
+              paddingHorizontal: horizontalPadding,
             }
           ]}
         >
-          {continueWatchingItems.map((item, index) => renderTVItem(item, index))}
-        </ScrollView>
+          {tvGridRows.map((row, rowIndex) => {
+            const isLastRow = rowIndex === tvGridRows.length - 1;
+            const shouldShowViewAllInThisRow = tvGridInfo.hasViewAll && isLastRow;
+
+            return (
+              <View
+                key={`cw-row-${rowIndex}`}
+                style={[
+                  styles.tvGridRow,
+                  {
+                    marginBottom: rowIndex < tvGridRows.length - 1 ? tvGridLayout.rowSpacing : 0,
+                  }
+                ]}
+              >
+                {row.map((item, colIndex) => {
+                  const flatIndex = rowIndex * tvGridLayout.itemsPerRow + colIndex;
+                  const isLastItemInRow = colIndex === row.length - 1;
+                  // If this is the last row and we need to show View All, account for the margin
+                  const needsMarginForViewAll = shouldShowViewAllInThisRow && isLastItemInRow;
+
+                  return (
+                    <View
+                      key={`cw-${item.id}-${flatIndex}`}
+                      style={{
+                        marginRight: needsMarginForViewAll ? itemSpacing : (colIndex < row.length - 1 ? itemSpacing : 0),
+                      }}
+                    >
+                      {renderTVGridItem(item, flatIndex, rowIndex, colIndex)}
+                    </View>
+                  );
+                })}
+                {/* Show View All card at end of last row if needed */}
+                {shouldShowViewAllInThisRow && (
+                  <View key="cw-view-all">
+                    {renderTVViewAllCard(
+                      row.length, // flatIndex is after the last item
+                      rowIndex,
+                      row.length // colIndex is after the last item
+                    )}
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
       ) : (
         <FlashList
           data={continueWatchingItems}
@@ -1562,6 +1735,40 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     paddingTop: 0,
     marginTop: 12,
+  },
+  tvGridContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    overflow: 'visible',
+    paddingVertical: 4,
+  },
+  tvGridRow: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'flex-start',
+    overflow: 'visible',
+  },
+  viewAllCard: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 8,
+  },
+  viewAllCount: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 4,
   },
   header: {
     flexDirection: 'row',
