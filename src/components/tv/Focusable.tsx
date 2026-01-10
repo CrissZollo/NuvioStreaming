@@ -84,6 +84,8 @@ interface FocusableProps {
   animateBackground?: boolean;
   /** External ref to the underlying View for directional focus linking */
   viewRef?: React.RefObject<View>;
+  /** Callback when layout is measured (useful for registering node handles) */
+  onLayout?: () => void;
 }
 
 export interface FocusableRef {
@@ -137,6 +139,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       unfocusedScale = 1.0,
       animateBackground = false, // Default to false for performance
       viewRef,
+      onLayout,
     },
     ref
   ) => {
@@ -167,14 +170,14 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         (viewRef as React.MutableRefObject<View | null>).current = node;
       }
 
-      // Capture node handle for block* props
-      if (node && (blockUp || blockDown || blockLeft || blockRight)) {
+      // Always capture node handle - it may be needed later if block* props change
+      if (node) {
         const handle = findNodeHandle(node);
         if (handle) {
           setSelfNodeHandle(handle);
         }
       }
-    }, [blockUp, blockDown, blockLeft, blockRight, viewRef]);
+    }, [viewRef]);
 
     // Only apply autoFocus once on mount
     useEffect(() => {
@@ -336,6 +339,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         onLongPress={onLongPress}
         disabled={disabled}
         android_disableSound={true}
+        onLayout={onLayout}
         style={[
           style,
           animatedContainerStyle,

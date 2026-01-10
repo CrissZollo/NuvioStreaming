@@ -264,11 +264,14 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
 
   // TV navigation - store View refs for each card for directional focus wrap-around
   const tvCardViewRefs = useRef<React.RefObject<View>[]>([]);
+  // Cache for item node handles (like CatalogSection) - avoids findNodeHandle on every render
+  const tvItemNodeHandles = useRef<Map<number, number>>(new Map());
   // Use ref for immediate focus tracking (no re-render) - cards read from shared value
   const tvFocusedIndexRef = useRef(0);
   // State only for text display below carousel - debounced to reduce re-renders
   const [tvDisplayIndex, setTvDisplayIndex] = useState(0);
   const [tvRefsReady, setTvRefsReady] = useState(false);
+  const [tvNodeHandlesReady, setTvNodeHandlesReady] = useState(false);
   // Shared value for TV focused index - cards read this in worklets to avoid re-renders
   const tvFocusedIndexShared = useSharedValue(0);
 
@@ -279,17 +282,31 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
   // Debounce timer for display text update
   const tvDisplayDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Callback to register item's node handle when it mounts (cached lookup)
+  const registerTVItemNodeHandle = useCallback((index: number, view: View | null) => {
+    if (view) {
+      const handle = findNodeHandle(view);
+      if (handle) {
+        tvItemNodeHandles.current.set(index, handle);
+      }
+    }
+  }, []);
+
   // Initialize refs array when data changes
   useEffect(() => {
     // Create stable ref objects for each card
     tvCardViewRefs.current = data.map(() => React.createRef<View>());
+    tvItemNodeHandles.current.clear();
     setTvRefsReady(false);
+    setTvNodeHandlesReady(false);
     // Mark refs ready after a short delay to allow all Focusables to mount
     const timer = setTimeout(() => {
       setTvRefsReady(true);
+      setTvNodeHandlesReady(true);
     }, 150);
     return () => clearTimeout(timer);
   }, [data.length]);
+
 
   // Note: do not early-return before hooks. Loading UI is returned later.
 
@@ -551,9 +568,40 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
     return data.map((item) => () => handleNavigateToMetadata(item.id, item.type));
   }, [isTVDevice, data, handleNavigateToMetadata]);
 
+  // TV blur handler - reset carousel to first item when focus leaves any hero card
+  // This ensures when navigating back up, the first hero card (not behind sidebar) is focused
+  const tvBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tvBlurHandler = useCallback(() => {
+    if (!isTVDevice) return;
+
+    // Use a small timeout to check if focus moved to another hero card
+    // If focus moved within the carousel, the timeout will be cleared by the next focus handler
+    if (tvBlurTimeoutRef.current) {
+      clearTimeout(tvBlurTimeoutRef.current);
+    }
+
+    tvBlurTimeoutRef.current = setTimeout(() => {
+      // Reset to first item after focus leaves the hero section
+      if (tvFocusedIndexRef.current !== 0) {
+        scrollToLogicalIndex(0, true);
+        tvFocusedIndexRef.current = 0;
+        tvFocusedIndexShared.value = 0;
+        setTvDisplayIndex(0);
+      }
+    }, 100);
+  }, [isTVDevice, scrollToLogicalIndex, tvFocusedIndexShared]);
+
+  // TV focus handlers that also clear any pending blur reset
   const tvFocusHandlers = useMemo(() => {
     if (!isTVDevice) return [];
-    return data.map((_, idx) => () => handleTVCardFocus(idx));
+    return data.map((_, idx) => () => {
+      // Clear any pending blur reset since focus is still in the carousel
+      if (tvBlurTimeoutRef.current) {
+        clearTimeout(tvBlurTimeoutRef.current);
+        tvBlurTimeoutRef.current = null;
+      }
+      handleTVCardFocus(idx);
+    });
   }, [isTVDevice, data.length, handleTVCardFocus]);
 
   // Container animation based on scroll - must be before early returns
@@ -711,16 +759,21 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
               const isFirstItem = logicalIndex === 0;
               const isLastItem = logicalIndex === data.length - 1;
 
-              // Get refs for directional focus (only after refs are ready)
+              // Get ref for this card
               const currentViewRef = tvCardViewRefs.current[logicalIndex];
-              // For non-first items: use previous card ref for left navigation
-              const leftRef = !isFirstItem && prevIndex >= 0 && tvRefsReady
-                ? tvCardViewRefs.current[prevIndex]
-                : undefined;
-              // Last item: don't set rightRef and block right navigation
-              const rightRef = nextIndex >= 0 && tvRefsReady ? tvCardViewRefs.current[nextIndex] : undefined;
 
-              // For first item: block left if menu handle not available yet, otherwise navigate to menu
+              // Use cached node handles for navigation (avoids findNodeHandle on every render)
+              // First item: left goes to menu; others: go to previous item (cached handle)
+              const leftNodeHandle = isFirstItem
+                ? menuFirstItemNodeHandle
+                : (tvNodeHandlesReady ? tvItemNodeHandles.current.get(prevIndex) : undefined);
+
+              // Last item: block right; others: go to next item (cached handle)
+              const rightNodeHandle = isLastItem
+                ? undefined
+                : (tvNodeHandlesReady ? tvItemNodeHandles.current.get(nextIndex) : undefined);
+
+              // For first item: block left if menu handle not available yet
               const shouldBlockLeft = isFirstItem && !menuFirstItemNodeHandle;
 
               return (
@@ -732,13 +785,14 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
                   colors={currentTheme.colors}
                   onPress={tvPressHandlers[logicalIndex]}
                   onFocus={tvFocusHandlers[logicalIndex]}
+                  onBlur={tvBlurHandler}
                   viewRef={currentViewRef}
-                  leftRef={leftRef}
-                  rightRef={rightRef}
                   downRef={continueWatchingFirstRef}
                   blockRight={isLastItem}
                   blockLeft={shouldBlockLeft}
-                  nextFocusLeftId={isFirstItem ? menuFirstItemNodeHandle : undefined}
+                  nextFocusLeftId={leftNodeHandle}
+                  nextFocusRightId={rightNodeHandle}
+                  onRegisterNodeHandle={(view) => registerTVItemNodeHandle(logicalIndex, view)}
                 />
               );
             }
@@ -1038,14 +1092,17 @@ interface TVHeroCardWrapperProps {
   colors: any;
   onPress: () => void;
   onFocus: () => void;
+  onBlur?: () => void;
   viewRef: React.RefObject<View> | undefined;
-  leftRef: React.RefObject<View> | undefined;
-  rightRef: React.RefObject<View> | undefined;
   downRef: React.RefObject<View> | undefined;
   blockRight?: boolean;
   blockLeft?: boolean;
   /** Direct node handle for left focus (used for first item to navigate to menu) */
   nextFocusLeftId?: number | null;
+  /** Cached node handle for right navigation */
+  nextFocusRightId?: number | null;
+  /** Callback to register this item's node handle */
+  onRegisterNodeHandle?: (view: View | null) => void;
 }
 
 const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
@@ -1055,13 +1112,14 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
   colors,
   onPress,
   onFocus,
+  onBlur,
   viewRef,
-  leftRef,
-  rightRef,
   downRef,
   blockRight = false,
   blockLeft = false,
   nextFocusLeftId,
+  nextFocusRightId,
+  onRegisterNodeHandle,
 }) => {
   // Border padding - space between poster and focus border frame
   const borderPadding = 4;
@@ -1074,6 +1132,8 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
         viewRef={viewRef}
         onPress={onPress}
         onFocus={onFocus}
+        onBlur={onBlur}
+        onLayout={() => onRegisterNodeHandle?.(viewRef?.current ?? null)}
         style={{
           width: focusableWidth,
           height: focusableHeight,
@@ -1086,12 +1146,11 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
         borderRadius={20}
         showFocusBorder={true}
         animateBackground={false}
-        nextFocusLeft={leftRef}
-        nextFocusRight={rightRef}
         nextFocusDown={downRef}
         blockRight={blockRight}
         blockLeft={blockLeft}
         nextFocusLeftId={nextFocusLeftId}
+        nextFocusRightId={nextFocusRightId}
       >
         <TVSimpleCard
           item={item}
@@ -1110,6 +1169,7 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
          prevProps.cardHeight === nextProps.cardHeight &&
          prevProps.viewRef === nextProps.viewRef &&
          prevProps.nextFocusLeftId === nextProps.nextFocusLeftId &&
+         prevProps.nextFocusRightId === nextProps.nextFocusRightId &&
          prevProps.blockLeft === nextProps.blockLeft;
 });
 
