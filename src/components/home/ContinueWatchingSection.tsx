@@ -31,6 +31,7 @@ import { useSettings } from '../../hooks/useSettings';
 import CustomAlert from '../../components/CustomAlert';
 import { useIsTV } from '../../contexts/TVContext';
 import { Focusable } from '../tv/Focusable';
+import { useTVFocus } from '../../contexts/TVFocusContext';
 
 // Define interface for continue watching items
 interface ContinueWatchingItem extends StreamingContent {
@@ -125,6 +126,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
 
   // TV navigation
   const isTVDevice = useIsTV();
+  const { menuFirstItemNodeHandle } = useTVFocus();
   const tvScrollViewRef = useRef<ScrollView>(null);
   const tvItemViewRefs = useRef<React.RefObject<View>[]>([]);
   const [tvRefsReady, setTvRefsReady] = useState(false);
@@ -1317,12 +1319,25 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
   // TV-specific render function with Focusable wrapper
   const renderTVItem = useCallback((item: ContinueWatchingItem, index: number) => {
     const itemCount = continueWatchingItems.length;
-    const prevIndex = index === 0 ? itemCount - 1 : index - 1;
-    const nextIndex = index === itemCount - 1 ? 0 : index + 1;
+    const isFirstItem = index === 0;
+    const isLastItem = index === itemCount - 1;
     // For the first item, use the passed-in firstItemRef so HeroCarousel can navigate to it
-    const currentViewRef = index === 0 && firstItemRef ? firstItemRef : tvItemViewRefs.current[index];
-    const leftRef = tvRefsReady ? tvItemViewRefs.current[prevIndex] : undefined;
-    const rightRef = tvRefsReady ? tvItemViewRefs.current[nextIndex] : undefined;
+    const currentViewRef = isFirstItem && firstItemRef ? firstItemRef : tvItemViewRefs.current[index];
+    // Block right on last item (no wrap-around)
+    const nextIndex = isLastItem ? -1 : index + 1;
+    const rightRef = nextIndex >= 0 && tvRefsReady ? tvItemViewRefs.current[nextIndex] : undefined;
+
+    // Get previous item's node handle for left navigation constraint
+    // First item goes to menu, others go to previous item in row
+    let prevItemNodeHandle: number | null | undefined;
+    if (isFirstItem) {
+      prevItemNodeHandle = menuFirstItemNodeHandle;
+    } else if (tvRefsReady) {
+      const prevRef = tvItemViewRefs.current[index - 1];
+      if (prevRef?.current) {
+        prevItemNodeHandle = findNodeHandle(prevRef.current);
+      }
+    }
 
     const card = (
       <View
@@ -1440,9 +1455,11 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
         borderRadius={14}
         showFocusBorder={true}
         animateBackground={false}
-        nextFocusLeft={leftRef}
         nextFocusRight={rightRef}
         nextFocusUp={heroSectionRef}
+        blockRight={isLastItem}
+        // Constrain left navigation: first item goes to menu, others go to previous item
+        nextFocusLeftId={prevItemNodeHandle}
       >
         {card}
       </Focusable>
@@ -1460,6 +1477,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     itemSpacing,
     heroSectionRef,
     firstItemRef,
+    menuFirstItemNodeHandle,
   ]);
 
   // If no continue watching items, don't render anything

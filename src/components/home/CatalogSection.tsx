@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useMemo, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList } from 'react-native';
+import React, { useCallback, useRef, useMemo, memo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList, findNodeHandle } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { CatalogContent, StreamingContent } from '../../services/catalogService';
@@ -115,6 +115,10 @@ interface ViewAllCardProps {
   focusRef?: React.RefObject<View>;
   isTVDevice: boolean;
   colors: any;
+  /** Node handle of previous item for left navigation constraint */
+  prevItemNodeHandle?: number | null;
+  /** Override poster width (TV only - used for fixed grid layout) */
+  tvPosterWidth?: number;
 }
 
 const ViewAllCard = memo<ViewAllCardProps>(({
@@ -125,9 +129,11 @@ const ViewAllCard = memo<ViewAllCardProps>(({
   focusRef,
   isTVDevice,
   colors,
+  prevItemNodeHandle,
+  tvPosterWidth,
 }) => {
-  // Calculate poster dimensions matching ContentItem exactly
-  const posterWidth = calculateContentItemPosterWidth(width, isTVDevice);
+  // Calculate poster dimensions - use tvPosterWidth if provided, otherwise calculate
+  const posterWidth = (isTVDevice && tvPosterWidth) ? tvPosterWidth : calculateContentItemPosterWidth(width, isTVDevice);
   const posterHeight = posterWidth * 1.5; // 2:3 aspect ratio
   const borderRadius = isTV ? 12 : isLargeTablet ? 14 : isTablet ? 12 : 12;
 
@@ -145,15 +151,15 @@ const ViewAllCard = memo<ViewAllCardProps>(({
     ]}>
       <MaterialIcons
         name="arrow-forward"
-        size={isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 28}
+        size={isTVDevice ? 28 : isLargeTablet ? 36 : isTablet ? 32 : 28}
         color={colors.textMuted || '#888'}
       />
       <Text style={[
         styles.viewAllCardText,
         {
           color: colors.text || '#fff',
-          fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13,
-          marginTop: 8,
+          fontSize: isTVDevice ? 12 : isLargeTablet ? 15 : isTablet ? 14 : 13,
+          marginTop: 6,
         }
       ]}>
         View All
@@ -174,6 +180,7 @@ const ViewAllCard = memo<ViewAllCardProps>(({
           viewRef={focusRef}
           blockRight={isLastInRow}
           blockDown={isLastRow}
+          nextFocusLeftId={prevItemNodeHandle}
         >
           {cardContent}
         </Focusable>
@@ -197,18 +204,71 @@ const ViewAllCard = memo<ViewAllCardProps>(({
 // Special marker for "View All" item
 const VIEW_ALL_ITEM_ID = '__VIEW_ALL__';
 
+// Calculate TV grid layout - how many items fit per row
+const calculateTVGridLayout = (screenWidth: number) => {
+  const sidebarWidth = 80; // Account for the sidebar menu on the left
+  const horizontalPadding = 24 * 2; // Left and right padding
+  const itemSpacing = 8; // Space between items (reduced)
+  const rowSpacing = 10; // Vertical space between rows
+
+  // Use smaller poster width for TV grid to fit more items
+  // This is smaller than the default ContentItem calculation
+  const tvPosterWidth = 95; // Fixed smaller width to ensure all items fit
+
+  // Calculate available width accounting for sidebar
+  const availableWidth = screenWidth - sidebarWidth - horizontalPadding;
+  const itemTotalWidth = tvPosterWidth + itemSpacing;
+  const itemsPerRow = Math.floor((availableWidth + itemSpacing) / itemTotalWidth);
+
+  return {
+    itemsPerRow: Math.max(itemsPerRow, 6), // Minimum 6 items per row for TV
+    rowCount: 2, // Display 2 rows per catalog
+    posterWidth: tvPosterWidth,
+    itemSpacing,
+    rowSpacing,
+    horizontalPadding: 24,
+  };
+};
+
 const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const isTVDevice = useIsTV();
-  const { setLastFocusedRowView } = useTVFocus();
+  const { setLastFocusedRowView, menuFirstItemNodeHandle } = useTVFocus();
 
   // Use isTVDevice for TV-specific styling (more reliable than screen width detection)
   const isTVLayout = isTVDevice || isTV;
 
+  // TV grid layout calculations
+  const tvGridLayout = useMemo(() => calculateTVGridLayout(width), []);
+
   // Only create refs for first and last items (for navigation constraints)
   const firstItemRef = useRef<View>(null);
   const lastItemRef = useRef<View>(null);
+
+  // Track node handles for all items to constrain left navigation within the row
+  // Key: item index, Value: node handle
+  const itemNodeHandles = useRef<Map<number, number>>(new Map());
+  const [nodeHandlesReady, setNodeHandlesReady] = useState(false);
+
+  // Reset node handles when catalog items change
+  useEffect(() => {
+    itemNodeHandles.current.clear();
+    setNodeHandlesReady(false);
+    // Set ready after a short delay to allow refs to register
+    const timer = setTimeout(() => setNodeHandlesReady(true), 200);
+    return () => clearTimeout(timer);
+  }, [catalog.items.length]);
+
+  // Callback to register item's node handle when it mounts
+  const registerItemNodeHandle = useCallback((index: number, view: View | null) => {
+    if (view) {
+      const handle = findNodeHandle(view);
+      if (handle) {
+        itemNodeHandles.current.set(index, handle);
+      }
+    }
+  }, []);
 
   // When any item in this section gets focus, update the last focused row
   // so pressing right from menu returns to this row's first item
@@ -232,6 +292,7 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
   }, [navigation, catalog.id, catalog.type, catalog.addon]);
 
   // Create data array with "View All" item at the end
+  // For TV: limit items to fit in two rows (last slot of row 2 is View All)
   const dataWithViewAll = useMemo(() => {
     const viewAllItem: StreamingContent = {
       id: VIEW_ALL_ITEM_ID,
@@ -239,13 +300,52 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
       name: 'View All',
       poster: '', // Empty string for type safety, not used since we render a custom card
     };
-    return [...catalog.items, viewAllItem];
-  }, [catalog.items, catalog.type]);
 
-  const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
-    const isFirst = index === 0;
-    const isLast = index === dataWithViewAll.length - 1;
+    if (isTVDevice) {
+      // TV: Show items for 2 rows (leaving last slot for View All)
+      const totalSlots = tvGridLayout.itemsPerRow * tvGridLayout.rowCount;
+      const maxItems = totalSlots - 1; // Reserve last slot for View All
+      const limitedItems = catalog.items.slice(0, maxItems);
+      return [...limitedItems, viewAllItem];
+    }
+
+    return [...catalog.items, viewAllItem];
+  }, [catalog.items, catalog.type, isTVDevice, tvGridLayout.itemsPerRow, tvGridLayout.rowCount]);
+
+  // For TV: organize items into rows for the grid layout
+  const tvGridRows = useMemo(() => {
+    if (!isTVDevice) return [];
+
+    const rows: StreamingContent[][] = [];
+    const itemsPerRow = tvGridLayout.itemsPerRow;
+
+    for (let i = 0; i < dataWithViewAll.length; i += itemsPerRow) {
+      rows.push(dataWithViewAll.slice(i, i + itemsPerRow));
+    }
+
+    return rows;
+  }, [isTVDevice, dataWithViewAll, tvGridLayout.itemsPerRow]);
+
+  // Render a single item for the TV grid with proper row/column awareness
+  const renderTVGridItem = useCallback((item: StreamingContent, flatIndex: number, rowIndex: number, colIndex: number) => {
     const isViewAllItem = item.id === VIEW_ALL_ITEM_ID;
+    const itemsPerRow = tvGridLayout.itemsPerRow;
+    const totalRows = tvGridRows.length;
+
+    // Navigation constraints
+    const isFirstInRow = colIndex === 0;
+    const isLastInRow = colIndex === itemsPerRow - 1 || flatIndex === dataWithViewAll.length - 1;
+    const isFirstRow = rowIndex === 0;
+    const isLastRowInCatalog = rowIndex === totalRows - 1;
+
+    // Get previous item's node handle for left navigation (within same row)
+    // First item in row: goes to menu; others: go to previous item in same row
+    let prevItemHandle: number | null | undefined;
+    if (isFirstInRow) {
+      prevItemHandle = menuFirstItemNodeHandle;
+    } else if (nodeHandlesReady) {
+      prevItemHandle = itemNodeHandles.current.get(flatIndex - 1);
+    }
 
     // Render "View All" card
     if (isViewAllItem) {
@@ -253,11 +353,13 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         <ViewAllCard
           onPress={handleViewAllPress}
           onItemFocus={handleSectionItemFocus}
-          isLastInRow={isTVDevice}
-          isLastRow={isTVDevice ? isLastSection : undefined}
-          focusRef={isTVDevice ? lastItemRef : undefined}
-          isTVDevice={isTVDevice}
+          isLastInRow={true}
+          isLastRow={isLastSection && isLastRowInCatalog}
+          focusRef={lastItemRef}
+          isTVDevice={true}
           colors={currentTheme.colors}
+          prevItemNodeHandle={prevItemHandle}
+          tvPosterWidth={tvGridLayout.posterWidth}
         />
       );
     }
@@ -267,13 +369,59 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         item={item}
         onPress={handleContentPress}
         onItemFocus={handleSectionItemFocus}
-        isFirstInRow={isTVDevice ? isFirst : undefined}
-        isLastInRow={false} // Never last since View All is after
-        isLastRow={isTVDevice ? isLastSection : undefined}
-        focusRef={isTVDevice ? (isFirst ? firstItemRef : undefined) : undefined}
+        isFirstInRow={isFirstInRow}
+        isLastInRow={isLastInRow}
+        isLastRow={isLastSection && isLastRowInCatalog}
+        focusRef={flatIndex === 0 ? firstItemRef : undefined}
+        nextFocusLeftId={prevItemHandle}
+        onRegisterNodeHandle={(view) => registerItemNodeHandle(flatIndex, view)}
+        tvPosterWidth={tvGridLayout.posterWidth}
       />
     );
-  }, [handleContentPress, handleViewAllPress, handleSectionItemFocus, isTVDevice, dataWithViewAll.length, isLastSection, currentTheme.colors]);
+  }, [tvGridLayout.itemsPerRow, tvGridLayout.posterWidth, tvGridRows.length, dataWithViewAll.length, menuFirstItemNodeHandle, nodeHandlesReady, handleViewAllPress, handleSectionItemFocus, isLastSection, currentTheme.colors, handleContentPress, registerItemNodeHandle]);
+
+  // Mobile/tablet render function (unchanged behavior)
+  const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
+    const isFirst = index === 0;
+    const isLast = index === dataWithViewAll.length - 1;
+    const isViewAllItem = item.id === VIEW_ALL_ITEM_ID;
+
+    // Get previous item's node handle for left navigation constraint
+    // First item goes to menu, others go to previous item in row
+    const prevItemHandle = isFirst
+      ? menuFirstItemNodeHandle
+      : (nodeHandlesReady ? itemNodeHandles.current.get(index - 1) : undefined);
+
+    // Render "View All" card
+    if (isViewAllItem) {
+      return (
+        <ViewAllCard
+          onPress={handleViewAllPress}
+          onItemFocus={handleSectionItemFocus}
+          isLastInRow={true}
+          isLastRow={isLastSection}
+          focusRef={lastItemRef}
+          isTVDevice={false}
+          colors={currentTheme.colors}
+          prevItemNodeHandle={prevItemHandle}
+        />
+      );
+    }
+
+    return (
+      <ContentItem
+        item={item}
+        onPress={handleContentPress}
+        onItemFocus={handleSectionItemFocus}
+        isFirstInRow={isFirst}
+        isLastInRow={false} // Never last since View All is after
+        isLastRow={isLastSection}
+        focusRef={isFirst ? firstItemRef : undefined}
+        nextFocusLeftId={prevItemHandle}
+        onRegisterNodeHandle={(view) => registerItemNodeHandle(index, view)}
+      />
+    );
+  }, [handleContentPress, handleViewAllPress, handleSectionItemFocus, dataWithViewAll.length, isLastSection, currentTheme.colors, menuFirstItemNodeHandle, nodeHandlesReady, registerItemNodeHandle]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation (responsive spacing)
   const separatorWidth = isTVLayout ? 8 : isLargeTablet ? 10 : isTablet ? 8 : 8;
@@ -340,33 +488,70 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         </View>
       </View>
 
-      <FlatList
-        data={dataWithViewAll}
-        renderItem={renderContentItem}
-        keyExtractor={keyExtractor}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        scrollEventThrottle={16}
-        decelerationRate="fast"
-        scrollEnabled={!isTVDevice}
-        nestedScrollEnabled={!isTVDevice}
-        contentContainerStyle={StyleSheet.flatten([
-          styles.catalogList,
-          isTVLayout && styles.catalogListTV,
-          {
-            paddingHorizontal: isTVLayout ? 24 : isLargeTablet ? 28 : isTablet ? 24 : 16,
-            paddingRight: (isTVLayout ? 24 : isLargeTablet ? 28 : isTablet ? 24 : 16) - posterLayout.partialPosterWidth,
-          }
-        ])}
-        style={isTVDevice ? { overflow: 'visible' } : undefined}
-        ItemSeparatorComponent={ItemSeparator}
-        getItemLayout={getItemLayout}
-        removeClippedSubviews={!isTVDevice} // Disable on TV to prevent clipping focused items
-        initialNumToRender={isTVLayout ? 10 : isLargeTablet ? 5 : isTablet ? 4 : 3}
-        maxToRenderPerBatch={isTVLayout ? 5 : isLargeTablet ? 4 : 3}
-        windowSize={isTVLayout ? 5 : isLargeTablet ? 4 : 3}
-        updateCellsBatchingPeriod={50}
-      />
+      {isTVDevice ? (
+        // TV: Fixed 2-row grid layout - no scrolling, items have fixed positions
+        <View
+          style={[
+            styles.tvGridContainer,
+            {
+              paddingHorizontal: tvGridLayout.horizontalPadding,
+            }
+          ]}
+        >
+          {tvGridRows.map((row, rowIndex) => (
+            <View
+              key={`row-${rowIndex}`}
+              style={[
+                styles.tvGridRow,
+                {
+                  marginBottom: rowIndex < tvGridRows.length - 1 ? tvGridLayout.rowSpacing : 0,
+                }
+              ]}
+            >
+              {row.map((item, colIndex) => {
+                const flatIndex = rowIndex * tvGridLayout.itemsPerRow + colIndex;
+                return (
+                  <View
+                    key={keyExtractor(item)}
+                    style={{
+                      marginRight: colIndex < row.length - 1 ? tvGridLayout.itemSpacing : 0,
+                    }}
+                  >
+                    {renderTVGridItem(item, flatIndex, rowIndex, colIndex)}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      ) : (
+        // Mobile/Tablet: Horizontal scrolling list
+        <FlatList
+          data={dataWithViewAll}
+          renderItem={renderContentItem}
+          keyExtractor={keyExtractor}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          decelerationRate="fast"
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
+          contentContainerStyle={StyleSheet.flatten([
+            styles.catalogList,
+            {
+              paddingHorizontal: isLargeTablet ? 28 : isTablet ? 24 : 16,
+              paddingRight: (isLargeTablet ? 28 : isTablet ? 24 : 16) - posterLayout.partialPosterWidth,
+            }
+          ])}
+          ItemSeparatorComponent={ItemSeparator}
+          getItemLayout={getItemLayout}
+          removeClippedSubviews={true}
+          initialNumToRender={isLargeTablet ? 5 : isTablet ? 4 : 3}
+          maxToRenderPerBatch={isLargeTablet ? 4 : 3}
+          windowSize={isLargeTablet ? 4 : 3}
+          updateCellsBatchingPeriod={50}
+        />
+      )}
     </View>
   );
 };
@@ -379,6 +564,18 @@ const styles = StyleSheet.create({
   },
   catalogContainerTV: {
     marginBottom: 8, // Reduced margin for TV to fit more rows
+  },
+  tvGridContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    overflow: 'visible', // Allow focused items to scale beyond container
+    paddingVertical: 4,
+  },
+  tvGridRow: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'flex-start',
+    overflow: 'visible',
   },
   catalogHeader: {
     flexDirection: 'row',
@@ -420,9 +617,6 @@ const styles = StyleSheet.create({
     // padding will be applied responsively in JSX
     overflow: 'visible', // Allow focused items to scale beyond container
     paddingVertical: 8, // Extra vertical space for scaled items
-  },
-  catalogListTV: {
-    paddingVertical: 4, // Reduced vertical padding for TV
   },
 });
 

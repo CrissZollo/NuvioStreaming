@@ -31,6 +31,12 @@ interface ContentItemProps {
   isLastRow?: boolean;
   /** Ref to this item's view for focus navigation (TV only) */
   focusRef?: React.RefObject<View>;
+  /** Node handle for left focus navigation - used for first item to navigate to menu (TV only) */
+  nextFocusLeftId?: number | null;
+  /** Callback to register this item's node handle for sibling navigation (TV only) */
+  onRegisterNodeHandle?: (view: View | null) => void;
+  /** Override poster width (TV only - used for fixed grid layout) */
+  tvPosterWidth?: number;
 }
 
 const { width } = Dimensions.get('window');
@@ -93,11 +99,27 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0, onItemFocus, isFirstInRow, isLastInRow, isLastRow, focusRef }: ContentItemProps) => {
+const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0, onItemFocus, isFirstInRow, isLastInRow, isLastRow, focusRef, nextFocusLeftId, onRegisterNodeHandle, tvPosterWidth }: ContentItemProps) => {
   const isTVDevice = useIsTV();
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
   const [menuVisible, setMenuVisible] = useState(false);
+
+  // Internal ref for registering node handle
+  const internalViewRef = useRef<View>(null);
+  // Use provided focusRef or internal ref
+  const actualViewRef = focusRef || internalViewRef;
+
+  // Register node handle when component mounts (for sibling navigation)
+  useEffect(() => {
+    if (isTVDevice && onRegisterNodeHandle && actualViewRef.current) {
+      // Small delay to ensure the view is fully mounted
+      const timer = setTimeout(() => {
+        onRegisterNodeHandle(actualViewRef.current);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isTVDevice, onRegisterNodeHandle, actualViewRef]);
   const [isWatched, setIsWatched] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -161,6 +183,11 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
+    // If TV grid specifies a fixed width, use it
+    if (isTVDevice && tvPosterWidth) {
+      return tvPosterWidth;
+    }
+
     const deviceType = getDeviceType(width);
     // TV uses smaller posters (0.7x) to fit 2 rows on screen
     const sizeMultiplier = isTVDevice ? 0.7 : deviceType === 'largeTablet' ? 1.1 : deviceType === 'tablet' ? 1.0 : 0.9;
@@ -175,7 +202,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       default:
         return POSTER_WIDTH * sizeMultiplier;
     }
-  }, [settings.posterSize, width, isTVDevice]);
+  }, [settings.posterSize, width, isTVDevice, tvPosterWidth]);
 
   // Determine dimensions based on poster shape
   const { finalWidth, finalAspectRatio, borderRadius } = React.useMemo(() => {
@@ -406,11 +433,15 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             borderRadius={borderRadius}
             animateBackground={false}
             focusScale={1.08}
-            viewRef={focusRef}
-            // Constrain right navigation at row end (left is allowed to reach side menu)
+            viewRef={actualViewRef}
+            // Constrain right navigation at row end
             blockRight={isLastInRow}
             // Constrain down navigation on last row to prevent wrap-around
             blockDown={isLastRow}
+            // Use nextFocusLeftId for constrained left navigation:
+            // - First item: points to menu sidebar
+            // - Other items: points to previous item in row (passed from parent)
+            nextFocusLeftId={nextFocusLeftId}
           >
             {renderPosterContent()}
           </Focusable>
@@ -539,5 +570,8 @@ export default React.memo(ContentItem, (prev, next) => {
   if (prev.isFirstInRow !== next.isFirstInRow) return false;
   if (prev.isLastInRow !== next.isLastInRow) return false;
   if (prev.isLastRow !== next.isLastRow) return false;
+  if (prev.nextFocusLeftId !== next.nextFocusLeftId) return false;
+  if (prev.tvPosterWidth !== next.tvPosterWidth) return false;
+  // Note: onRegisterNodeHandle callback identity should remain stable
   return true;
 });
