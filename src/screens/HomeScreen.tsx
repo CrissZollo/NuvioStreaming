@@ -651,7 +651,9 @@ const HomeScreen = () => {
 
     catalogsToShow.forEach((catalog, index) => {
       if (catalog) {
-        data.push({ type: 'catalog', catalog, key: `${catalog.addon}-${catalog.id}-${index}` });
+        // Include addon, type, id, AND index to ensure uniqueness
+        // Some addons may have duplicate catalog IDs across different types
+        data.push({ type: 'catalog', catalog, key: `${catalog.addon}-${catalog.type}-${catalog.id}-${index}` });
       } else {
         // Add a key for placeholders
         data.push({ type: 'placeholder', key: `placeholder-${index}` });
@@ -803,62 +805,30 @@ const HomeScreen = () => {
     const prevIndex = lastFocusedIndexRef.current;
     lastFocusedIndexRef.current = index;
 
-    // Check if the focused index is within the "comfortable" visible range
-    // Only scroll if the item would be at the edges or outside the visible area
+    // Only scroll when moving to a different catalog (not within same visible area)
     const { first, last } = visibleRangeRef.current;
-    const isNearTop = index <= first + 1; // Within 1 row of top edge
-    const isNearBottom = index >= last - 1; // Within 1 row of bottom edge
-    const isOutsideRange = index < first || index > last;
+    const isVisible = index >= first && index <= last;
 
-    // Skip scroll if item is comfortably visible (not at edges)
-    if (!isNearTop && !isNearBottom && !isOutsideRange) {
+    // If item is already fully visible, don't scroll
+    if (isVisible && index > first && index < last) {
       return;
     }
 
-    // Clear any pending scroll to debounce rapid focus changes
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
+    // Instant scroll - position based on direction
+    try {
+      // When going down, put item at top (viewPosition 0)
+      // When going up, put item at bottom (viewPosition 1)
+      const isMovingDown = index > prevIndex;
+      flashListRef.current.scrollToIndex({
+        index,
+        animated: false,
+        viewPosition: isMovingDown ? 0 : 0.5,
+      });
+    } catch (e) {
+      // FlashList may throw if index is out of bounds during loading
+      if (__DEV__) console.warn('[HomeScreen] scrollToIndex failed:', e);
     }
-
-    // Skip if already scrolling to prevent race conditions
-    if (isTVScrollingRef.current) {
-      // Queue the scroll for after current one finishes
-      scrollTimeoutRef.current = setTimeout(() => {
-        handleCatalogFocus(index);
-      }, 50);
-      return;
-    }
-
-    isTVScrollingRef.current = true;
-
-    // Small delay to batch rapid focus changes (e.g., holding down key)
-    scrollTimeoutRef.current = setTimeout(() => {
-      try {
-        const latestListData = listDataRef.current;
-        // Double-check the ref and data are still valid
-        if (flashListRef.current && index < latestListData.length && latestListData[index]?.type !== 'placeholder') {
-          // Determine scroll position based on direction
-          // When going up, position item lower; when going down, position it higher
-          const isMovingDown = index > prevIndex;
-          const viewPosition = isMovingDown ? 0.2 : 0.3;
-
-          flashListRef.current.scrollToIndex({
-            index,
-            animated: true,
-            viewPosition,
-          });
-        }
-      } catch (e) {
-        // FlashList may throw if index is out of bounds during loading
-        if (__DEV__) console.warn('[HomeScreen] scrollToIndex failed:', e);
-      } finally {
-        // Reset scrolling flag after animation completes
-        setTimeout(() => {
-          isTVScrollingRef.current = false;
-        }, 200);
-      }
-    }, 16); // Single frame delay for batching
-  }, [isTVDevice]); // Removed listData dependency - using ref instead
+  }, [isTVDevice]);
 
   // Track visible items to optimize scroll decisions
   const handleViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
