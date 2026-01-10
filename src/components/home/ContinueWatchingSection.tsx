@@ -9,7 +9,6 @@ import {
   AppStateStatus,
   ActivityIndicator,
   Platform,
-  ScrollView,
   findNodeHandle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -128,14 +127,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
   // TV navigation
   const isTVDevice = useIsTV();
   const { menuFirstItemNodeHandle } = useTVFocus();
-  const tvScrollViewRef = useRef<ScrollView>(null);
   const tvItemViewRefs = useRef<React.RefObject<View>[]>([]);
   const [tvRefsReady, setTvRefsReady] = useState(false);
-  const [tvFocusedIndex, setTvFocusedIndex] = useState(0);
-
-  // Debounce for TV focus events to prevent jumping on fast navigation
-  const lastTVFocusTime = useRef<number>(0);
-  const TV_FOCUS_DEBOUNCE_MS = 80; // Minimum ms between focus events
 
   // Enhanced responsive sizing for tablets and TV screens
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
@@ -265,35 +258,39 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
   // For backwards compatibility
   const tvGridRows = tvGridInfo.rows;
 
+  // Cache for item node handles (like CatalogSection)
+  const itemNodeHandles = useRef<Map<number, number>>(new Map());
+  const [nodeHandlesReady, setNodeHandlesReady] = useState(false);
+
   // Initialize TV refs when items change
   useEffect(() => {
     if (isTVDevice && continueWatchingItems.length > 0) {
       tvItemViewRefs.current = continueWatchingItems.map(() => React.createRef<View>());
-      setTvRefsReady(false);
+      itemNodeHandles.current.clear();
+      setNodeHandlesReady(false);
       // Small delay to allow refs to be assigned before enabling directional focus
-      const timer = setTimeout(() => setTvRefsReady(true), 150);
+      const timer = setTimeout(() => {
+        setTvRefsReady(true);
+        setNodeHandlesReady(true);
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [isTVDevice, continueWatchingItems.length]);
 
-  // Handle TV focus - scroll to focused item
-  // Includes debounce to prevent jumping on fast navigation
-  const handleTVItemFocus = useCallback((index: number) => {
-    // Debounce rapid focus events to prevent scroll conflicts
-    const now = Date.now();
-    if (now - lastTVFocusTime.current < TV_FOCUS_DEBOUNCE_MS) {
-      return; // Skip this focus event - too soon after last one
+  // Callback to register item's node handle when it mounts (cached lookup)
+  const registerItemNodeHandle = useCallback((index: number, view: View | null) => {
+    if (view) {
+      const handle = findNodeHandle(view);
+      if (handle) {
+        itemNodeHandles.current.set(index, handle);
+      }
     }
-    lastTVFocusTime.current = now;
+  }, []);
 
-    setTvFocusedIndex(index);
-    if (tvScrollViewRef.current && isTVDevice) {
-      // Calculate scroll position to center the focused item
-      const itemTotalWidth = computedItemWidth + itemSpacing;
-      const scrollX = Math.max(0, index * itemTotalWidth - horizontalPadding);
-      tvScrollViewRef.current.scrollTo({ x: scrollX, y: 0, animated: true });
-    }
-  }, [isTVDevice, computedItemWidth, itemSpacing, horizontalPadding]);
+  // Handle TV focus - no scrolling needed for grid layout
+  const handleTVItemFocus = useCallback(() => {
+    // Grid doesn't scroll, so no scroll logic needed
+  }, []);
 
   // Alert state for CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
@@ -1390,15 +1387,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     const currentViewRef = isFirstItemOverall && firstItemRef ? firstItemRef : tvItemViewRefs.current[flatIndex];
 
     // Get previous item's node handle for left navigation (within same row)
-    // First item in row: goes to menu; others: go to previous item in same row
+    // First item in row: goes to menu; others: go to previous item in same row (cached lookup)
     let prevItemNodeHandle: number | null | undefined;
     if (isFirstInRow) {
       prevItemNodeHandle = menuFirstItemNodeHandle;
-    } else if (tvRefsReady) {
-      const prevRef = tvItemViewRefs.current[flatIndex - 1];
-      if (prevRef?.current) {
-        prevItemNodeHandle = findNodeHandle(prevRef.current);
-      }
+    } else if (nodeHandlesReady) {
+      prevItemNodeHandle = itemNodeHandles.current.get(flatIndex - 1);
     }
 
     const card = (
@@ -1495,11 +1489,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
 
     return (
       <Focusable
-        key={`tv-cw-${item.id}-${flatIndex}-${tvRefsReady ? 'ready' : 'init'}`}
+        key={`tv-cw-${item.id}-${flatIndex}`}
         viewRef={currentViewRef}
         onPress={() => handleContentPress(item)}
         onLongPress={() => handleLongPress(item)}
-        onFocus={() => handleTVItemFocus(flatIndex)}
+        onFocus={handleTVItemFocus}
+        onLayout={() => registerItemNodeHandle(flatIndex, currentViewRef?.current ?? null)}
         focusScale={1.03}
         borderRadius={10}
         showFocusBorder={true}
@@ -1517,7 +1512,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
   }, [
     tvGridLayout.itemsPerRow,
     tvGridRows.length,
-    tvRefsReady,
+    nodeHandlesReady,
     currentTheme.colors,
     computedItemWidth,
     computedItemHeight,
@@ -1529,6 +1524,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     firstItemRef,
     menuFirstItemNodeHandle,
     tvGridInfo.hasViewAll,
+    registerItemNodeHandle,
   ]);
 
   // View All card ref for TV focus navigation
@@ -1536,27 +1532,21 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
 
   // Render the View All card for TV grid
   const renderTVViewAllCard = useCallback((flatIndex: number, rowIndex: number, colIndex: number) => {
-    const totalRows = tvGridRows.length;
-    const currentRowLength = tvGridRows[rowIndex]?.length || 0;
-
     // Navigation constraints
     const isFirstInRow = colIndex === 0;
     const isFirstRow = rowIndex === 0;
 
-    // Get previous item's node handle for left navigation
+    // Get previous item's node handle for left navigation (cached lookup)
     let prevItemNodeHandle: number | null | undefined;
     if (isFirstInRow) {
       prevItemNodeHandle = menuFirstItemNodeHandle;
-    } else if (tvRefsReady) {
-      const prevRef = tvItemViewRefs.current[flatIndex - 1];
-      if (prevRef?.current) {
-        prevItemNodeHandle = findNodeHandle(prevRef.current);
-      }
+    } else if (nodeHandlesReady) {
+      prevItemNodeHandle = itemNodeHandles.current.get(flatIndex - 1);
     }
 
     return (
       <Focusable
-        key={`tv-cw-view-all-${tvRefsReady ? 'ready' : 'init'}`}
+        key={`tv-cw-view-all`}
         viewRef={viewAllCardRef}
         onPress={handleViewAllPress}
         focusScale={1.03}
@@ -1603,8 +1593,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
       </Focusable>
     );
   }, [
-    tvGridRows.length,
-    tvRefsReady,
+    nodeHandlesReady,
     menuFirstItemNodeHandle,
     handleViewAllPress,
     heroSectionRef,
