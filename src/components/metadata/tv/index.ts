@@ -6,8 +6,8 @@ export { TVMetadataTabBar } from './TVMetadataTabBar';
 export { TVMetadataTabContent } from './TVMetadataTabContent';
 export { TVEpisodesTabContent } from './TVEpisodesTabContent';
 export { TVRecommendationsTabContent } from './TVRecommendationsTabContent';
+export { TVCastTabContent } from './TVCastTabContent';
 export { TVTrailersTabContent } from './TVTrailersTabContent';
-export { TVDetailsTabContent } from './TVDetailsTabContent';
 
 export type { Tab } from './TVMetadataTabBar';
 export type { TVMetadataLayoutProps } from './TVMetadataLayout';

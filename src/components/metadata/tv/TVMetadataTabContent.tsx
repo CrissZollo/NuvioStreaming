@@ -7,8 +7,8 @@ import { StreamingContent } from '../../../services/catalogService';
 import { Episode } from '../../../types/metadata';
 import { TVEpisodesTabContent } from './TVEpisodesTabContent';
 import { TVRecommendationsTabContent } from './TVRecommendationsTabContent';
+import { TVCastTabContent } from './TVCastTabContent';
 import { TVTrailersTabContent } from './TVTrailersTabContent';
-import { TVDetailsTabContent } from './TVDetailsTabContent';
 
 interface TVMetadataTabContentProps {
   activeTab: string | null;
@@ -24,7 +24,6 @@ interface TVMetadataTabContentProps {
   recommendations: StreamingContent[];
   cast: any[];
   tmdbId: number | null;
-  imdbId: string | null;
   contentId: string;
   // Focus navigation
   firstContentItemRef: React.RefObject<View>;
@@ -43,7 +42,6 @@ const TVMetadataTabContentComponent: React.FC<TVMetadataTabContentProps> = ({
   recommendations,
   cast,
   tmdbId,
-  imdbId,
   contentId,
   firstContentItemRef,
   activeTabRef,
@@ -73,6 +71,15 @@ const TVMetadataTabContentComponent: React.FC<TVMetadataTabContentProps> = ({
           />
         );
 
+      case 'cast':
+        return (
+          <TVCastTabContent
+            cast={cast}
+            firstContentItemRef={firstContentItemRef}
+            activeTabRef={activeTabRef}
+          />
+        );
+
       case 'trailers':
         return (
           <TVTrailersTabContent
@@ -80,18 +87,6 @@ const TVMetadataTabContentComponent: React.FC<TVMetadataTabContentProps> = ({
             type={type === 'series' ? 'tv' : 'movie'}
             contentId={contentId}
             contentTitle={metadata.name}
-            firstContentItemRef={firstContentItemRef}
-            activeTabRef={activeTabRef}
-          />
-        );
-
-      case 'details':
-        return (
-          <TVDetailsTabContent
-            metadata={metadata}
-            type={type}
-            cast={cast}
-            imdbId={imdbId}
             firstContentItemRef={firstContentItemRef}
             activeTabRef={activeTabRef}
           />

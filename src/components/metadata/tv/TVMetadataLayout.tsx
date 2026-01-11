@@ -29,15 +29,15 @@ const TV_LAYOUT = {
 // Tab configurations
 const MOVIE_TABS: Tab[] = [
   { id: 'recommendations', label: 'More Like This' },
+  { id: 'cast', label: 'Cast' },
   { id: 'trailers', label: 'Trailers & More' },
-  { id: 'details', label: 'Details' },
 ];
 
 const SERIES_TABS: Tab[] = [
   { id: 'episodes', label: 'Episodes' },
   { id: 'recommendations', label: 'More Like This' },
+  { id: 'cast', label: 'Cast' },
   { id: 'trailers', label: 'Trailers & More' },
-  { id: 'details', label: 'Details' },
 ];
 
 export interface TVMetadataLayoutProps {
@@ -184,6 +184,8 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
               bannerImage={bannerImage}
               posterImage={metadata.poster}
               backgroundColor={backgroundColor}
+              metadata={metadata}
+              type={type}
             />
           </View>
         </Animated.View>
@@ -218,7 +220,6 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
               recommendations={recommendations}
               cast={cast}
               tmdbId={tmdbId}
-              imdbId={imdbId}
               contentId={contentId}
               firstContentItemRef={firstContentItemRef}
               activeTabRef={activeTabRef}
