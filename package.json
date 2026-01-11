@@ -74,6 +74,7 @@
     "react-native-gesture-handler": "^2.29.1",
     "react-native-get-random-values": "^2.0.0",
     "react-native-google-cast": "^4.9.1",
+    "react-native-http-bridge-refurbished": "^1.2.9",
     "react-native-image-colors": "^2.5.0",
     "react-native-immersive-mode": "^2.0.2",
     "react-native-markdown-display": "^7.0.2",

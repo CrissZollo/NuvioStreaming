@@ -72,6 +72,7 @@ import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsS
 import ContributorsScreen from '../screens/ContributorsScreen';
 import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
 import ContinueWatchingListScreen from '../screens/ContinueWatchingListScreen';
+import TVRestoreScreen from '../screens/TVRestoreScreen';
 
 // Optional Android immersive mode module
 let RNImmersiveMode: any = null;
@@ -201,6 +202,7 @@ export type RootStackParamList = {
   Contributors: undefined;
   DebridIntegration: undefined;
   ContinueWatchingList: undefined;
+  TVRestore: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -1567,6 +1569,20 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 presentation: 'card',
                 gestureEnabled: true,
                 gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="TVRestore"
+              component={TVRestoreScreen}
+              options={{
+                animation: 'fade',
+                animationDuration: 200,
+                presentation: 'card',
+                gestureEnabled: false,
                 headerShown: false,
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,

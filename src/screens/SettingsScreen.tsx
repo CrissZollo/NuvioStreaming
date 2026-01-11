@@ -1065,16 +1065,14 @@ const SettingsScreen: React.FC = () => {
         return (
           <SettingsCard title="BACKUP & RESTORE" isTablet={isTablet}>
             <SettingItem
-              title="Backup & Restore"
-              description="Create and restore app backups"
+              title={isTVDevice ? "Restore from Backup" : "Backup & Restore"}
+              description={isTVDevice ? "Upload backup file from phone to restore" : "Create and restore app backups"}
               icon="archive"
               renderControl={ChevronRight}
-              onPress={() => navigation.navigate('Backup')}
+              onPress={() => navigation.navigate(isTVDevice ? 'TVRestore' : 'Backup')}
               isLast={true}
               isTablet={isTablet}
               isTV={isTVDevice}
-              disabled={isTVDevice}
-              disabledMessage="Coming soon to TV"
             />
           </SettingsCard>
         );
