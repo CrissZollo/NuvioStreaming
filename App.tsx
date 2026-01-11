@@ -11,7 +11,8 @@ import {
   StyleSheet,
   I18nManager,
   Platform,
-  LogBox
+  LogBox,
+  BackHandler,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -52,6 +53,7 @@ import { mmkvStorage } from './src/services/mmkvStorage';
 import AnnouncementOverlay from './src/components/AnnouncementOverlay';
 import { CampaignManager } from './src/components/promotions/CampaignManager';
 import { isAndroidTV } from './src/utils/tvDetection';
+import ExitConfirmationPopup from './src/components/ExitConfirmationPopup';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -99,6 +101,7 @@ const ThemedApp = () => {
   const [isAppReady, setIsAppReady] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [showExitConfirmation, setShowExitConfirmation] = useState(false);
 
   // Update popup functionality
   const {
@@ -203,6 +206,25 @@ const ThemedApp = () => {
     await mmkvStorage.setItem('announcement_v1.0.0_shown', 'true');
   };
 
+  // Handle hardware back button for exit confirmation
+  useEffect(() => {
+    const onBackPress = () => {
+      // Check if we're at the root of navigation (can't go back further)
+      if (navigationRef.current && !navigationRef.current.canGoBack()) {
+        setShowExitConfirmation(true);
+        return true; // Prevent default back behavior
+      }
+      return false; // Let navigation handle it
+    };
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      onBackPress
+    );
+
+    return () => subscription.remove();
+  }, []);
+
   // Don't render anything until we know the onboarding status
   const shouldShowApp = isAppReady && hasCompletedOnboarding !== null;
   const initialRouteName = hasCompletedOnboarding ? 'MainTabs' : 'Onboarding';
@@ -255,6 +277,11 @@ const ThemedApp = () => {
                   actionButtonText="Connect Now"
                 />
                 <CampaignManager />
+                <ExitConfirmationPopup
+                  visible={showExitConfirmation}
+                  onConfirm={() => setShowExitConfirmation(false)}
+                  onCancel={() => setShowExitConfirmation(false)}
+                />
               </View>
             </DownloadsProvider>
           </NavigationContainer>
