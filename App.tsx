@@ -51,6 +51,7 @@ import { ToastProvider } from './src/contexts/ToastContext';
 import { mmkvStorage } from './src/services/mmkvStorage';
 import AnnouncementOverlay from './src/components/AnnouncementOverlay';
 import { CampaignManager } from './src/components/promotions/CampaignManager';
+import { isAndroidTV } from './src/utils/tvDetection';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -142,8 +143,9 @@ const ThemedApp = () => {
         console.log('AI service initialized');
 
         // Check if announcement should be shown (version 1.0.0)
+        // Skip announcement on TV devices
         const announcementShown = await mmkvStorage.getItem('announcement_v1.0.0_shown');
-        if (!announcementShown && onboardingCompleted === 'true') {
+        if (!announcementShown && onboardingCompleted === 'true' && !isAndroidTV()) {
           // Show announcement only after app is ready
           setTimeout(() => {
             setShowAnnouncement(true);
