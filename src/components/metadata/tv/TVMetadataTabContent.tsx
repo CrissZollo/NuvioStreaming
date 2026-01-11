@@ -1,0 +1,119 @@
+import React, { memo } from 'react';
+import {
+  View,
+  StyleSheet,
+} from 'react-native';
+import { StreamingContent } from '../../../services/catalogService';
+import { Episode } from '../../../types/metadata';
+import { TVEpisodesTabContent } from './TVEpisodesTabContent';
+import { TVRecommendationsTabContent } from './TVRecommendationsTabContent';
+import { TVTrailersTabContent } from './TVTrailersTabContent';
+import { TVDetailsTabContent } from './TVDetailsTabContent';
+
+interface TVMetadataTabContentProps {
+  activeTab: string | null;
+  metadata: StreamingContent;
+  type: 'movie' | 'series';
+  // Episodes
+  episodes: Episode[];
+  groupedEpisodes: { [season: number]: Episode[] };
+  selectedSeason: number;
+  onSeasonChange?: (season: number) => void;
+  onSelectEpisode?: (episode: Episode) => void;
+  // Other sections
+  recommendations: StreamingContent[];
+  cast: any[];
+  tmdbId: number | null;
+  imdbId: string | null;
+  contentId: string;
+  // Focus navigation
+  firstContentItemRef: React.RefObject<View>;
+  activeTabRef: React.RefObject<View>;
+}
+
+const TVMetadataTabContentComponent: React.FC<TVMetadataTabContentProps> = ({
+  activeTab,
+  metadata,
+  type,
+  episodes,
+  groupedEpisodes,
+  selectedSeason,
+  onSeasonChange,
+  onSelectEpisode,
+  recommendations,
+  cast,
+  tmdbId,
+  imdbId,
+  contentId,
+  firstContentItemRef,
+  activeTabRef,
+}) => {
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'episodes':
+        return (
+          <TVEpisodesTabContent
+            episodes={episodes}
+            groupedEpisodes={groupedEpisodes}
+            selectedSeason={selectedSeason}
+            onSeasonChange={onSeasonChange}
+            onSelectEpisode={onSelectEpisode}
+            metadata={metadata}
+            firstContentItemRef={firstContentItemRef}
+            activeTabRef={activeTabRef}
+          />
+        );
+
+      case 'recommendations':
+        return (
+          <TVRecommendationsTabContent
+            recommendations={recommendations}
+            firstContentItemRef={firstContentItemRef}
+            activeTabRef={activeTabRef}
+          />
+        );
+
+      case 'trailers':
+        return (
+          <TVTrailersTabContent
+            tmdbId={tmdbId}
+            type={type === 'series' ? 'tv' : 'movie'}
+            contentId={contentId}
+            contentTitle={metadata.name}
+            firstContentItemRef={firstContentItemRef}
+            activeTabRef={activeTabRef}
+          />
+        );
+
+      case 'details':
+        return (
+          <TVDetailsTabContent
+            metadata={metadata}
+            type={type}
+            cast={cast}
+            imdbId={imdbId}
+            firstContentItemRef={firstContentItemRef}
+            activeTabRef={activeTabRef}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      {renderContent()}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingTop: 12,
+  },
+});
+
+export const TVMetadataTabContent = memo(TVMetadataTabContentComponent);

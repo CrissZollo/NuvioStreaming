@@ -33,6 +33,7 @@ import { RatingsSection } from '../components/metadata/RatingsSection';
 import { CommentsSection, CommentBottomSheet } from '../components/metadata/CommentsSection';
 import TrailersSection from '../components/metadata/TrailersSection';
 import CollectionSection from '../components/metadata/CollectionSection';
+import { TVMetadataLayout } from '../components/metadata/tv';
 import { RouteParams, Episode } from '../types/metadata';
 import Animated, {
   useAnimatedStyle,
@@ -917,6 +918,54 @@ const MetadataScreen: React.FC = () => {
         ref={loadingScreenRef}
         type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
         onExitComplete={() => setLoadingScreenExited(true)}
+      />
+    );
+  }
+
+  // TV-optimized static layout with tabs (no vertical scrolling)
+  if (isTVDevice) {
+    const effectiveType = Object.keys(groupedEpisodes).length > 0 ? 'series' : 'movie';
+    return (
+      <TVMetadataLayout
+        metadata={metadata!}
+        type={effectiveType}
+        bannerImage={assetData.bannerImage}
+        logoUri={stableLogoUri}
+        handleShowStreams={handleShowStreams}
+        handleToggleLibrary={handleToggleLibrary}
+        inLibrary={inLibrary}
+        watchProgress={watchProgressData.watchProgress}
+        getPlayButtonText={watchProgressData.getPlayButtonText}
+        episodes={episodes}
+        groupedEpisodes={groupedEpisodes}
+        selectedSeason={selectedSeason}
+        onSeasonChange={handleSeasonChange}
+        onSelectEpisode={handleEpisodeSelect}
+        recommendations={recommendations}
+        cast={cast}
+        tmdbId={tmdbId}
+        imdbId={imdbId}
+        contentId={id}
+        navigation={navigation}
+        handleBack={handleBack}
+        isAuthenticated={isAuthenticated}
+        isInWatchlist={isInWatchlist(id, type as 'movie' | 'show')}
+        isInCollection={isInCollection(id, type as 'movie' | 'show')}
+        onToggleWatchlist={async () => {
+          if (isInWatchlist(id, type as 'movie' | 'show')) {
+            await removeFromWatchlist(id, type as 'movie' | 'show');
+          } else {
+            await addToWatchlist(id, type as 'movie' | 'show');
+          }
+        }}
+        onToggleCollection={async () => {
+          if (isInCollection(id, type as 'movie' | 'show')) {
+            await removeFromCollection(id, type as 'movie' | 'show');
+          } else {
+            await addToCollection(id, type as 'movie' | 'show');
+          }
+        }}
+        dynamicBackgroundColor={dynamicBackgroundColor}
       />
     );
   }
