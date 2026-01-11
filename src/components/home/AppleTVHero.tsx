@@ -707,24 +707,6 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     }
   }, [currentItem, navigation, setTrailerPlaying, watchProgress]);
 
-  // Handle fullscreen toggle
-  const handleFullscreenToggle = useCallback(async () => {
-    try {
-      logger.info('[AppleTVHero] Fullscreen button pressed');
-      if (trailerVideoRef.current) {
-        await trailerVideoRef.current.presentFullscreenPlayer();
-      }
-    } catch (error) {
-      logger.error('[AppleTVHero] Error toggling fullscreen:', error);
-    }
-  }, []);
-
-  // Handle mute toggle
-  const handleMuteToggle = useCallback(() => {
-    logger.info('[AppleTVHero] Mute toggle pressed, current:', trailerMuted);
-    updateSetting('trailerMuted', !trailerMuted);
-  }, [trailerMuted, updateSetting]);
-
   // Auto-advance timer - PAUSE when trailer is playing
   const startAutoPlay = useCallback(() => {
     if (autoPlayTimerRef.current) {
@@ -1069,7 +1051,6 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
                   style={StyleSheet.absoluteFillObject}
                   hideLoadingSpinner={true}
                   hideControls={true}
-                  onFullscreenToggle={handleFullscreenToggle}
                   onLoad={handleTrailerReady}
                   onError={handleTrailerError}
                   onEnd={handleTrailerEnd}
@@ -1112,62 +1093,6 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
           />
         </View>
 
-        {/* Trailer control buttons (unmute and fullscreen) */}
-        {settings?.showTrailers && trailerReady && trailerUrl && (
-          <Animated.View style={{
-            position: 'absolute',
-            top: (Platform.OS === 'android' ? 60 : 70) + insets.top,
-            right: 24,
-            zIndex: 1000,
-            opacity: trailerOpacity,
-            flexDirection: 'row',
-            gap: 8,
-          }}>
-            {/* Fullscreen button */}
-            <TouchableOpacity
-              onPress={(e) => {
-                e?.stopPropagation();
-                handleFullscreenToggle();
-              }}
-              activeOpacity={0.7}
-              onPressIn={(e) => e?.stopPropagation()}
-              onPressOut={(e) => e?.stopPropagation()}
-              style={{
-                padding: 8,
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                borderRadius: 20,
-              }}
-            >
-              <MaterialIcons
-                name="fullscreen"
-                size={24}
-                color="white"
-              />
-            </TouchableOpacity>
-
-            {/* Unmute button */}
-            <TouchableOpacity
-              onPress={(e) => {
-                e?.stopPropagation();
-                handleMuteToggle();
-              }}
-              activeOpacity={0.7}
-              onPressIn={(e) => e?.stopPropagation()}
-              onPressOut={(e) => e?.stopPropagation()}
-              style={{
-                padding: 8,
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                borderRadius: 20,
-              }}
-            >
-              <Entypo
-                name={trailerMuted ? 'sound-mute' : 'sound'}
-                size={24}
-                color="white"
-              />
-            </TouchableOpacity>
-          </Animated.View>
-        )}
 
         {/* Content Overlay */}
         <View style={[styles.contentContainer, { paddingBottom: 0 + insets.bottom }]}>

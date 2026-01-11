@@ -21,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTrailer } from '../../contexts/TrailerContext';
+import { useIsTV } from '../../contexts/TVContext';
 import { logger } from '../../utils/logger';
 
 const { width, height } = Dimensions.get('window');
@@ -63,6 +64,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
 }, ref) => {
   const { currentTheme } = useTheme();
   const { isTrailerPlaying: globalTrailerPlaying } = useTrailer();
+  const isTV = useIsTV();
   const videoRef = useRef<VideoRef>(null);
   
   const [isLoading, setIsLoading] = useState(true);
@@ -359,7 +361,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} pointerEvents={isTV ? 'none' : 'auto'}>
       <Video
         ref={videoRef}
         source={(() => {
@@ -410,7 +412,10 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         onLoad={handleLoad}
         onError={(error: any) => handleError(error)}
         onProgress={handleProgress}
-        controls={Platform.OS === 'android' ? isFullscreen : false}
+        controls={false}
+        // Disable TV focus and native controls for cinematic trailer playback
+        focusable={false}
+        disableFocus={isTV}
       />
 
       {/* Loading indicator - hidden during smooth transitions */}

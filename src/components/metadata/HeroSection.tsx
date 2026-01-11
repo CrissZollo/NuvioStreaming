@@ -1012,21 +1012,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     }
   }, [trailerReady, settings?.showTrailers, isFocused, globalTrailerPlaying, setTrailerPlaying, scrollY, heroHeight]);
 
-  // Handle fullscreen toggle
-  const handleFullscreenToggle = useCallback(async () => {
-    try {
-      logger.info('HeroSection', 'Fullscreen button pressed');
-      if (trailerVideoRef.current) {
-        // Use the native fullscreen player
-        await trailerVideoRef.current.presentFullscreenPlayer();
-      } else {
-        logger.warn('HeroSection', 'Trailer video ref not available');
-      }
-    } catch (error) {
-      logger.error('HeroSection', 'Error toggling fullscreen:', error);
-    }
-  }, []);
-
   // Handle trailer error - fade back to thumbnail
   const handleTrailerError = useCallback(() => {
     setTrailerError(true);
@@ -1657,7 +1642,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
               style={staticStyles.absoluteFill}
               hideLoadingSpinner={true}
               hideControls={true}
-              onFullscreenToggle={handleFullscreenToggle}
               onLoad={handleTrailerReady}
               onError={handleTrailerError}
               onEnd={handleTrailerEnd}
@@ -1670,8 +1654,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         </Animated.View>
       )}
 
-      {/* Trailer control buttons (unmute and fullscreen) */}
-      {settings?.showTrailers && trailerReady && trailerUrl && (
+      {/* AI Chat button (when trailers are showing) */}
+      {settings?.showTrailers && trailerReady && trailerUrl && settings?.aiChatEnabled && (
         <Animated.View style={{
           position: 'absolute',
           top: Platform.OS === 'android' ? 40 : 50,
@@ -1681,9 +1665,29 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           flexDirection: 'row',
           gap: 8,
         }}>
-          {/* Fullscreen button */}
           <TouchableOpacity
-            onPress={handleFullscreenToggle}
+            onPress={() => {
+              // Extract episode info if it's a series
+              let episodeData = null;
+              if (type === 'series' && watchProgress && watchProgress.episodeId) {
+                const parts = watchProgress.episodeId.split(':');
+                if (parts.length >= 3) {
+                  episodeData = {
+                    seasonNumber: parseInt(parts[1], 10),
+                    episodeNumber: parseInt(parts[2], 10)
+                  };
+                }
+              }
+
+              navigation.navigate('AIChat', {
+                contentId: id,
+                contentType: type,
+                episodeId: episodeData && watchProgress ? watchProgress.episodeId : undefined,
+                seasonNumber: episodeData?.seasonNumber,
+                episodeNumber: episodeData?.episodeNumber,
+                title: metadata?.name || metadata?.title || 'Unknown'
+              });
+            }}
             activeOpacity={0.7}
             onPressIn={(e) => e.stopPropagation()}
             onPressOut={(e) => e.stopPropagation()}
@@ -1694,88 +1698,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             }}
           >
             <MaterialIcons
-              name="fullscreen"
+              name="smart-toy"
               size={24}
               color="white"
             />
           </TouchableOpacity>
-
-          {/* Unmute button */}
-          <TouchableOpacity
-            onPress={() => {
-              logger.info('HeroSection', 'Mute toggle button pressed, current muted state:', trailerMuted);
-              updateSetting('trailerMuted', !trailerMuted);
-              if (trailerMuted) {
-                // When unmuting, hide action buttons, genre, title card, and watch progress
-                actionButtonsOpacity.value = withTiming(0, { duration: 300 });
-                genreOpacity.value = withTiming(0, { duration: 300 });
-                titleCardTranslateY.value = withTiming(100, { duration: 300 }); // Increased from 60 to 120 for further down movement
-                watchProgressOpacity.value = withTiming(0, { duration: 300 });
-              } else {
-                // When muting, show action buttons, genre, title card, and watch progress
-                actionButtonsOpacity.value = withTiming(1, { duration: 300 });
-                genreOpacity.value = withTiming(1, { duration: 300 });
-                titleCardTranslateY.value = withTiming(0, { duration: 300 });
-                watchProgressOpacity.value = withTiming(1, { duration: 300 });
-              }
-            }}
-            activeOpacity={0.7}
-            onPressIn={(e) => e.stopPropagation()}
-            onPressOut={(e) => e.stopPropagation()}
-            style={{
-              padding: 8,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              borderRadius: 20,
-            }}
-          >
-            <Entypo
-              name={trailerMuted ? 'sound-mute' : 'sound'}
-              size={24}
-              color="white"
-            />
-          </TouchableOpacity>
-
-          {/* AI Chat button */}
-          {settings?.aiChatEnabled && (
-            <TouchableOpacity
-              onPress={() => {
-                // Extract episode info if it's a series
-                let episodeData = null;
-                if (type === 'series' && watchProgress && watchProgress.episodeId) {
-                  const parts = watchProgress.episodeId.split(':');
-                  if (parts.length >= 3) {
-                    episodeData = {
-                      seasonNumber: parseInt(parts[1], 10),
-                      episodeNumber: parseInt(parts[2], 10)
-                    };
-                  }
-                }
-
-                navigation.navigate('AIChat', {
-                  contentId: id,
-                  contentType: type,
-                  episodeId: episodeData && watchProgress ? watchProgress.episodeId : undefined,
-                  seasonNumber: episodeData?.seasonNumber,
-                  episodeNumber: episodeData?.episodeNumber,
-                  title: metadata?.name || metadata?.title || 'Unknown'
-                });
-              }}
-              activeOpacity={0.7}
-              onPressIn={(e) => e.stopPropagation()}
-              onPressOut={(e) => e.stopPropagation()}
-              style={{
-                padding: 8,
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                borderRadius: 20,
-              }}
-            >
-              <MaterialIcons
-                name="smart-toy"
-                size={24}
-                color="white"
-              />
-            </TouchableOpacity>
-          )}
         </Animated.View>
       )}
 

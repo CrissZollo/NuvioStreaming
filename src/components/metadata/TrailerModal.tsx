@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTrailer } from '../../contexts/TrailerContext';
+import { useIsTV } from '../../contexts/TVContext';
 import { logger } from '../../utils/logger';
 import TrailerService from '../../services/trailerService';
 import Video, { VideoRef, OnLoadData, OnProgressData } from 'react-native-video';
@@ -63,6 +64,7 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
 }) => {
   const { currentTheme } = useTheme();
   const { pauseTrailer, resumeTrailer } = useTrailer();
+  const isTV = useIsTV();
   const videoRef = React.useRef<VideoRef>(null);
   const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -195,6 +197,68 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
   const modalHeight = isTablet ? height * 0.8 : height * 0.7;
   const modalWidth = isTablet ? width * 0.8 : width * 0.95;
 
+  // TV: Fullscreen cinematic view without modal UI
+  if (isTV) {
+    return (
+      <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleClose}
+        supportedOrientations={['landscape']}
+      >
+        <View style={styles.tvFullscreen}>
+          {loading && (
+            <View style={styles.tvLoadingContainer}>
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          )}
+
+          {error && !loading && (
+            <View style={styles.tvErrorContainer}>
+              <Text style={styles.tvErrorText}>{error}</Text>
+            </View>
+          )}
+
+          {trailerUrl && !error && (
+            <Video
+              ref={videoRef}
+              source={{ uri: trailerUrl }}
+              style={styles.tvPlayer}
+              controls={false}
+              paused={!isPlaying}
+              resizeMode="contain"
+              volume={1.0}
+              rate={1.0}
+              playInBackground={false}
+              playWhenInactive={false}
+              ignoreSilentSwitch="ignore"
+              focusable={false}
+              disableFocus={true}
+              onLoad={(data: OnLoadData) => {
+                logger.info('TrailerModal', 'TV Trailer loaded successfully', data);
+                setLoading(false);
+                setError(null);
+                setIsPlaying(true);
+              }}
+              onError={handleVideoError}
+              onEnd={() => {
+                logger.info('TrailerModal', 'TV Trailer ended');
+                handleTrailerEnd();
+                handleClose();
+              }}
+              onLoadStart={() => {
+                logger.info('TrailerModal', 'TV Video load started');
+                setLoading(true);
+              }}
+            />
+          )}
+        </View>
+      </Modal>
+    );
+  }
+
+  // Mobile/Tablet: Original modal UI
   return (
     <Modal
       visible={visible}
@@ -461,6 +525,35 @@ const styles = StyleSheet.create({
     fontSize: 11,
     opacity: 0.6,
     fontWeight: '500',
+  },
+  // TV Fullscreen Cinematic Styles
+  tvFullscreen: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tvPlayer: {
+    width: '100%',
+    height: '100%',
+  },
+  tvLoadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  tvErrorContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  tvErrorText: {
+    color: '#fff',
+    fontSize: 18,
+    textAlign: 'center',
+    opacity: 0.8,
   },
 });
 
