@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,12 +35,10 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StackActions } from '@react-navigation/native';
 import CustomAlert from '../components/CustomAlert';
+import { useIsTV } from '../contexts/TVContext';
+import Focusable from '../components/tv/Focusable';
 
 const { width, height } = Dimensions.get('window');
-const isTablet = width >= 768;
-const numColumns = isTablet ? 4 : 3;
-const posterWidth = (width - 60 - (numColumns - 1) * 12) / numColumns;
-const posterHeight = posterWidth * 1.5;
 
 interface CastMovie {
   id: number;
@@ -63,6 +61,17 @@ const CastMoviesScreen: React.FC = () => {
   const route = useRoute<CastMoviesScreenRouteProp>();
   const { castMember } = route.params;
   const { top: safeAreaTop } = useSafeAreaInsets();
+  const isTV = useIsTV();
+  const flatListRef = useRef<FlatList>(null);
+  const backButtonRef = useRef<View>(null);
+
+  // TV: 6 columns, Tablet: 4 columns, Phone: 3 columns
+  const isTablet = width >= 768;
+  const numColumns = isTV ? 6 : (isTablet ? 4 : 3);
+  const horizontalPadding = isTV ? 40 : 20;
+  const itemSpacing = isTV ? 10 : 12;
+  const posterWidth = (width - (horizontalPadding * 2) - (numColumns - 1) * itemSpacing) / numColumns;
+  const posterHeight = posterWidth * 1.5;
 
   const [movies, setMovies] = useState<CastMovie[]>([]);
   const [loading, setLoading] = useState(true);
@@ -278,32 +287,54 @@ const CastMoviesScreen: React.FC = () => {
 
   const renderFilterButton = (filter: 'all' | 'movies' | 'tv', label: string, count: number) => {
     const isSelected = selectedFilter === filter;
-    
+
+    const buttonContent = (
+      <View
+        style={{
+          paddingHorizontal: isTV ? 24 : 18,
+          paddingVertical: isTV ? 14 : 10,
+          borderRadius: 25,
+          backgroundColor: isSelected
+            ? currentTheme.colors.primary
+            : 'rgba(255, 255, 255, 0.08)',
+          marginRight: 12,
+          borderWidth: isSelected ? 0 : 1,
+          borderColor: 'rgba(255, 255, 255, 0.12)',
+        }}
+      >
+        <Text style={{
+          color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.85)',
+          fontSize: isTV ? 16 : 13,
+          fontWeight: isSelected ? '700' : '600',
+          letterSpacing: 0.3,
+        }}>
+          {count > 0 ? `${label} (${count})` : label}
+        </Text>
+      </View>
+    );
+
+    if (isTV) {
+      return (
+        <Animated.View entering={FadeIn.delay(100)}>
+          <Focusable
+            onPress={() => setSelectedFilter(filter)}
+            borderRadius={25}
+            focusScale={1.1}
+            showFocusBorder={true}
+          >
+            {buttonContent}
+          </Focusable>
+        </Animated.View>
+      );
+    }
+
     return (
       <Animated.View entering={FadeIn.delay(100)}>
         <TouchableOpacity
-          style={{
-            paddingHorizontal: 18,
-            paddingVertical: 10,
-            borderRadius: 25,
-            backgroundColor: isSelected 
-              ? currentTheme.colors.primary 
-              : 'rgba(255, 255, 255, 0.08)',
-            marginRight: 12,
-            borderWidth: isSelected ? 0 : 1,
-            borderColor: 'rgba(255, 255, 255, 0.12)',
-          }}
           onPress={() => setSelectedFilter(filter)}
           activeOpacity={0.8}
         >
-          <Text style={{
-            color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.85)',
-            fontSize: 13,
-            fontWeight: isSelected ? '700' : '600',
-            letterSpacing: 0.3,
-          }}>
-            {count > 0 ? `${label} (${count})` : label}
-          </Text>
+          {buttonContent}
         </TouchableOpacity>
       </Animated.View>
     );
@@ -311,77 +342,96 @@ const CastMoviesScreen: React.FC = () => {
 
   const renderSortButton = (sort: 'popularity' | 'latest' | 'upcoming', label: string, icon: string) => {
     const isSelected = sortBy === sort;
-    
+
+    const buttonContent = (
+      <View
+        style={{
+          paddingHorizontal: isTV ? 20 : 16,
+          paddingVertical: isTV ? 12 : 8,
+          borderRadius: 20,
+          backgroundColor: isSelected
+            ? 'rgba(255, 255, 255, 0.15)'
+            : 'transparent',
+          marginRight: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}
+      >
+        <MaterialIcons
+          name={icon as any}
+          size={isTV ? 20 : 16}
+          color={isSelected ? currentTheme.colors.primary : 'rgba(255, 255, 255, 0.6)'}
+          style={{ marginRight: 6 }}
+        />
+        <Text style={{
+          color: isSelected ? currentTheme.colors.primary : 'rgba(255, 255, 255, 0.8)',
+          fontSize: isTV ? 15 : 12,
+          fontWeight: isSelected ? '700' : '500',
+          letterSpacing: 0.2,
+        }}>
+          {label}
+        </Text>
+      </View>
+    );
+
+    if (isTV) {
+      return (
+        <Animated.View entering={FadeIn.delay(200)}>
+          <Focusable
+            onPress={() => setSortBy(sort)}
+            borderRadius={20}
+            focusScale={1.1}
+            showFocusBorder={true}
+          >
+            {buttonContent}
+          </Focusable>
+        </Animated.View>
+      );
+    }
+
     return (
       <Animated.View entering={FadeIn.delay(200)}>
         <TouchableOpacity
-          style={{
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 20,
-            backgroundColor: isSelected 
-              ? 'rgba(255, 255, 255, 0.15)' 
-              : 'transparent',
-            marginRight: 12,
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
           onPress={() => setSortBy(sort)}
           activeOpacity={0.7}
         >
-          <MaterialIcons 
-            name={icon as any} 
-            size={16} 
-            color={isSelected ? currentTheme.colors.primary : 'rgba(255, 255, 255, 0.6)'} 
-            style={{ marginRight: 6 }}
-          />
-          <Text style={{
-            color: isSelected ? currentTheme.colors.primary : 'rgba(255, 255, 255, 0.8)',
-            fontSize: 12,
-            fontWeight: isSelected ? '700' : '500',
-            letterSpacing: 0.2,
-          }}>
-            {label}
-          </Text>
+          {buttonContent}
         </TouchableOpacity>
       </Animated.View>
     );
   };
 
-  const renderMovieItem = useCallback(({ item, index }: { item: CastMovie; index: number }) => (
-    <Animated.View
-      entering={FadeIn.delay(Math.min(index * 30, 500)).springify()}
-      style={{
-        width: posterWidth,
-        marginBottom: 20,
-        marginRight: (index + 1) % numColumns === 0 ? 0 : 12,
-      }}
-    >
-      <TouchableOpacity
-        onPress={() => handleMoviePress(item)}
-        activeOpacity={0.85}
-        style={{
-          shadowColor: '#000',
-          shadowOffset: {
-            width: 0,
-            height: 4,
-          },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          elevation: 8,
-        }}
-      >
+  // Handle focus to auto-scroll item into view
+  const handleItemFocus = useCallback((index: number) => {
+    if (isTV && flatListRef.current) {
+      flatListRef.current.scrollToIndex({
+        index: Math.floor(index / numColumns),
+        animated: true,
+        viewPosition: 0.3,
+      });
+    }
+  }, [isTV, numColumns]);
+
+  const renderMovieItem = useCallback(({ item, index }: { item: CastMovie; index: number }) => {
+    const isFirstItem = index === 0;
+    const posterBorderRadius = isTV ? 8 : 16;
+    const titleFontSize = isTV ? 11 : 13;
+    const characterFontSize = isTV ? 9 : 11;
+    const yearFontSize = isTV ? 8 : 10;
+
+    const posterContent = (
+      <>
         <View style={{
           width: posterWidth,
           height: posterHeight,
-          borderRadius: 16,
+          borderRadius: posterBorderRadius,
           overflow: 'hidden',
           backgroundColor: 'rgba(255, 255, 255, 0.05)',
         }}>
           {item.poster_path ? (
             <FastImage
               source={{
-                uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
+                uri: `https://image.tmdb.org/t/p/w342${item.poster_path}`,
               }}
               style={{ width: '100%', height: '100%' }}
               resizeMode={FastImage.resizeMode.cover}
@@ -394,29 +444,29 @@ const CastMoviesScreen: React.FC = () => {
               justifyContent: 'center',
               backgroundColor: 'rgba(255, 255, 255, 0.05)',
             }}>
-              <MaterialIcons name="movie" size={32} color="rgba(255, 255, 255, 0.2)" />
+              <MaterialIcons name="movie" size={isTV ? 24 : 32} color="rgba(255, 255, 255, 0.2)" />
             </View>
           )}
-          
+
           {/* Upcoming indicator */}
           {item.isUpcoming ? (
             <View style={{
               position: 'absolute',
-              top: 8,
-              left: 8,
+              top: isTV ? 4 : 8,
+              left: isTV ? 4 : 8,
               backgroundColor: 'rgba(255, 193, 7, 0.95)',
-              borderRadius: 12,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
+              borderRadius: isTV ? 8 : 12,
+              paddingHorizontal: isTV ? 4 : 8,
+              paddingVertical: isTV ? 2 : 4,
               flexDirection: 'row',
               alignItems: 'center',
             }}>
-              <MaterialIcons name="schedule" size={12} color="#000" />
+              <MaterialIcons name="schedule" size={isTV ? 8 : 12} color="#000" />
               <Text style={{
                 color: '#000',
-                fontSize: 9,
+                fontSize: isTV ? 6 : 9,
                 fontWeight: '700',
-                marginLeft: 4,
+                marginLeft: isTV ? 2 : 4,
                 letterSpacing: 0.2,
               }}>
                 UPCOMING
@@ -428,21 +478,21 @@ const CastMoviesScreen: React.FC = () => {
           {item.vote_average && item.vote_average > 0 ? (
             <View style={{
               position: 'absolute',
-              bottom: 8,
-              right: 8,
+              bottom: isTV ? 4 : 8,
+              right: isTV ? 4 : 8,
               backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              borderRadius: 8,
-              paddingHorizontal: 6,
-              paddingVertical: 2,
+              borderRadius: isTV ? 4 : 8,
+              paddingHorizontal: isTV ? 4 : 6,
+              paddingVertical: isTV ? 1 : 2,
               flexDirection: 'row',
               alignItems: 'center',
             }}>
-              <MaterialIcons name="star" size={10} color="#FFC107" />
+              <MaterialIcons name="star" size={isTV ? 8 : 10} color="#FFC107" />
               <Text style={{
                 color: '#fff',
-                fontSize: 9,
+                fontSize: isTV ? 7 : 9,
                 fontWeight: '600',
-                marginLeft: 2,
+                marginLeft: isTV ? 1 : 2,
               }}>
                 {item.vote_average.toFixed(1)}
               </Text>
@@ -457,72 +507,200 @@ const CastMoviesScreen: React.FC = () => {
               bottom: 0,
               left: 0,
               right: 0,
-              height: 40,
+              height: isTV ? 20 : 40,
             }}
           />
         </View>
-        
-        <View style={{ paddingHorizontal: 4, marginTop: 8 }}>
-          <Text style={{
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: '700',
-            lineHeight: 16,
-            letterSpacing: 0.1,
-          }} numberOfLines={2}>
-            {item.title || 'Unknown Title'}
-          </Text>
-          
-          {item.character ? (
+
+        {!isTV && (
+          <View style={{ paddingHorizontal: 4, marginTop: 8 }}>
             <Text style={{
-              color: 'rgba(255, 255, 255, 0.65)',
-              fontSize: 11,
-              marginTop: 3,
-              fontWeight: '500',
-            }} numberOfLines={1}>
-              as {item.character}
+              color: '#fff',
+              fontSize: titleFontSize,
+              fontWeight: '700',
+              lineHeight: 16,
+              letterSpacing: 0.1,
+            }} numberOfLines={2}>
+              {item.title || 'Unknown Title'}
             </Text>
-          ) : null}
-          
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginTop: 4,
-            justifyContent: 'space-between',
-          }}>
-            {item.release_date ? (
+
+            {item.character ? (
               <Text style={{
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: 10,
-                fontWeight: '600',
-                letterSpacing: 0.3,
-              }}>
-                {new Date(item.release_date).getFullYear()}
+                color: 'rgba(255, 255, 255, 0.65)',
+                fontSize: characterFontSize,
+                marginTop: 3,
+                fontWeight: '500',
+              }} numberOfLines={1}>
+                as {item.character}
               </Text>
             ) : null}
-            
+
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: 4,
+              justifyContent: 'space-between',
+            }}>
+              {item.release_date ? (
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontSize: yearFontSize,
+                  fontWeight: '600',
+                  letterSpacing: 0.3,
+                }}>
+                  {new Date(item.release_date).getFullYear()}
+                </Text>
+              ) : null}
+
+              {item.isUpcoming ? (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}>
+                  <MaterialIcons name="schedule" size={10} color="rgba(255, 193, 7, 0.8)" />
+                  <Text style={{
+                    color: 'rgba(255, 193, 7, 0.8)',
+                    fontSize: 9,
+                    fontWeight: '600',
+                    marginLeft: 2,
+                    letterSpacing: 0.2,
+                  }}>
+                    Coming Soon
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        )}
+      </>
+    );
+
+    if (isTV) {
+      return (
+        <View
+          style={{
+            width: posterWidth,
+            marginBottom: 12,
+            marginRight: (index + 1) % numColumns === 0 ? 0 : itemSpacing,
+          }}
+        >
+          <Focusable
+            onPress={() => handleMoviePress(item)}
+            onFocus={() => handleItemFocus(index)}
+            autoFocus={isFirstItem}
+            borderRadius={posterBorderRadius}
+            focusScale={1.08}
+            showFocusBorder={true}
+            style={{
+              width: posterWidth,
+              height: posterHeight,
+              borderRadius: posterBorderRadius,
+              overflow: 'hidden',
+            }}
+          >
+            {item.poster_path ? (
+              <FastImage
+                source={{
+                  uri: `https://image.tmdb.org/t/p/w342${item.poster_path}`,
+                }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode={FastImage.resizeMode.cover}
+              />
+            ) : (
+              <View style={{
+                width: '100%',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              }}>
+                <MaterialIcons name="movie" size={24} color="rgba(255, 255, 255, 0.2)" />
+              </View>
+            )}
+
+            {/* Upcoming indicator */}
             {item.isUpcoming ? (
               <View style={{
+                position: 'absolute',
+                top: 4,
+                left: 4,
+                backgroundColor: 'rgba(255, 193, 7, 0.95)',
+                borderRadius: 8,
+                paddingHorizontal: 4,
+                paddingVertical: 2,
                 flexDirection: 'row',
                 alignItems: 'center',
               }}>
-                <MaterialIcons name="schedule" size={10} color="rgba(255, 193, 7, 0.8)" />
+                <MaterialIcons name="schedule" size={8} color="#000" />
                 <Text style={{
-                  color: 'rgba(255, 193, 7, 0.8)',
-                  fontSize: 9,
-                  fontWeight: '600',
+                  color: '#000',
+                  fontSize: 6,
+                  fontWeight: '700',
                   marginLeft: 2,
                   letterSpacing: 0.2,
                 }}>
-                  Coming Soon
+                  UPCOMING
                 </Text>
               </View>
             ) : null}
-          </View>
+
+            {/* Rating badge */}
+            {item.vote_average && item.vote_average > 0 ? (
+              <View style={{
+                position: 'absolute',
+                bottom: 6,
+                right: 6,
+                backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                borderRadius: 6,
+                paddingHorizontal: 6,
+                paddingVertical: 3,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}>
+                <MaterialIcons name="star" size={12} color="#FFC107" />
+                <Text style={{
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: '600',
+                  marginLeft: 2,
+                }}>
+                  {item.vote_average.toFixed(1)}
+                </Text>
+              </View>
+            ) : null}
+          </Focusable>
         </View>
-      </TouchableOpacity>
-    </Animated.View>
-  ), [posterWidth, posterHeight, handleMoviePress]);
+      );
+    }
+
+    return (
+      <Animated.View
+        entering={FadeIn.delay(Math.min(index * 30, 500)).springify()}
+        style={{
+          width: posterWidth,
+          marginBottom: 20,
+          marginRight: (index + 1) % numColumns === 0 ? 0 : itemSpacing,
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => handleMoviePress(item)}
+          activeOpacity={0.85}
+          style={{
+            shadowColor: '#000',
+            shadowOffset: {
+              width: 0,
+              height: 4,
+            },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+          }}
+        >
+          {posterContent}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }, [posterWidth, posterHeight, numColumns, itemSpacing, isTV, handleMoviePress, handleItemFocus]);
 
   const movieCount = movies.filter(m => m.media_type === 'movie').length;
   const tvCount = movies.filter(m => m.media_type === 'tv').length;
@@ -545,12 +723,12 @@ const CastMoviesScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
       {/* Minimal Header */}
-      <Animated.View 
+      <Animated.View
         style={[
           {
-            paddingTop: safeAreaTop + 16,
-            paddingHorizontal: 20,
-            paddingBottom: 20,
+            paddingTop: isTV ? 20 : safeAreaTop + 16,
+            paddingHorizontal: horizontalPadding,
+            paddingBottom: isTV ? 16 : 20,
             backgroundColor: currentTheme.colors.darkBackground,
             borderBottomWidth: 1,
             borderBottomColor: 'rgba(255, 255, 255, 0.05)',
@@ -558,25 +736,46 @@ const CastMoviesScreen: React.FC = () => {
           headerAnimatedStyle
         ]}
       >
-        <Animated.View 
+        <Animated.View
           entering={SlideInDown.delay(100)}
           style={{ flexDirection: 'row', alignItems: 'center' }}
         >
-          <TouchableOpacity
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: 16,
-            }}
-            onPress={handleBack}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons name="arrow-back" size={20} color="rgba(255, 255, 255, 0.9)" />
-          </TouchableOpacity>
+          {isTV ? (
+            <Focusable
+              onPress={handleBack}
+              viewRef={backButtonRef}
+              borderRadius={18}
+              focusScale={1.1}
+              showFocusBorder={true}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 16,
+              }}
+            >
+              <MaterialIcons name="arrow-back" size={20} color="rgba(255, 255, 255, 0.9)" />
+            </Focusable>
+          ) : (
+            <TouchableOpacity
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 16,
+              }}
+              onPress={handleBack}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="arrow-back" size={20} color="rgba(255, 255, 255, 0.9)" />
+            </TouchableOpacity>
+          )}
           
           <View style={{
             width: 44,
@@ -636,26 +835,26 @@ const CastMoviesScreen: React.FC = () => {
 
       {/* Filters and Sort */}
       <View style={{
-        paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingHorizontal: horizontalPadding,
+        paddingVertical: isTV ? 8 : 12,
         backgroundColor: currentTheme.colors.darkBackground,
       }}>
         {/* Filter Section */}
-        <View style={{ marginBottom: 12 }}>
+        <View style={{ marginBottom: isTV ? 8 : 12 }}>
           <Text style={{
             color: 'rgba(255, 255, 255, 0.7)',
-            fontSize: 12,
+            fontSize: isTV ? 14 : 12,
             fontWeight: '600',
-            marginBottom: 8,
+            marginBottom: isTV ? 10 : 8,
             letterSpacing: 0.5,
             textTransform: 'uppercase',
           }}>
             Filter
           </Text>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingRight: 20 }}
+            contentContainerStyle={{ paddingRight: horizontalPadding }}
           >
             {renderFilterButton('all', 'All', movies.length)}
             {renderFilterButton('movies', 'Movies', movieCount)}
@@ -667,18 +866,18 @@ const CastMoviesScreen: React.FC = () => {
         <View>
           <Text style={{
             color: 'rgba(255, 255, 255, 0.7)',
-            fontSize: 12,
+            fontSize: isTV ? 14 : 12,
             fontWeight: '600',
-            marginBottom: 8,
+            marginBottom: isTV ? 10 : 8,
             letterSpacing: 0.5,
             textTransform: 'uppercase',
           }}>
             Sort By
           </Text>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingRight: 20 }}
+            contentContainerStyle={{ paddingRight: horizontalPadding }}
           >
             {renderSortButton('popularity', 'Popular', 'trending-up')}
             {renderSortButton('latest', 'Latest', 'schedule')}
@@ -706,15 +905,16 @@ const CastMoviesScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
+          ref={flatListRef}
           data={displayedMovies}
           renderItem={renderMovieItem}
           keyExtractor={(item) => `${item.media_type}-${item.id}`}
           numColumns={numColumns}
-
+          key={numColumns}
           contentContainerStyle={{
-            paddingHorizontal: 20,
-            paddingTop: 8,
-            paddingBottom: Platform.OS === 'ios' ? 120 : 100,
+            paddingHorizontal: horizontalPadding,
+            paddingTop: isTV ? 16 : 8,
+            paddingBottom: isTV ? 40 : (Platform.OS === 'ios' ? 120 : 100),
           }}
           onScroll={(event) => {
             scrollY.value = event.nativeEvent.contentOffset.y;
@@ -724,9 +924,20 @@ const CastMoviesScreen: React.FC = () => {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.8}
           removeClippedSubviews={false}
-          initialNumToRender={30}
-          maxToRenderPerBatch={20}
-          windowSize={7}
+          initialNumToRender={isTV ? 48 : 30}
+          maxToRenderPerBatch={isTV ? 32 : 20}
+          windowSize={isTV ? 5 : 7}
+          onScrollToIndexFailed={(info) => {
+            // Handle scroll to index failure gracefully
+            setTimeout(() => {
+              if (flatListRef.current && displayedMovies.length > 0) {
+                flatListRef.current.scrollToIndex({
+                  index: Math.min(info.index, displayedMovies.length - 1),
+                  animated: true,
+                });
+              }
+            }, 100);
+          }}
           ListFooterComponent={
             displayLimit < filteredAndSortedMovies.length ? (
               <View style={{
@@ -735,6 +946,32 @@ const CastMoviesScreen: React.FC = () => {
               }}>
                 {isLoadingMore ? (
                   <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+                ) : isTV ? (
+                  <Focusable
+                    onPress={handleLoadMore}
+                    borderRadius={20}
+                    focusScale={1.1}
+                    showFocusBorder={true}
+                  >
+                    <View
+                      style={{
+                        paddingHorizontal: 24,
+                        paddingVertical: 12,
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                      }}
+                    >
+                      <Text style={{
+                        color: 'rgba(255, 255, 255, 0.8)',
+                        fontSize: 16,
+                        fontWeight: '600',
+                      }}>
+                        {`Load More (${filteredAndSortedMovies.length - displayLimit} remaining)`}
+                      </Text>
+                    </View>
+                  </Focusable>
                 ) : (
                   <TouchableOpacity
                     style={{
