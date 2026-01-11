@@ -399,7 +399,7 @@ const CastMoviesScreen: React.FC = () => {
           )}
           
           {/* Upcoming indicator */}
-          {item.isUpcoming && (
+          {item.isUpcoming ? (
             <View style={{
               position: 'absolute',
               top: 8,
@@ -422,12 +422,10 @@ const CastMoviesScreen: React.FC = () => {
                 UPCOMING
               </Text>
             </View>
-          )}
-
-
+          ) : null}
 
           {/* Rating badge */}
-          {item.vote_average && item.vote_average > 0 && (
+          {item.vote_average && item.vote_average > 0 ? (
             <View style={{
               position: 'absolute',
               bottom: 8,
@@ -446,10 +444,10 @@ const CastMoviesScreen: React.FC = () => {
                 fontWeight: '600',
                 marginLeft: 2,
               }}>
-                {`${item.vote_average.toFixed(1)}`}
+                {item.vote_average.toFixed(1)}
               </Text>
             </View>
-          )}
+          ) : null}
 
           {/* Gradient overlay for better text readability */}
           <LinearGradient
@@ -472,19 +470,19 @@ const CastMoviesScreen: React.FC = () => {
             lineHeight: 16,
             letterSpacing: 0.1,
           }} numberOfLines={2}>
-            {`${item.title}`}
+            {item.title || 'Unknown Title'}
           </Text>
           
-          {item.character && (
+          {item.character ? (
             <Text style={{
               color: 'rgba(255, 255, 255, 0.65)',
               fontSize: 11,
               marginTop: 3,
               fontWeight: '500',
             }} numberOfLines={1}>
-              {`as ${item.character}`}
+              as {item.character}
             </Text>
-          )}
+          ) : null}
           
           <View style={{
             flexDirection: 'row',
@@ -492,18 +490,18 @@ const CastMoviesScreen: React.FC = () => {
             marginTop: 4,
             justifyContent: 'space-between',
           }}>
-            {item.release_date && (
+            {item.release_date ? (
               <Text style={{
                 color: 'rgba(255, 255, 255, 0.5)',
                 fontSize: 10,
                 fontWeight: '600',
                 letterSpacing: 0.3,
               }}>
-                {`${new Date(item.release_date).getFullYear()}`}
+                {new Date(item.release_date).getFullYear()}
               </Text>
-            )}
+            ) : null}
             
-            {item.isUpcoming && (
+            {item.isUpcoming ? (
               <View style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -519,7 +517,7 @@ const CastMoviesScreen: React.FC = () => {
                   Coming Soon
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
       </TouchableOpacity>
@@ -622,7 +620,7 @@ const CastMoviesScreen: React.FC = () => {
               letterSpacing: 0.3,
               marginBottom: 2,
             }} numberOfLines={1}>
-              {`${castMember?.name}`}
+              {castMember?.name || 'Unknown'}
             </Text>
             <Text style={{
               color: 'rgba(255, 255, 255, 0.6)',

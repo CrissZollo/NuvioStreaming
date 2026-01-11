@@ -7,6 +7,8 @@ import {
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackActions } from '@react-navigation/native';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { Focusable } from '../../tv/Focusable';
 
@@ -27,6 +29,7 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
   activeTabRef,
 }) => {
   const { currentTheme } = useTheme();
+  const navigation = useNavigation();
   const flatListRef = useRef<FlatList<any>>(null);
 
   // Cast item refs
@@ -50,6 +53,20 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
     }
   }, []);
 
+  // Handle cast member press - navigate to filmography
+  const handleCastPress = useCallback((castMember: any) => {
+    navigation.dispatch(
+      StackActions.push('CastMovies', {
+        castMember: {
+          id: castMember.id,
+          name: castMember.name,
+          profile_path: castMember.profile_path,
+          character: castMember.character,
+        },
+      })
+    );
+  }, [navigation]);
+
   // Render cast card
   const renderCastCard = useCallback(({ item, index }: { item: any; index: number }) => {
     const isFirst = index === 0;
@@ -62,7 +79,7 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
       <View style={[styles.castCardWrapper, { marginRight: CAST_SPACING }]}>
         <Focusable
           viewRef={isFirst ? firstContentItemRef : getCastRef(index)}
-          onPress={() => {}}
+          onPress={() => handleCastPress(item)}
           onFocus={() => handleCastFocus(index)}
           style={styles.castCard}
           borderRadius={6}
@@ -103,7 +120,7 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
         </Text>
       </View>
     );
-  }, [cast.length, currentTheme.colors, firstContentItemRef, activeTabRef, getCastRef, handleCastFocus]);
+  }, [cast.length, currentTheme.colors, firstContentItemRef, activeTabRef, getCastRef, handleCastFocus, handleCastPress]);
 
   // Key extractor
   const keyExtractor = useCallback((item: any) => item.id.toString(), []);
