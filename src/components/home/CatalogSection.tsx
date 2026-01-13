@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useMemo, memo, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useMemo, memo, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList, findNodeHandle } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useIsTV } from '../../contexts/TVContext';
 import { Focusable } from '../tv/Focusable';
 import { useTVFocus } from '../../contexts/TVFocusContext';
+import { focusLog } from '../../utils/focusPerformanceLogger';
 
 interface CatalogSectionProps {
   catalog: CatalogContent;
@@ -19,6 +20,12 @@ interface CatalogSectionProps {
   isFirstSection?: boolean;
   /** Whether this is the last catalog section (TV only - constrains down navigation) */
   isLastSection?: boolean;
+  /** Node handle of first item in PREVIOUS section (for explicit UP navigation - bypasses native search) */
+  prevSectionFirstItemHandle?: number | null;
+  /** Node handle of first item in NEXT section (for explicit DOWN navigation - bypasses native search) */
+  nextSectionFirstItemHandle?: number | null;
+  /** Callback to report this section's first item's node handle (TV only) */
+  onFirstItemHandleReady?: (handle: number | null) => void;
 }
 
 const { width } = Dimensions.get('window');
@@ -119,6 +126,10 @@ interface ViewAllCardProps {
   prevItemNodeHandle?: number | null;
   /** Override poster width (TV only - used for fixed grid layout) */
   tvPosterWidth?: number;
+  /** Explicit UP navigation handle (bypasses native focus search) */
+  nextFocusUpId?: number | null;
+  /** Explicit DOWN navigation handle (bypasses native focus search) */
+  nextFocusDownId?: number | null;
 }
 
 const ViewAllCard = memo<ViewAllCardProps>(({
@@ -131,6 +142,8 @@ const ViewAllCard = memo<ViewAllCardProps>(({
   colors,
   prevItemNodeHandle,
   tvPosterWidth,
+  nextFocusUpId,
+  nextFocusDownId,
 }) => {
   // Calculate poster dimensions - use tvPosterWidth if provided, otherwise calculate
   const posterWidth = (isTVDevice && tvPosterWidth) ? tvPosterWidth : calculateContentItemPosterWidth(width, isTVDevice);
@@ -181,6 +194,8 @@ const ViewAllCard = memo<ViewAllCardProps>(({
           blockRight={isLastInRow}
           blockDown={isLastRow}
           nextFocusLeftId={prevItemNodeHandle}
+          nextFocusUpId={nextFocusUpId}
+          nextFocusDownId={nextFocusDownId}
         >
           {cardContent}
         </Focusable>
@@ -230,11 +245,11 @@ const calculateTVGridLayout = (screenWidth: number) => {
   };
 };
 
-const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection }: CatalogSectionProps) => {
+const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection, prevSectionFirstItemHandle, nextSectionFirstItemHandle, onFirstItemHandleReady }: CatalogSectionProps) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const isTVDevice = useIsTV();
-  const { setLastFocusedRowView, menuFirstItemNodeHandle } = useTVFocus();
+  const { setLastFocusedRowView, getMenuFirstItemNodeHandle } = useTVFocus();
 
   // Use isTVDevice for TV-specific styling (more reliable than screen width detection)
   const isTVLayout = isTVDevice || isTV;
@@ -246,19 +261,35 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
   const firstItemRef = useRef<View>(null);
   const lastItemRef = useRef<View>(null);
 
+  // Track this section's first item node handle for vertical navigation
+  const firstItemNodeHandleRef = useRef<number | null>(null);
+
   // Track node handles for all items to constrain left navigation within the row
-  // Key: item index, Value: node handle
+  // Key: flat item index, Value: node handle
+  // Also used for within-section vertical navigation via flat index calculation
   const itemNodeHandles = useRef<Map<number, number>>(new Map());
-  const [nodeHandlesReady, setNodeHandlesReady] = useState(false);
+
+  // Force re-render when all items have registered their handles (TV only)
+  // This ensures row 0 items can see row 1 handles for downward navigation
+  const [handlesReady, setHandlesReady] = useState(false);
+  const expectedItemCount = useRef(0);
 
   // Reset node handles when catalog items change
   useEffect(() => {
     itemNodeHandles.current.clear();
-    setNodeHandlesReady(false);
-    // Set ready after a short delay to allow refs to register
-    const timer = setTimeout(() => setNodeHandlesReady(true), 200);
-    return () => clearTimeout(timer);
+    firstItemNodeHandleRef.current = null;
+    setHandlesReady(false);
   }, [catalog.items.length]);
+
+  // Report first item handle when it's registered
+  // Always call the callback even if handle hasn't changed - HomeScreen handles deduplication
+  // This ensures handles are propagated even after FlashList recycling or re-renders
+  const reportFirstItemHandle = useCallback((handle: number | null) => {
+    if (handle) {
+      firstItemNodeHandleRef.current = handle;
+      onFirstItemHandleReady?.(handle);
+    }
+  }, [onFirstItemHandleReady]);
 
   // Callback to register item's node handle when it mounts
   const registerItemNodeHandle = useCallback((index: number, view: View | null) => {
@@ -266,18 +297,38 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
       const handle = findNodeHandle(view);
       if (handle) {
         itemNodeHandles.current.set(index, handle);
+
+        // Report first item handle for vertical navigation
+        if (index === 0) {
+          reportFirstItemHandle(handle);
+        }
+
+        // When all items have registered, trigger re-render so row 0 items
+        // can get row 1 handles for downward navigation (TV only)
+        if (isTVDevice && !handlesReady && itemNodeHandles.current.size >= expectedItemCount.current) {
+          setHandlesReady(true);
+        }
       }
     }
-  }, []);
+  }, [reportFirstItemHandle, isTVDevice, handlesReady]);
 
   // When any item in this section gets focus, update the last focused row
   // so pressing right from menu returns to this row's first item
   const handleSectionItemFocus = useCallback(() => {
+    const startTime = focusLog.start(`CatalogSection[${catalog.name}].handleSectionItemFocus`);
+
     if (isTVDevice && firstItemRef.current) {
+      focusLog.mark('setLastFocusedRowView START');
       setLastFocusedRowView(firstItemRef.current);
+      focusLog.mark('setLastFocusedRowView END');
     }
+
+    focusLog.mark('onSectionFocus callback START');
     onSectionFocus?.();
-  }, [isTVDevice, setLastFocusedRowView, onSectionFocus]);
+    focusLog.mark('onSectionFocus callback END');
+
+    focusLog.end(`CatalogSection[${catalog.name}].handleSectionItemFocus`, startTime);
+  }, [isTVDevice, setLastFocusedRowView, onSectionFocus, catalog.name]);
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
@@ -306,7 +357,10 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
       const totalSlots = tvGridLayout.itemsPerRow * tvGridLayout.rowCount;
       const maxItems = totalSlots - 1; // Reserve last slot for View All
       const limitedItems = catalog.items.slice(0, maxItems);
-      return [...limitedItems, viewAllItem];
+      const result = [...limitedItems, viewAllItem];
+      // Set expected item count for handle registration (excludes ViewAll card)
+      expectedItemCount.current = limitedItems.length;
+      return result;
     }
 
     return [...catalog.items, viewAllItem];
@@ -342,9 +396,50 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
     // First item in row: goes to menu; others: go to previous item in same row
     let prevItemHandle: number | null | undefined;
     if (isFirstInRow) {
-      prevItemHandle = menuFirstItemNodeHandle;
-    } else if (nodeHandlesReady) {
+      prevItemHandle = getMenuFirstItemNodeHandle();
+    } else {
       prevItemHandle = itemNodeHandles.current.get(flatIndex - 1);
+    }
+
+    // Explicit vertical navigation handles (bypass native focus search)
+    // For within-section navigation:
+    //   - Row 0 DOWN → Row 1 (same column)
+    //   - Row 1 UP → Row 0 (same column)
+    // For between-section navigation:
+    //   - Row 0 UP → Previous section's first item
+    //   - Last row DOWN → Next section's first item
+    //
+    // Note: We use flat index calculation for within-section navigation:
+    //   - Item at (row, col) has flatIndex = row * itemsPerRow + col
+    //   - Item below at (row+1, col) has flatIndex = (row+1) * itemsPerRow + col
+    let upHandle: number | null | undefined;
+    let downHandle: number | null | undefined;
+
+    if (isFirstRow) {
+      // First row: UP goes to previous section
+      upHandle = prevSectionFirstItemHandle;
+      // First row: DOWN goes to same column in row 1 (within section)
+      // Calculate target flat index: next row, same column
+      const targetFlatIndex = (rowIndex + 1) * itemsPerRow + colIndex;
+      if (targetFlatIndex < dataWithViewAll.length) {
+        downHandle = itemNodeHandles.current.get(targetFlatIndex) || undefined;
+      }
+    } else {
+      // Row 1 (or later): UP goes to same column in previous row (within section)
+      // Calculate target flat index: previous row, same column
+      const targetFlatIndex = (rowIndex - 1) * itemsPerRow + colIndex;
+      upHandle = itemNodeHandles.current.get(targetFlatIndex) || undefined;
+
+      if (isLastRowInCatalog) {
+        // Last row: DOWN goes to next section
+        downHandle = nextSectionFirstItemHandle;
+      } else {
+        // Not last row: DOWN goes to same column in next row (within section)
+        const targetFlatIndex = (rowIndex + 1) * itemsPerRow + colIndex;
+        if (targetFlatIndex < dataWithViewAll.length) {
+          downHandle = itemNodeHandles.current.get(targetFlatIndex) || undefined;
+        }
+      }
     }
 
     // Render "View All" card
@@ -360,6 +455,8 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
           colors={currentTheme.colors}
           prevItemNodeHandle={prevItemHandle}
           tvPosterWidth={tvGridLayout.posterWidth}
+          nextFocusUpId={upHandle}
+          nextFocusDownId={downHandle}
         />
       );
     }
@@ -374,11 +471,13 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         isLastRow={isLastSection && isLastRowInCatalog}
         focusRef={flatIndex === 0 ? firstItemRef : undefined}
         nextFocusLeftId={prevItemHandle}
+        nextFocusUpId={upHandle}
+        nextFocusDownId={downHandle}
         onRegisterNodeHandle={(view) => registerItemNodeHandle(flatIndex, view)}
         tvPosterWidth={tvGridLayout.posterWidth}
       />
     );
-  }, [tvGridLayout.itemsPerRow, tvGridLayout.posterWidth, tvGridRows.length, dataWithViewAll.length, menuFirstItemNodeHandle, nodeHandlesReady, handleViewAllPress, handleSectionItemFocus, isLastSection, currentTheme.colors, handleContentPress, registerItemNodeHandle]);
+  }, [tvGridLayout.itemsPerRow, tvGridLayout.posterWidth, tvGridRows.length, dataWithViewAll.length, getMenuFirstItemNodeHandle, handleViewAllPress, handleSectionItemFocus, isLastSection, currentTheme.colors, handleContentPress, registerItemNodeHandle, prevSectionFirstItemHandle, nextSectionFirstItemHandle, handlesReady]);
 
   // Mobile/tablet render function (unchanged behavior)
   const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {
@@ -389,8 +488,8 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
     // Get previous item's node handle for left navigation constraint
     // First item goes to menu, others go to previous item in row
     const prevItemHandle = isFirst
-      ? menuFirstItemNodeHandle
-      : (nodeHandlesReady ? itemNodeHandles.current.get(index - 1) : undefined);
+      ? getMenuFirstItemNodeHandle()
+      : itemNodeHandles.current.get(index - 1);
 
     // Render "View All" card
     if (isViewAllItem) {
@@ -421,7 +520,7 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         onRegisterNodeHandle={(view) => registerItemNodeHandle(index, view)}
       />
     );
-  }, [handleContentPress, handleViewAllPress, handleSectionItemFocus, dataWithViewAll.length, isLastSection, currentTheme.colors, menuFirstItemNodeHandle, nodeHandlesReady, registerItemNodeHandle]);
+  }, [handleContentPress, handleViewAllPress, handleSectionItemFocus, dataWithViewAll.length, isLastSection, currentTheme.colors, getMenuFirstItemNodeHandle, registerItemNodeHandle]);
 
   // Memoize the ItemSeparatorComponent to prevent re-creation (responsive spacing)
   const separatorWidth = isTVLayout ? 8 : isLargeTablet ? 10 : isTablet ? 8 : 8;
@@ -629,6 +728,9 @@ export default React.memo(CatalogSection, (prevProps, nextProps) => {
     prevProps.catalog.items.length === nextProps.catalog.items.length &&
     prevProps.isFirstSection === nextProps.isFirstSection &&
     prevProps.isLastSection === nextProps.isLastSection &&
+    // Vertical navigation handles - must re-render when these change
+    prevProps.prevSectionFirstItemHandle === nextProps.prevSectionFirstItemHandle &&
+    prevProps.nextSectionFirstItemHandle === nextProps.nextSectionFirstItemHandle &&
     // Deep compare the first few items to detect changes
     prevProps.catalog.items.slice(0, 3).every((item, index) =>
       nextProps.catalog.items[index] &&

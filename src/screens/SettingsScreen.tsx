@@ -44,6 +44,7 @@ import { campaignService } from '../services/campaignService';
 import { Focusable } from '../components/tv/Focusable';
 import { useIsTV } from '../contexts/TVContext';
 import QRCode from 'react-native-qrcode-svg';
+import { SpatialNavTest } from '../components/tv/SpatialNavTest';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -409,6 +410,7 @@ const SettingsScreen: React.FC = () => {
   const [totalDownloads, setTotalDownloads] = useState<number | null>(null);
   const [displayDownloads, setDisplayDownloads] = useState<number | null>(null);
   const [isCountingUp, setIsCountingUp] = useState<boolean>(false);
+  const [showSpatialNavTest, setShowSpatialNavTest] = useState<boolean>(false);
 
   // Add a useEffect to check Trakt authentication status on focus
   useEffect(() => {
@@ -1017,6 +1019,18 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
               isTV={isTVDevice}
             />
+            {isTVDevice && (
+              <SettingItem
+                title="Test Spatial Navigation"
+                description={showSpatialNavTest ? "Hide test component" : "Test react-tv-space-navigation library"}
+                icon="navigation"
+                onPress={() => setShowSpatialNavTest(!showSpatialNavTest)}
+                renderControl={ChevronRight}
+                isTablet={isTablet}
+                isTV={isTVDevice}
+              />
+            )}
+            {showSpatialNavTest && isTVDevice && <SpatialNavTest />}
             <SettingItem
               title="Clear All Data"
               icon="trash-2"

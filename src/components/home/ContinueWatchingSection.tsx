@@ -126,7 +126,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
 
   // TV navigation
   const isTVDevice = useIsTV();
-  const { menuFirstItemNodeHandle } = useTVFocus();
+  const { getMenuFirstItemNodeHandle } = useTVFocus();
   const tvItemViewRefs = useRef<React.RefObject<View>[]>([]);
   const [tvRefsReady, setTvRefsReady] = useState(false);
 
@@ -260,18 +260,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
 
   // Cache for item node handles (like CatalogSection)
   const itemNodeHandles = useRef<Map<number, number>>(new Map());
-  const [nodeHandlesReady, setNodeHandlesReady] = useState(false);
 
   // Initialize TV refs when items change
   useEffect(() => {
     if (isTVDevice && continueWatchingItems.length > 0) {
       tvItemViewRefs.current = continueWatchingItems.map(() => React.createRef<View>());
       itemNodeHandles.current.clear();
-      setNodeHandlesReady(false);
       // Small delay to allow refs to be assigned before enabling directional focus
       const timer = setTimeout(() => {
         setTvRefsReady(true);
-        setNodeHandlesReady(true);
       }, 150);
       return () => clearTimeout(timer);
     }
@@ -1389,8 +1386,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     // First item in row: goes to menu; others: go to previous item in same row (cached lookup)
     let prevItemNodeHandle: number | null | undefined;
     if (isFirstInRow) {
-      prevItemNodeHandle = menuFirstItemNodeHandle;
-    } else if (nodeHandlesReady) {
+      prevItemNodeHandle = getMenuFirstItemNodeHandle();
+    } else {
       prevItemNodeHandle = itemNodeHandles.current.get(flatIndex - 1);
     }
 
@@ -1511,7 +1508,6 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
   }, [
     tvGridLayout.itemsPerRow,
     tvGridRows.length,
-    nodeHandlesReady,
     currentTheme.colors,
     computedItemWidth,
     computedItemHeight,
@@ -1521,7 +1517,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     handleTVItemFocus,
     heroSectionRef,
     firstItemRef,
-    menuFirstItemNodeHandle,
+    getMenuFirstItemNodeHandle,
     tvGridInfo.hasViewAll,
     registerItemNodeHandle,
   ]);
@@ -1538,8 +1534,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     // Get previous item's node handle for left navigation (cached lookup)
     let prevItemNodeHandle: number | null | undefined;
     if (isFirstInRow) {
-      prevItemNodeHandle = menuFirstItemNodeHandle;
-    } else if (nodeHandlesReady) {
+      prevItemNodeHandle = getMenuFirstItemNodeHandle();
+    } else {
       prevItemNodeHandle = itemNodeHandles.current.get(flatIndex - 1);
     }
 
@@ -1592,8 +1588,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
       </Focusable>
     );
   }, [
-    nodeHandlesReady,
-    menuFirstItemNodeHandle,
+    getMenuFirstItemNodeHandle,
     handleViewAllPress,
     heroSectionRef,
     currentTheme.colors,

@@ -140,10 +140,17 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
         clearTimeout(blurTimeoutRef.current);
         blurTimeoutRef.current = null;
       }
+
+      const wasAlreadyFocused = focusedItemRef.current !== null;
       focusedItemRef.current = index;
-      setRailHasFocus(true);
-      setIsExpanded(true);
-      onRailFocus?.();
+
+      // Only update state if not already in focused/expanded state
+      // This prevents re-renders when moving between items within the rail
+      if (!wasAlreadyFocused) {
+        setRailHasFocus(true);
+        setIsExpanded(true);
+        onRailFocus?.();
+      }
     },
     [onRailFocus]
   );

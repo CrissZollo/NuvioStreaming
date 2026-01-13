@@ -1,4 +1,4 @@
-import React, { forwardRef, useRef, useImperativeHandle, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { forwardRef, useRef, useImperativeHandle, useState, useCallback, useEffect } from 'react';
 import {
   TouchableOpacity,
   Pressable,
@@ -13,8 +13,10 @@ import Animated, {
   useSharedValue,
   interpolate,
   interpolateColor,
+  SharedValue,
 } from 'react-native-reanimated';
 import { useIsTV } from '../../contexts/TVContext';
+import { focusLog } from '../../utils/focusPerformanceLogger';
 
 // Focus colors - clean white outline style
 const TV_FOCUS_BORDER_COLOR = '#FFFFFF';
@@ -94,6 +96,8 @@ export interface FocusableRef {
   isFocused: () => boolean;
   /** The underlying View ref for directional focus navigation */
   getViewRef: () => React.RefObject<View>;
+  /** SharedValue for children to use in useAnimatedStyle (0 = unfocused, 1 = focused) */
+  focusProgress: SharedValue<number>;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -156,9 +160,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     const focusProgress = useSharedValue(0);
     // Track if autoFocus has been consumed (only apply once on mount)
     const autoFocusConsumed = useRef(false);
-    const [shouldAutoFocus, setShouldAutoFocus] = useState(autoFocus);
-    // Store own node handle for block* props - use state to trigger re-render
-    const [selfNodeHandle, setSelfNodeHandle] = useState<number | null>(null);
+    // Compute shouldAutoFocus directly to avoid state re-render
+    const shouldAutoFocus = autoFocus && !autoFocusConsumed.current;
+    // Store own node handle for block* props - use ref to avoid re-renders
+    const selfNodeHandleRef = useRef<number | null>(null);
 
     // Ref callback to capture node handle synchronously when view mounts
     const refCallback = useCallback((node: View | null) => {
@@ -174,20 +179,15 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       if (node) {
         const handle = findNodeHandle(node);
         if (handle) {
-          setSelfNodeHandle(handle);
+          selfNodeHandleRef.current = handle;
         }
       }
     }, [viewRef]);
 
-    // Only apply autoFocus once on mount
+    // Mark autoFocus as consumed after first render to prevent re-application
     useEffect(() => {
       if (autoFocus && !autoFocusConsumed.current) {
         autoFocusConsumed.current = true;
-        // Clear the autoFocus after a short delay to prevent it from re-grabbing focus
-        const timer = setTimeout(() => {
-          setShouldAutoFocus(false);
-        }, 500);
-        return () => clearTimeout(timer);
       }
     }, [autoFocus]);
 
@@ -199,24 +199,52 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     };
 
     const handleFocus = useCallback(() => {
+      const startTime = focusLog.start('Focusable.handleFocus');
+
       isFocusedRef.current = true;
+      focusLog.mark('ref updated');
+
       // Only update state if we have a render prop that needs it
       if (needsFocusState) {
+        focusLog.mark('setState(true) START');
         setIsFocusedState(true);
+        focusLog.mark('setState(true) END');
       }
+
       // Use fast timing instead of spring for better performance
+      focusLog.mark('animation START');
       focusProgress.value = withTiming(1, { duration: 100 });
+      focusLog.mark('animation END');
+
+      focusLog.mark('onFocus callback START');
       onFocus?.();
+      focusLog.mark('onFocus callback END');
+
+      focusLog.end('Focusable.handleFocus', startTime);
     }, [onFocus, focusProgress, needsFocusState]);
 
     const handleBlur = useCallback(() => {
+      const startTime = focusLog.start('Focusable.handleBlur');
+
       isFocusedRef.current = false;
+      focusLog.mark('ref updated');
+
       // Only update state if we have a render prop that needs it
       if (needsFocusState) {
+        focusLog.mark('setState(false) START');
         setIsFocusedState(false);
+        focusLog.mark('setState(false) END');
       }
+
+      focusLog.mark('animation START');
       focusProgress.value = withTiming(0, { duration: 150 });
+      focusLog.mark('animation END');
+
+      focusLog.mark('onBlur callback START');
       onBlur?.();
+      focusLog.mark('onBlur callback END');
+
+      focusLog.end('Focusable.handleBlur', startTime);
     }, [onBlur, focusProgress, needsFocusState]);
 
     // Expose focus methods via ref
@@ -242,6 +270,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       },
       isFocused: () => isFocusedRef.current,
       getViewRef: () => actualRef,
+      focusProgress,
     }));
 
     // Animated styles for focus effect - simplified for performance
@@ -322,10 +351,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
 
     // Add directional focus if refs or IDs are provided
     // Priority: block > direct ID > ref
-    const upHandle = blockUp ? selfNodeHandle : (nextFocusUpId ?? getNodeHandle(nextFocusUp));
-    const downHandle = blockDown ? selfNodeHandle : (nextFocusDownId ?? getNodeHandle(nextFocusDown));
-    const leftHandle = blockLeft ? selfNodeHandle : (nextFocusLeftId ?? getNodeHandle(nextFocusLeft));
-    const rightHandle = blockRight ? selfNodeHandle : (nextFocusRightId ?? getNodeHandle(nextFocusRight));
+    const upHandle = blockUp ? selfNodeHandleRef.current : (nextFocusUpId ?? getNodeHandle(nextFocusUp));
+    const downHandle = blockDown ? selfNodeHandleRef.current : (nextFocusDownId ?? getNodeHandle(nextFocusDown));
+    const leftHandle = blockLeft ? selfNodeHandleRef.current : (nextFocusLeftId ?? getNodeHandle(nextFocusLeft));
+    const rightHandle = blockRight ? selfNodeHandleRef.current : (nextFocusRightId ?? getNodeHandle(nextFocusRight));
 
     if (upHandle) tvProps.nextFocusUp = upHandle;
     if (downHandle) tvProps.nextFocusDown = downHandle;

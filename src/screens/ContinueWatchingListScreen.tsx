@@ -127,7 +127,7 @@ const ContinueWatchingListScreen = () => {
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
   const isTVDevice = useIsTV();
-  const { menuFirstItemNodeHandle } = useTVFocus();
+  const { getMenuFirstItemNodeHandle } = useTVFocus();
 
   const [items, setItems] = useState<ContinueWatchingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -543,7 +543,7 @@ const ContinueWatchingListScreen = () => {
 
       let prevItemHandle: number | undefined;
       if (isFirstInRow) {
-        prevItemHandle = menuFirstItemNodeHandle ?? undefined;
+        prevItemHandle = getMenuFirstItemNodeHandle() ?? undefined;
       } else {
         prevItemHandle = itemNodeHandles.current.get(index - 1);
       }
@@ -586,7 +586,7 @@ const ContinueWatchingListScreen = () => {
     handleContentPress,
     handleLongPress,
     registerItemRef,
-    menuFirstItemNodeHandle,
+    getMenuFirstItemNodeHandle,
   ]);
 
   const styles = useMemo(() => createStyles(currentTheme.colors), [currentTheme.colors]);
@@ -625,7 +625,7 @@ const ContinueWatchingListScreen = () => {
             focusScale={1.05}
             borderRadius={8}
             showFocusBorder={true}
-            nextFocusLeftId={menuFirstItemNodeHandle ?? undefined}
+            nextFocusLeftId={getMenuFirstItemNodeHandle() ?? undefined}
           >
             {backButton}
           </Focusable>

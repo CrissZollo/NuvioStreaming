@@ -188,7 +188,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
   const { settings } = useSettings();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isTVDevice = useIsTV();
-  const { menuFirstItemNodeHandle } = useTVFocus();
+  const { getMenuFirstItemNodeHandle } = useTVFocus();
 
   // Responsive sizing computed per-render so rotation updates layout
   const isTablet = useMemo(
@@ -271,7 +271,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
   // State only for text display below carousel - debounced to reduce re-renders
   const [tvDisplayIndex, setTvDisplayIndex] = useState(0);
   const [tvRefsReady, setTvRefsReady] = useState(false);
-  const [tvNodeHandlesReady, setTvNodeHandlesReady] = useState(false);
   // Shared value for TV focused index - cards read this in worklets to avoid re-renders
   const tvFocusedIndexShared = useSharedValue(0);
 
@@ -298,11 +297,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
     tvCardViewRefs.current = data.map(() => React.createRef<View>());
     tvItemNodeHandles.current.clear();
     setTvRefsReady(false);
-    setTvNodeHandlesReady(false);
     // Mark refs ready after a short delay to allow all Focusables to mount
     const timer = setTimeout(() => {
       setTvRefsReady(true);
-      setTvNodeHandlesReady(true);
     }, 150);
     return () => clearTimeout(timer);
   }, [data.length]);
@@ -764,17 +761,18 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
 
               // Use cached node handles for navigation (avoids findNodeHandle on every render)
               // First item: left goes to menu; others: go to previous item (cached handle)
+              const menuHandle = getMenuFirstItemNodeHandle();
               const leftNodeHandle = isFirstItem
-                ? menuFirstItemNodeHandle
-                : (tvNodeHandlesReady ? tvItemNodeHandles.current.get(prevIndex) : undefined);
+                ? menuHandle
+                : tvItemNodeHandles.current.get(prevIndex);
 
               // Last item: block right; others: go to next item (cached handle)
               const rightNodeHandle = isLastItem
                 ? undefined
-                : (tvNodeHandlesReady ? tvItemNodeHandles.current.get(nextIndex) : undefined);
+                : tvItemNodeHandles.current.get(nextIndex);
 
               // For first item: block left if menu handle not available yet
-              const shouldBlockLeft = isFirstItem && !menuFirstItemNodeHandle;
+              const shouldBlockLeft = isFirstItem && !menuHandle;
 
               return (
                 <TVHeroCardWrapper

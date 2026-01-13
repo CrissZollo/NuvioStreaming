@@ -33,6 +33,10 @@ interface ContentItemProps {
   focusRef?: React.RefObject<View>;
   /** Node handle for left focus navigation - used for first item to navigate to menu (TV only) */
   nextFocusLeftId?: number | null;
+  /** Node handle for up focus navigation - explicit vertical navigation (TV only) */
+  nextFocusUpId?: number | null;
+  /** Node handle for down focus navigation - explicit vertical navigation (TV only) */
+  nextFocusDownId?: number | null;
   /** Callback to register this item's node handle for sibling navigation (TV only) */
   onRegisterNodeHandle?: (view: View | null) => void;
   /** Override poster width (TV only - used for fixed grid layout) */
@@ -99,7 +103,7 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0, onItemFocus, isFirstInRow, isLastInRow, isLastRow, focusRef, nextFocusLeftId, onRegisterNodeHandle, tvPosterWidth }: ContentItemProps) => {
+const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0, onItemFocus, isFirstInRow, isLastInRow, isLastRow, focusRef, nextFocusLeftId, nextFocusUpId, nextFocusDownId, onRegisterNodeHandle, tvPosterWidth }: ContentItemProps) => {
   const isTVDevice = useIsTV();
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
@@ -112,14 +116,16 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
   // Register node handle when component mounts (for sibling navigation)
   useEffect(() => {
-    if (isTVDevice && onRegisterNodeHandle && actualViewRef.current) {
+    if (isTVDevice && onRegisterNodeHandle) {
       // Small delay to ensure the view is fully mounted
       const timer = setTimeout(() => {
-        onRegisterNodeHandle(actualViewRef.current);
+        if (actualViewRef.current) {
+          onRegisterNodeHandle(actualViewRef.current);
+        }
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isTVDevice, onRegisterNodeHandle, actualViewRef]);
+  }, [isTVDevice, onRegisterNodeHandle, actualViewRef, item.id, focusRef]);
   const [isWatched, setIsWatched] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -442,6 +448,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             // - First item: points to menu sidebar
             // - Other items: points to previous item in row (passed from parent)
             nextFocusLeftId={nextFocusLeftId}
+            // Explicit vertical navigation to bypass native focus search
+            nextFocusUpId={nextFocusUpId}
+            nextFocusDownId={nextFocusDownId}
           >
             {renderPosterContent()}
           </Focusable>
@@ -571,6 +580,8 @@ export default React.memo(ContentItem, (prev, next) => {
   if (prev.isLastInRow !== next.isLastInRow) return false;
   if (prev.isLastRow !== next.isLastRow) return false;
   if (prev.nextFocusLeftId !== next.nextFocusLeftId) return false;
+  if (prev.nextFocusUpId !== next.nextFocusUpId) return false;
+  if (prev.nextFocusDownId !== next.nextFocusDownId) return false;
   if (prev.tvPosterWidth !== next.tvPosterWidth) return false;
   // Note: onRegisterNodeHandle callback identity should remain stable
   return true;

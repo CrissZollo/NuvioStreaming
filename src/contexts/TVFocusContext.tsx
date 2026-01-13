@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useCallback, useState } from 'react';
+import React, { createContext, useContext, useRef, useCallback } from 'react';
 import { View, findNodeHandle } from 'react-native';
 
 interface TVFocusContextValue {
@@ -6,8 +6,8 @@ interface TVFocusContextValue {
   lastFocusedRowRef: React.MutableRefObject<View | null>;
   /** Set the first item ref of the currently focused row (pass the View directly) */
   setLastFocusedRowView: (view: View | null) => void;
-  /** The menu's first nav item node handle - used for navigating left from content to menu */
-  menuFirstItemNodeHandle: number | null;
+  /** Get the menu's first nav item node handle - used for navigating left from content to menu */
+  getMenuFirstItemNodeHandle: () => number | null;
   /** Set the menu's first nav item (pass the View, we'll get the node handle) */
   setMenuFirstItemView: (view: View | null) => void;
 }
@@ -19,9 +19,8 @@ export const TVFocusProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // When user presses right from menu, focus goes here
   const lastFocusedRowRef = useRef<View | null>(null);
 
-  // Store the node handle for the menu's first nav item
-  // Using state so that when it's set, consumers will get the update
-  const [menuFirstItemNodeHandle, setMenuFirstItemNodeHandle] = useState<number | null>(null);
+  // Store the node handle for the menu's first nav item using ref to avoid re-renders
+  const menuFirstItemNodeHandleRef = useRef<number | null>(null);
 
   // No state updates needed - just store the ref directly
   const setLastFocusedRowView = useCallback((view: View | null) => {
@@ -30,15 +29,20 @@ export const TVFocusProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, []);
 
+  // Getter function to read the menu handle synchronously when needed
+  const getMenuFirstItemNodeHandle = useCallback(() => {
+    return menuFirstItemNodeHandleRef.current;
+  }, []);
+
   const setMenuFirstItemView = useCallback((view: View | null) => {
     if (view) {
       const handle = findNodeHandle(view);
-      setMenuFirstItemNodeHandle(handle);
+      menuFirstItemNodeHandleRef.current = handle;
     }
   }, []);
 
   return (
-    <TVFocusContext.Provider value={{ lastFocusedRowRef, setLastFocusedRowView, menuFirstItemNodeHandle, setMenuFirstItemView }}>
+    <TVFocusContext.Provider value={{ lastFocusedRowRef, setLastFocusedRowView, getMenuFirstItemNodeHandle, setMenuFirstItemView }}>
       {children}
     </TVFocusContext.Provider>
   );
@@ -51,7 +55,7 @@ export const useTVFocus = () => {
     return {
       lastFocusedRowRef: { current: null } as React.MutableRefObject<View | null>,
       setLastFocusedRowView: () => {},
-      menuFirstItemNodeHandle: null as number | null,
+      getMenuFirstItemNodeHandle: () => null as number | null,
       setMenuFirstItemView: () => {},
     };
   }
