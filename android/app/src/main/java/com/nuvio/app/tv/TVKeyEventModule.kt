@@ -11,6 +11,9 @@ class TVKeyEventModule(reactContext: ReactApplicationContext) : ReactContextBase
 
     override fun getName(): String = "TVKeyEvent"
 
+    // Flag to allow/block repeat events (controlled from JS for player seeking)
+    private var allowRepeatEnabled = false
+
     companion object {
         private var instance: TVKeyEventModule? = null
 
@@ -38,7 +41,22 @@ class TVKeyEventModule(reactContext: ReactApplicationContext) : ReactContextBase
         instance = this
     }
 
-    fun sendKeyEvent(keyCode: Int, action: Int) {
+    /**
+     * Check if repeat events should be allowed (for player seeking)
+     * Called from MainActivity to decide whether to block repeat D-pad events
+     */
+    fun shouldAllowRepeat(): Boolean = allowRepeatEnabled
+
+    /**
+     * Enable/disable repeat events from JavaScript
+     * Call setAllowRepeat(true) when entering player, setAllowRepeat(false) when exiting
+     */
+    @ReactMethod
+    fun setAllowRepeat(allow: Boolean) {
+        allowRepeatEnabled = allow
+    }
+
+    fun sendKeyEvent(keyCode: Int, action: Int, repeatCount: Int = 0) {
         val eventType = keyCodeToEventType(keyCode) ?: return
         val actionStr = if (action == KeyEvent.ACTION_DOWN) "down" else "up"
 
@@ -46,6 +64,7 @@ class TVKeyEventModule(reactContext: ReactApplicationContext) : ReactContextBase
             putString("key", eventType)
             putString("action", actionStr)
             putInt("keyCode", keyCode)
+            putInt("repeatCount", repeatCount)
         }
 
         try {

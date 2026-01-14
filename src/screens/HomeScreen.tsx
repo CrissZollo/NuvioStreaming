@@ -775,6 +775,8 @@ const HomeScreen = () => {
   const isTVScrollingRef = useRef(false);
   // Track visible range to avoid unnecessary scrolls
   const visibleRangeRef = useRef<{ first: number; last: number }>({ first: 0, last: 5 });
+  // Debounce scroll calls to prevent jitter during rapid navigation
+  const lastScrollTimeRef = useRef(0);
   // Ref to track listData without causing callback recreation
   const listDataRef = useRef<HomeScreenListItem[]>([]);
   // Pre-computed catalog indices to avoid O(n) searches in renderListItem
@@ -907,40 +909,40 @@ const HomeScreen = () => {
     const item = currentListData[index];
     if (!item || item.type === 'placeholder') return;
 
-    const prevIndex = lastFocusedIndexRef.current;
     lastFocusedIndexRef.current = index;
 
     // TV Prefetch: Auto-load more catalogs when approaching the end
-    // Calculate how many catalog items away from the last visible catalog
     const { lastCatalogIndex } = catalogIndicesRef.current;
     const catalogItemsFromEnd = lastCatalogIndex - index;
 
-    // If within prefetch threshold and there are more catalogs to load, load them
     if (catalogItemsFromEnd <= prefetchThreshold && catalogs.length > visibleCatalogCount) {
-      // Load 4 more catalogs (batch load to reduce state updates)
       setVisibleCatalogCount(prev => Math.min(prev + 4, catalogs.length));
     }
 
-    // Only scroll when moving to a different catalog (not within same visible area)
+    // Only scroll if item is near edges or outside visible range
+    // This prevents unnecessary scroll adjustments when item is already well-positioned
     const { first, last } = visibleRangeRef.current;
-    const isVisible = index >= first && index <= last;
+    const isNearTop = index <= first + 1;
+    const isNearBottom = index >= last - 1;
+    const needsScroll = isNearTop || isNearBottom;
 
-    // If item is already fully visible, don't scroll
-    if (isVisible && index > first && index < last) return;
+    if (needsScroll) {
+      // Debounce rapid scroll calls (100ms minimum between scrolls)
+      const now = Date.now();
+      if (now - lastScrollTimeRef.current < 100) {
+        return;
+      }
+      lastScrollTimeRef.current = now;
 
-    // Instant scroll - position based on direction
-    try {
-      // When going down, put item at top (viewPosition 0)
-      // When going up, put item at bottom (viewPosition 1)
-      const isMovingDown = index > prevIndex;
-      flashListRef.current.scrollToIndex({
-        index,
-        animated: false,
-        viewPosition: isMovingDown ? 0 : 0.5,
-      });
-    } catch (e) {
-      // FlashList may throw if index is out of bounds during loading
-      if (__DEV__) console.warn('[HomeScreen] scrollToIndex failed:', e);
+      try {
+        flashListRef.current.scrollToIndex({
+          index,
+          animated: false,
+          viewPosition: 0.3,
+        });
+      } catch (e) {
+        // FlashList may throw if index is out of bounds during loading
+      }
     }
   }, [isTVDevice, prefetchThreshold, catalogs.length, visibleCatalogCount]);
 
@@ -1120,6 +1122,8 @@ const HomeScreen = () => {
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           nestedScrollEnabled={true}
+          estimatedItemSize={300}
+          drawDistance={isTVDevice ? 900 : 250}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}

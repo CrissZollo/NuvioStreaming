@@ -243,7 +243,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       const scrollX = Math.max(0, index * itemWidth - horizontalPadding);
       horizontalEpisodeScrollViewRef.current.scrollToOffset({
         offset: scrollX,
-        animated: true
+        animated: false
       });
     }
   }, [effectiveEpisodeLayout, horizontalCardWidth, horizontalItemSpacing, horizontalPadding]);
@@ -396,7 +396,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           // Use scrollToIndex which automatically uses getItemLayout for accurate positioning
           horizontalEpisodeScrollViewRef.current.scrollToIndex({
             index: mostRecentEpisodeIndex,
-            animated: true,
+            animated: false,
             viewPosition: 0 // Align to start of card for precise positioning
           });
         }
@@ -556,7 +556,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           if (seasonScrollViewRef.current && typeof (seasonScrollViewRef.current as any).scrollToOffset === 'function') {
             (seasonScrollViewRef.current as any).scrollToOffset({
               offset: selectedIndex * 116, // 100px width + 16px margin
-              animated: true
+              animated: false
             });
           }
         }, 300);
@@ -1854,7 +1854,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     const offset = horizontalPadding + (length * info.index);
                     horizontalEpisodeScrollViewRef.current.scrollToOffset({
                       offset: offset,
-                      animated: true
+                      animated: false
                     });
                   }
                 });

@@ -406,7 +406,7 @@ const CastMoviesScreen: React.FC = () => {
     if (isTV && flatListRef.current) {
       flatListRef.current.scrollToIndex({
         index: Math.floor(index / numColumns),
-        animated: true,
+        animated: false,
         viewPosition: 0.3,
       });
     }
@@ -933,7 +933,7 @@ const CastMoviesScreen: React.FC = () => {
               if (flatListRef.current && displayedMovies.length > 0) {
                 flatListRef.current.scrollToIndex({
                   index: Math.min(info.index, displayedMovies.length - 1),
-                  animated: true,
+                  animated: false,
                 });
               }
             }, 100);
