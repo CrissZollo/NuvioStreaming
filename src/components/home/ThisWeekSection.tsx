@@ -237,7 +237,7 @@ export const ThisWeekSection = React.memo(() => {
     if (isTVDevice && flatListRef.current) {
       flatListRef.current.scrollToIndex({
         index,
-        animated: true,
+        animated: false,
         viewPosition: 0.1, // Align near the left
       });
     }

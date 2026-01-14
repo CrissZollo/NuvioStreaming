@@ -433,6 +433,7 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   // Select also toggles playback when hidden
   useTVKeyEvent({
     enabled: true, // Always listen
+    allowRepeat: true, // Allow holding direction buttons for continuous seeking
     onLeft: () => {
       if (DEBUG_UI) console.log('[TVPlayerControls] onLeft - modal:', modalOpenRef.current, 'visible:', visibleRef.current);
       // Don't process if modal is open

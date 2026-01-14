@@ -43,7 +43,7 @@ export const TVScrollProvider: React.FC<TVScrollProviderProps> = ({
         // Scroll to center the element
         (scrollViewRef.current as any)?.scrollTo?.({
           y: targetScrollY,
-          animated: true,
+          animated: false,
         });
       }
     });

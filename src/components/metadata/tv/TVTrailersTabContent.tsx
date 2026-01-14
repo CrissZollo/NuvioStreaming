@@ -131,7 +131,7 @@ const TVTrailersTabContentComponent: React.FC<TVTrailersTabContentProps> = ({
       const offset = index * (CARD_WIDTH + CARD_SPACING);
       flatListRef.current.scrollToOffset({
         offset: Math.max(0, offset - 48),
-        animated: true,
+        animated: false,
       });
     }
   }, []);

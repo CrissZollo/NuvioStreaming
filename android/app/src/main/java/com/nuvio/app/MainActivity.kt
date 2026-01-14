@@ -3,6 +3,7 @@ import com.reactnative.googlecast.api.RNGCCastContext
 
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 
 import com.facebook.react.ReactActivity
@@ -67,15 +68,62 @@ class MainActivity : ReactActivity() {
   }
 
   /**
-   * Intercept key events from TV remote and forward to React Native
+   * Intercept ALL key events before they reach React Native's view hierarchy
+   * This is called before onKeyDown/onKeyUp and allows us to fully block repeat events
    */
-  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-      TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_DOWN)
-      return super.onKeyDown(keyCode, event)
+  override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
+      if (event == null) return super.dispatchKeyEvent(event)
+
+      val keyCode = event.keyCode
+      val action = event.action
+      val repeatCount = event.repeatCount
+
+      // Check if this is a D-pad direction key
+      val isDpadDirection = keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+                           keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+                           keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+                           keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+
+      // Block repeat events for D-pad directions (unless player allows it)
+      if (isDpadDirection && action == KeyEvent.ACTION_DOWN && repeatCount > 0) {
+          val allowRepeat = TVKeyEventModule.getInstance()?.shouldAllowRepeat() ?: false
+          Log.d("NuvioKeyEvent", "D-pad repeat: keyCode=$keyCode, repeatCount=$repeatCount, allowRepeat=$allowRepeat")
+          if (!allowRepeat) {
+              // Fully consume the event - don't let it reach React Native at all
+              Log.d("NuvioKeyEvent", "BLOCKING repeat event")
+              return true
+          }
+      }
+
+      // Send to JS for custom handling
+      if (action == KeyEvent.ACTION_DOWN) {
+          TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_DOWN, repeatCount)
+      } else if (action == KeyEvent.ACTION_UP) {
+          TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_UP, 0)
+      }
+
+      // Let React Native handle the event for focus navigation
+      return super.dispatchKeyEvent(event)
   }
 
-  override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-      TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_UP)
-      return super.onKeyUp(keyCode, event)
+  /**
+   * Also override onKeyDown as a backup - some devices route keys differently
+   */
+  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+      val repeatCount = event?.repeatCount ?: 0
+
+      val isDpadDirection = keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+                           keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+                           keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+                           keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+
+      if (isDpadDirection && repeatCount > 0) {
+          val allowRepeat = TVKeyEventModule.getInstance()?.shouldAllowRepeat() ?: false
+          if (!allowRepeat) {
+              return true
+          }
+      }
+
+      return super.onKeyDown(keyCode, event)
   }
 }

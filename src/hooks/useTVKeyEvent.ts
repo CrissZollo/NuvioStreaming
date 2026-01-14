@@ -20,6 +20,7 @@ export interface TVKeyEvent {
   key: TVKeyType;
   action: TVKeyAction;
   keyCode: number;
+  repeatCount: number;
 }
 
 interface UseTVKeyEventConfig {
@@ -35,6 +36,8 @@ interface UseTVKeyEventConfig {
   onLeftUp?: () => void;
   onRightUp?: () => void;
   enabled?: boolean;
+  /** Allow key repeat/hold events. Default: false (blocks repeats). Set to true for player seeking. */
+  allowRepeat?: boolean;
 }
 
 // Debounce times - reduced for faster response
@@ -60,6 +63,7 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
     onLeftUp,
     onRightUp,
     enabled = true,
+    allowRepeat = false,
   } = config;
 
   const lastEventTime = useRef<Record<string, number>>({});
@@ -78,6 +82,7 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
     onLeftUp,
     onRightUp,
     enabled,
+    allowRepeat,
   });
 
   // Update refs when callbacks change
@@ -95,8 +100,24 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
       onLeftUp,
       onRightUp,
       enabled,
+      allowRepeat,
     };
-  }, [onKeyDown, onKeyUp, onLeft, onRight, onUp, onDown, onSelect, onBack, onPlayPause, onLeftUp, onRightUp, enabled]);
+  }, [onKeyDown, onKeyUp, onLeft, onRight, onUp, onDown, onSelect, onBack, onPlayPause, onLeftUp, onRightUp, enabled, allowRepeat]);
+
+  // Sync allowRepeat state to native module for native-level blocking
+  useEffect(() => {
+    if (!isTV || Platform.OS !== 'android') return;
+    const { TVKeyEvent } = NativeModules;
+    if (TVKeyEvent?.setAllowRepeat) {
+      TVKeyEvent.setAllowRepeat(allowRepeat);
+    }
+    return () => {
+      // Reset to false when component unmounts
+      if (TVKeyEvent?.setAllowRepeat) {
+        TVKeyEvent.setAllowRepeat(false);
+      }
+    };
+  }, [isTV, allowRepeat]);
 
   useEffect(() => {
     if (!isTV || Platform.OS !== 'android') {
@@ -112,15 +133,23 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
       const callbacks = callbacksRef.current;
       if (!callbacks.enabled) return;
 
-      const { key, action } = event;
+      const { key, action, repeatCount } = event;
+
+      // Block repeat events unless explicitly allowed (e.g., for player seeking)
+      if (!callbacks.allowRepeat && repeatCount > 0) {
+        return;
+      }
+
       const now = Date.now();
       const eventKey = `${key}-${action}`;
 
       // Use shorter debounce for left/right (seeking), longer for others
-      const debounceMs = (key === 'left' || key === 'right') ? DEBOUNCE_MS_SEEK : DEBOUNCE_MS_DEFAULT;
+      // Skip debounce if allowRepeat is true (player handles its own timing)
+      const debounceMs = callbacks.allowRepeat ? 0 :
+        (key === 'left' || key === 'right') ? DEBOUNCE_MS_SEEK : DEBOUNCE_MS_DEFAULT;
 
       // Debounce rapid key presses
-      if (now - (lastEventTime.current[eventKey] || 0) < debounceMs) {
+      if (debounceMs > 0 && now - (lastEventTime.current[eventKey] || 0) < debounceMs) {
         return;
       }
       lastEventTime.current[eventKey] = now;
