@@ -35,6 +35,27 @@ const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
 const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
 
+// Language options for TV dropdown
+const TV_LANGUAGE_OPTIONS = [
+  { code: 'en', label: 'English' },
+  { code: 'ar', label: 'العربية (Arabic)' },
+  { code: 'es', label: 'Español (Spanish)' },
+  { code: 'fr', label: 'Français (French)' },
+  { code: 'de', label: 'Deutsch (German)' },
+  { code: 'it', label: 'Italiano (Italian)' },
+  { code: 'pt', label: 'Português (Portuguese)' },
+  { code: 'ru', label: 'Русский (Russian)' },
+  { code: 'tr', label: 'Türkçe (Turkish)' },
+  { code: 'ja', label: '日本語 (Japanese)' },
+  { code: 'ko', label: '한국어 (Korean)' },
+  { code: 'zh', label: '中文 (Chinese)' },
+  { code: 'hi', label: 'हिन्दी (Hindi)' },
+  { code: 'he', label: 'עברית (Hebrew)' },
+  { code: 'nl', label: 'Nederlands (Dutch)' },
+  { code: 'sv', label: 'Svenska (Swedish)' },
+  { code: 'pl', label: 'Polski (Polish)' },
+];
+
 // Define example shows with their IMDB IDs and TMDB IDs
 const EXAMPLE_SHOWS = [
   {
@@ -87,6 +108,9 @@ const TMDBSettingsScreen = () => {
   const backButtonRef = useRef<FocusableRef>(null);
   const enrichToggleRef = useRef<FocusableRef>(null);
   const localizedToggleRef = useRef<FocusableRef>(null);
+  const languageButtonRef = useRef<FocusableRef>(null);
+  const languageOptionRefs = useRef<{ [key: string]: FocusableRef | null }>({});
+  const showItemRefs = useRef<{ [key: string]: FocusableRef | null }>({});
   const customKeyToggleRef = useRef<FocusableRef>(null);
   const apiKeyInputRef2 = useRef<FocusableRef>(null);
   const saveButtonRef = useRef<FocusableRef>(null);
@@ -94,6 +118,7 @@ const TMDBSettingsScreen = () => {
   const clearCacheRef = useRef<FocusableRef>(null);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [languageSearch, setLanguageSearch] = useState('');
+  const [tvLanguageDropdownOpen, setTvLanguageDropdownOpen] = useState(false);
 
   // Logo preview state
   const [selectedShow, setSelectedShow] = useState(EXAMPLE_SHOWS[0]);
@@ -645,7 +670,7 @@ const TMDBSettingsScreen = () => {
                   animateBackground={true}
                   showFocusBorder={true}
                   nextFocusUp={enrichToggleRef.current?.getViewRef()}
-                  nextFocusDown={customKeyToggleRef.current?.getViewRef()}
+                  nextFocusDown={settings.useTmdbLocalizedMetadata ? languageButtonRef.current?.getViewRef() : customKeyToggleRef.current?.getViewRef()}
                 >
                   {(focused) => (
                     <>
@@ -692,70 +717,198 @@ const TMDBSettingsScreen = () => {
                 <>
                   <View style={styles.divider} />
 
-                  <View style={styles.settingRow}>
-                    <View style={styles.settingTextContainer}>
-                      <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Language</Text>
-                      <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                        Current: {(settings.tmdbLanguagePreference || 'en').toUpperCase()}
-                      </Text>
+                  {isTV ? (
+                    <>
+                      <Focusable
+                        ref={languageButtonRef}
+                        onPress={() => setTvLanguageDropdownOpen(!tvLanguageDropdownOpen)}
+                        style={styles.settingRow}
+                        borderRadius={8}
+                        focusScale={1}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                        nextFocusUp={localizedToggleRef.current?.getViewRef()}
+                        nextFocusDown={tvLanguageDropdownOpen
+                          ? languageOptionRefs.current[TV_LANGUAGE_OPTIONS[0]?.code]?.getViewRef()
+                          : showItemRefs.current[EXAMPLE_SHOWS[0]?.imdbId]?.getViewRef()}
+                      >
+                        {(focused) => (
+                          <>
+                            <View style={styles.settingTextContainer}>
+                              <Text style={[styles.settingTitle, { color: focused ? '#000' : currentTheme.colors.text }]}>Language</Text>
+                              <Text style={[styles.settingDescription, { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }]}>
+                                Current: {TV_LANGUAGE_OPTIONS.find(l => l.code === settings.tmdbLanguagePreference)?.label || 'English'}
+                              </Text>
+                            </View>
+                            <View style={[styles.languageButton, { backgroundColor: focused ? '#333' : currentTheme.colors.primary }]}>
+                              <MaterialIcons
+                                name={tvLanguageDropdownOpen ? 'expand-less' : 'expand-more'}
+                                size={20}
+                                color={currentTheme.colors.white}
+                              />
+                            </View>
+                          </>
+                        )}
+                      </Focusable>
+
+                      {/* TV Language Dropdown */}
+                      {tvLanguageDropdownOpen && (
+                        <ScrollView
+                          style={[styles.tvLanguageDropdown, { backgroundColor: currentTheme.colors.elevation1 }]}
+                          nestedScrollEnabled
+                        >
+                          {TV_LANGUAGE_OPTIONS.map((lang, index) => (
+                            <Focusable
+                              key={lang.code}
+                              ref={(ref) => { languageOptionRefs.current[lang.code] = ref; }}
+                              onPress={() => {
+                                updateSetting('tmdbLanguagePreference', lang.code);
+                                setTvLanguageDropdownOpen(false);
+                              }}
+                              style={[
+                                styles.tvLanguageOption,
+                                settings.tmdbLanguagePreference === lang.code && { backgroundColor: currentTheme.colors.primary + '30' }
+                              ]}
+                              borderRadius={8}
+                              focusScale={1}
+                              animateBackground={true}
+                              showFocusBorder={true}
+                              nextFocusUp={index === 0
+                                ? languageButtonRef.current?.getViewRef()
+                                : languageOptionRefs.current[TV_LANGUAGE_OPTIONS[index - 1]?.code]?.getViewRef()}
+                              nextFocusDown={index === TV_LANGUAGE_OPTIONS.length - 1
+                                ? customKeyToggleRef.current?.getViewRef()
+                                : languageOptionRefs.current[TV_LANGUAGE_OPTIONS[index + 1]?.code]?.getViewRef()}
+                            >
+                              {(focused) => (
+                                <View style={styles.tvLanguageOptionContent}>
+                                  <Text style={[
+                                    styles.tvLanguageOptionText,
+                                    { color: focused ? '#000' : currentTheme.colors.text }
+                                  ]}>
+                                    {lang.label}
+                                  </Text>
+                                  {settings.tmdbLanguagePreference === lang.code && (
+                                    <MaterialIcons
+                                      name="check"
+                                      size={20}
+                                      color={focused ? '#000' : currentTheme.colors.primary}
+                                    />
+                                  )}
+                                </View>
+                              )}
+                            </Focusable>
+                          ))}
+                        </ScrollView>
+                      )}
+                    </>
+                  ) : (
+                    <View style={styles.settingRow}>
+                      <View style={styles.settingTextContainer}>
+                        <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Language</Text>
+                        <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                          Current: {(settings.tmdbLanguagePreference || 'en').toUpperCase()}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setLanguagePickerVisible(true)}
+                        style={[styles.languageButton, { backgroundColor: currentTheme.colors.primary }]}
+                      >
+                        <Text style={[styles.languageButtonText, { color: currentTheme.colors.white }]}>Change</Text>
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => setLanguagePickerVisible(true)}
-                      style={[styles.languageButton, { backgroundColor: currentTheme.colors.primary }]}
-                    >
-                      <Text style={[styles.languageButtonText, { color: currentTheme.colors.white }]}>Change</Text>
-                    </TouchableOpacity>
-                  </View>
+                  )}
 
-                  {/* Logo Preview */}
-                  <View style={styles.divider} />
+                  {/* Logo Preview - hidden on TV when language dropdown is open */}
+                  {!(isTV && tvLanguageDropdownOpen) && (
+                    <>
+                      <View style={styles.divider} />
 
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 8 }]}>Logo Preview</Text>
-                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, marginBottom: 12 }]}>
-                    Preview shows how localized logos will appear in the selected language.
-                  </Text>
+                      <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 8 }]}>Logo Preview</Text>
+                      <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, marginBottom: 12 }]}>
+                        Preview shows how localized logos will appear in the selected language.
+                      </Text>
 
-                  {/* Show selector */}
-                  <Text style={[styles.selectorLabel, { color: currentTheme.colors.mediumEmphasis }]}>Example:</Text>
+                      {/* Show selector */}
+                      <Text style={[styles.selectorLabel, { color: currentTheme.colors.mediumEmphasis }]}>Example:</Text>
+                    </>
+                  )}
+                  {!(isTV && tvLanguageDropdownOpen) && (
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.showsScrollContent}
                     style={styles.showsScrollView}
                   >
-                    {EXAMPLE_SHOWS.map((show) => (
-                      <TouchableOpacity
-                        key={show.imdbId}
-                        style={[
-                          styles.showItem,
-                          { backgroundColor: currentTheme.colors.elevation1 },
-                          selectedShow.imdbId === show.imdbId && [styles.selectedShowItem, { borderColor: currentTheme.colors.primary }]
-                        ]}
-                        onPress={() => handleShowSelect(show)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
+                    {EXAMPLE_SHOWS.map((show, index) => (
+                      isTV ? (
+                        <Focusable
+                          key={show.imdbId}
+                          ref={(ref) => { showItemRefs.current[show.imdbId] = ref; }}
+                          onPress={() => handleShowSelect(show)}
                           style={[
-                            styles.showItemText,
-                            { color: currentTheme.colors.mediumEmphasis },
-                            selectedShow.imdbId === show.imdbId && [styles.selectedShowItemText, { color: currentTheme.colors.white }]
+                            styles.showItem,
+                            { backgroundColor: currentTheme.colors.elevation1 },
+                            selectedShow.imdbId === show.imdbId && [styles.selectedShowItem, { borderColor: currentTheme.colors.primary }]
                           ]}
+                          borderRadius={16}
+                          focusScale={1.1}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                          nextFocusUp={languageButtonRef.current?.getViewRef()}
+                          nextFocusDown={customKeyToggleRef.current?.getViewRef()}
+                          nextFocusLeft={index > 0 ? showItemRefs.current[EXAMPLE_SHOWS[index - 1]?.imdbId]?.getViewRef() : undefined}
+                          nextFocusRight={index < EXAMPLE_SHOWS.length - 1 ? showItemRefs.current[EXAMPLE_SHOWS[index + 1]?.imdbId]?.getViewRef() : undefined}
                         >
-                          {show.name}
-                        </Text>
-                      </TouchableOpacity>
+                          {(focused) => (
+                            <Text
+                              style={[
+                                styles.showItemText,
+                                { color: focused ? '#000' : currentTheme.colors.mediumEmphasis },
+                                selectedShow.imdbId === show.imdbId && !focused && [styles.selectedShowItemText, { color: currentTheme.colors.white }]
+                              ]}
+                            >
+                              {show.name}
+                            </Text>
+                          )}
+                        </Focusable>
+                      ) : (
+                        <TouchableOpacity
+                          key={show.imdbId}
+                          style={[
+                            styles.showItem,
+                            { backgroundColor: currentTheme.colors.elevation1 },
+                            selectedShow.imdbId === show.imdbId && [styles.selectedShowItem, { borderColor: currentTheme.colors.primary }]
+                          ]}
+                          onPress={() => handleShowSelect(show)}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.showItemText,
+                              { color: currentTheme.colors.mediumEmphasis },
+                              selectedShow.imdbId === show.imdbId && [styles.selectedShowItemText, { color: currentTheme.colors.white }]
+                            ]}
+                          >
+                            {show.name}
+                          </Text>
+                        </TouchableOpacity>
+                      )
                     ))}
                   </ScrollView>
+                  )}
 
                   {/* Preview card */}
-                  <View style={[styles.logoPreviewCard, { backgroundColor: currentTheme.colors.elevation1 }]}>
-                    {renderLogoExample(tmdbLogo, tmdbBanner, loadingLogos)}
-                    {tmdbLogo && (
-                      <Text style={[styles.logoSourceLabel, { color: currentTheme.colors.mediumEmphasis }]}>
-                        {`Language: ${(previewLanguage || '').toUpperCase() || 'N/A'}${isPreviewFallback ? ' (fallback to available)' : ''}`}
-                      </Text>
-                    )}
-                  </View>
+                  {!(isTV && tvLanguageDropdownOpen) && (
+                    <View style={[styles.logoPreviewCard, { backgroundColor: currentTheme.colors.elevation1 }]}>
+                      {renderLogoExample(tmdbLogo, tmdbBanner, loadingLogos)}
+                      {tmdbLogo && (
+                        <Text style={[styles.logoSourceLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                          {`Language: ${(previewLanguage || '').toUpperCase() || 'N/A'}${isPreviewFallback ? ' (fallback to available)' : ''}`}
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </>
               )}
             </>
@@ -781,7 +934,13 @@ const TMDBSettingsScreen = () => {
               focusScale={1}
               animateBackground={true}
               showFocusBorder={true}
-              nextFocusUp={settings.enrichMetadataWithTMDB ? localizedToggleRef.current?.getViewRef() : enrichToggleRef.current?.getViewRef()}
+              nextFocusUp={
+                settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata
+                  ? (showItemRefs.current[EXAMPLE_SHOWS[0]?.imdbId]?.getViewRef() || localizedToggleRef.current?.getViewRef())
+                  : settings.enrichMetadataWithTMDB
+                    ? localizedToggleRef.current?.getViewRef()
+                    : enrichToggleRef.current?.getViewRef()
+              }
               nextFocusDown={useCustomKey ? apiKeyInputRef2.current?.getViewRef() : clearCacheRef.current?.getViewRef()}
             >
               {(focused) => (
@@ -1821,6 +1980,28 @@ const styles = StyleSheet.create({
   },
   tvSwitchThumbOff: {
     left: 0,
+  },
+  // TV Language Dropdown styles
+  tvLanguageDropdown: {
+    borderRadius: 12,
+    marginTop: 8,
+    marginBottom: 8,
+    padding: 8,
+    maxHeight: 300,
+  },
+  tvLanguageOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginVertical: 2,
+  },
+  tvLanguageOptionContent: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  tvLanguageOptionText: {
+    fontSize: 16,
+    fontWeight: '500' as const,
   },
 });
 
