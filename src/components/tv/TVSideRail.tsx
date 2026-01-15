@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTVFocus } from '../../contexts/TVFocusContext';
+import { navLog } from '../../utils/navigationDebugLogger';
 
 // Nuvio logo
 const NuvioLogo = require('../../assets/IMG_0762.png');
@@ -135,6 +136,8 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
 
   const handleItemFocus = useCallback(
     (index: number) => {
+      navLog.focus(`TVSideRail.item[${index}]`, { label: NAV_ITEMS[index]?.label });
+
       // Clear any pending blur timeout since we're still in the rail
       if (blurTimeoutRef.current) {
         clearTimeout(blurTimeoutRef.current);
@@ -147,6 +150,7 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
       // Only update state if not already in focused/expanded state
       // This prevents re-renders when moving between items within the rail
       if (!wasAlreadyFocused) {
+        navLog.log('FOCUS', 'TVSideRail: expanding rail');
         setRailHasFocus(true);
         setIsExpanded(true);
         onRailFocus?.();
@@ -156,10 +160,12 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   );
 
   const handleItemBlur = useCallback(() => {
+    navLog.blur('TVSideRail.item');
     // Use timeout to check if focus moved to another rail item
     // If another rail item gets focus, the timeout will be cleared
     // Using a longer timeout to handle fast navigation
     blurTimeoutRef.current = setTimeout(() => {
+      navLog.log('FOCUS', 'TVSideRail: collapsing rail (focus left)');
       focusedItemRef.current = null;
       setRailHasFocus(false);
       setIsExpanded(false);
