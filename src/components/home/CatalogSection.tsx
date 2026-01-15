@@ -11,6 +11,7 @@ import { useIsTV } from '../../contexts/TVContext';
 import { Focusable } from '../tv/Focusable';
 import { useTVFocus } from '../../contexts/TVFocusContext';
 import { focusLog } from '../../utils/focusPerformanceLogger';
+import { navLog } from '../../utils/navigationDebugLogger';
 
 interface CatalogSectionProps {
   catalog: CatalogContent;
@@ -315,15 +316,14 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
   // When any item in this section gets focus, update the last focused row
   // so pressing right from menu returns to this row's first item
   const handleSectionItemFocus = useCallback(() => {
-    const focusTime = performance.now();
-    if (__DEV__) console.log(`[SCROLL] @${focusTime.toFixed(0)}ms CatalogSection[${catalog.name}] item focused`);
+    navLog.focus(`CatalogSection[${catalog.name}]`, { handlesReady, itemCount: catalog.items.length });
 
     if (isTVDevice && firstItemRef.current) {
       setLastFocusedRowView(firstItemRef.current);
     }
 
     onSectionFocus?.();
-  }, [isTVDevice, setLastFocusedRowView, onSectionFocus, catalog.name]);
+  }, [isTVDevice, setLastFocusedRowView, onSectionFocus, catalog.name, handlesReady, catalog.items.length]);
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });

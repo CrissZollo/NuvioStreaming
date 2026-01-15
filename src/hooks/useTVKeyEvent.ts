@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import { useIsTV } from '../contexts/TVContext';
+import { navLog } from '../utils/navigationDebugLogger';
 
 export type TVKeyType =
   | 'up'
@@ -131,12 +132,18 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
 
     const handleKeyEvent = (event: TVKeyEvent) => {
       const callbacks = callbacksRef.current;
-      if (!callbacks.enabled) return;
+      if (!callbacks.enabled) {
+        navLog.log('KEY', 'EVENT_IGNORED: hook disabled');
+        return;
+      }
 
       const { key, action, repeatCount } = event;
 
+      navLog.keyEvent(key, action, repeatCount);
+
       // Block repeat events unless explicitly allowed (e.g., for player seeking)
       if (!callbacks.allowRepeat && repeatCount > 0) {
+        navLog.keyDebounced(key, `repeat blocked (repeatCount=${repeatCount})`);
         return;
       }
 
@@ -149,50 +156,65 @@ export const useTVKeyEvent = (config: UseTVKeyEventConfig) => {
         (key === 'left' || key === 'right') ? DEBOUNCE_MS_SEEK : DEBOUNCE_MS_DEFAULT;
 
       // Debounce rapid key presses
-      if (debounceMs > 0 && now - (lastEventTime.current[eventKey] || 0) < debounceMs) {
+      const timeSinceLastEvent = now - (lastEventTime.current[eventKey] || 0);
+      if (debounceMs > 0 && timeSinceLastEvent < debounceMs) {
+        navLog.keyDebounced(key, `debounced (${timeSinceLastEvent}ms < ${debounceMs}ms threshold)`);
         return;
       }
       lastEventTime.current[eventKey] = now;
 
       if (action === 'down') {
+        navLog.perfStart(`useTVKeyEvent.${key}.down`);
         callbacks.onKeyDown?.(key);
 
         // Call specific handlers
         switch (key) {
           case 'left':
+            navLog.keyHandler(key, 'onLeft');
             callbacks.onLeft?.();
             break;
           case 'right':
+            navLog.keyHandler(key, 'onRight');
             callbacks.onRight?.();
             break;
           case 'up':
+            navLog.keyHandler(key, 'onUp');
             callbacks.onUp?.();
             break;
           case 'down':
+            navLog.keyHandler(key, 'onDown');
             callbacks.onDown?.();
             break;
           case 'select':
+            navLog.keyHandler(key, 'onSelect');
             callbacks.onSelect?.();
             break;
           case 'back':
+            navLog.keyHandler(key, 'onBack');
             callbacks.onBack?.();
             break;
           case 'playPause':
+            navLog.keyHandler(key, 'onPlayPause');
             callbacks.onPlayPause?.();
             break;
         }
+        navLog.perfEnd(`useTVKeyEvent.${key}.down`);
       } else if (action === 'up') {
+        navLog.perfStart(`useTVKeyEvent.${key}.up`);
         callbacks.onKeyUp?.(key);
 
         // Call specific key up handlers for left/right (for seeking)
         switch (key) {
           case 'left':
+            navLog.keyHandler(key, 'onLeftUp');
             callbacks.onLeftUp?.();
             break;
           case 'right':
+            navLog.keyHandler(key, 'onRightUp');
             callbacks.onRightUp?.();
             break;
         }
+        navLog.perfEnd(`useTVKeyEvent.${key}.up`);
       }
     };
 

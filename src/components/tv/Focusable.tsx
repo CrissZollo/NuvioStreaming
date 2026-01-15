@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useIsTV } from '../../contexts/TVContext';
 import { focusLog } from '../../utils/focusPerformanceLogger';
+import { navLog } from '../../utils/navigationDebugLogger';
 
 // Focus colors - clean white outline style
 const TV_FOCUS_BORDER_COLOR = '#FFFFFF';
@@ -200,6 +201,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
 
     const handleFocus = useCallback(() => {
       const startTime = focusLog.start('Focusable.handleFocus');
+      navLog.perfStart('Focusable.handleFocus');
+      navLog.focus(testID || 'Focusable', { autoFocus, hasRenderProp: needsFocusState });
 
       isFocusedRef.current = true;
       focusLog.mark('ref updated');
@@ -207,24 +210,33 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       // Only update state if we have a render prop that needs it
       if (needsFocusState) {
         focusLog.mark('setState(true) START');
+        navLog.perfStart('Focusable.setState.focus');
         setIsFocusedState(true);
+        navLog.perfEnd('Focusable.setState.focus');
         focusLog.mark('setState(true) END');
       }
 
       // Use fast timing instead of spring for better performance
       focusLog.mark('animation START');
+      navLog.perfStart('Focusable.animation.focus');
       focusProgress.value = withTiming(1, { duration: 100 });
+      navLog.perfEnd('Focusable.animation.focus');
       focusLog.mark('animation END');
 
       focusLog.mark('onFocus callback START');
+      navLog.perfStart('Focusable.onFocusCallback');
       onFocus?.();
+      navLog.perfEnd('Focusable.onFocusCallback');
       focusLog.mark('onFocus callback END');
 
       focusLog.end('Focusable.handleFocus', startTime);
-    }, [onFocus, focusProgress, needsFocusState]);
+      navLog.perfEnd('Focusable.handleFocus');
+    }, [onFocus, focusProgress, needsFocusState, testID, autoFocus]);
 
     const handleBlur = useCallback(() => {
       const startTime = focusLog.start('Focusable.handleBlur');
+      navLog.perfStart('Focusable.handleBlur');
+      navLog.blur(testID || 'Focusable');
 
       isFocusedRef.current = false;
       focusLog.mark('ref updated');
@@ -232,20 +244,27 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       // Only update state if we have a render prop that needs it
       if (needsFocusState) {
         focusLog.mark('setState(false) START');
+        navLog.perfStart('Focusable.setState.blur');
         setIsFocusedState(false);
+        navLog.perfEnd('Focusable.setState.blur');
         focusLog.mark('setState(false) END');
       }
 
       focusLog.mark('animation START');
+      navLog.perfStart('Focusable.animation.blur');
       focusProgress.value = withTiming(0, { duration: 150 });
+      navLog.perfEnd('Focusable.animation.blur');
       focusLog.mark('animation END');
 
       focusLog.mark('onBlur callback START');
+      navLog.perfStart('Focusable.onBlurCallback');
       onBlur?.();
+      navLog.perfEnd('Focusable.onBlurCallback');
       focusLog.mark('onBlur callback END');
 
       focusLog.end('Focusable.handleBlur', startTime);
-    }, [onBlur, focusProgress, needsFocusState]);
+      navLog.perfEnd('Focusable.handleBlur');
+    }, [onBlur, focusProgress, needsFocusState, testID]);
 
     // Expose focus methods via ref
     useImperativeHandle(ref, () => ({

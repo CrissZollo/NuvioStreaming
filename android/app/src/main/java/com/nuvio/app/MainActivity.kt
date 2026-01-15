@@ -71,8 +71,7 @@ class MainActivity : ReactActivity() {
    * Intercept ALL key events before they reach React Native's view hierarchy
    * This is called before onKeyDown/onKeyUp and allows us to fully block repeat events
    */
-  override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
-      if (event == null) return super.dispatchKeyEvent(event)
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
 
       val keyCode = event.keyCode
       val action = event.action

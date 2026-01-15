@@ -10,6 +10,7 @@ import {
 import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useFocusMemory } from '../../hooks/useTVFocus';
+import { navLog } from '../../utils/navigationDebugLogger';
 
 interface ContentItem {
   id: string;
@@ -111,8 +112,8 @@ interface TVContentRowProps {
  * TV-optimized horizontal content row with D-Pad navigation
  * Supports focus memory and auto-scrolling to focused item
  */
-// Debounce constant for TV focus events
-const TV_FOCUS_DEBOUNCE_MS = 80;
+// Debounce constant for TV focus events - 16ms (~1 frame) for responsive feel
+const TV_FOCUS_DEBOUNCE_MS = 16;
 
 export const TVContentRow: React.FC<TVContentRowProps> = memo(({
   title,
@@ -135,25 +136,35 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
 
   const handleItemFocus = useCallback(
     (index: number) => {
+      navLog.perfStart(`TVContentRow[${title}].handleItemFocus`);
+
       // Debounce rapid focus events to prevent scroll conflicts
       const now = Date.now();
       if (now - lastFocusTime.current < TV_FOCUS_DEBOUNCE_MS) {
+        navLog.focusBlocked('debounce', `TVContentRow[${title}]`, `${now - lastFocusTime.current}ms < ${TV_FOCUS_DEBOUNCE_MS}ms threshold`);
+        navLog.perfEnd(`TVContentRow[${title}].handleItemFocus`);
         return; // Skip this focus event - too soon after last one
       }
       lastFocusTime.current = now;
+
+      navLog.focus(`TVContentRow[${title}].item[${index}]`, { rowIndex, itemId: items[index]?.id });
 
       focusedIndexRef.current = index;
       saveFocus(rowIndex, index);
       onRowFocus?.(rowIndex);
 
       // Scroll to keep focused item visible
+      navLog.scrollAnimStart(`TVContentRow[${title}].FlatList`, focusedIndexRef.current, index);
       listRef.current?.scrollToIndex({
         index,
         viewPosition: 0.3, // Keep item towards left
         animated: false,
       });
+      navLog.scrollAnimEnd(`TVContentRow[${title}].FlatList`);
+
+      navLog.perfEnd(`TVContentRow[${title}].handleItemFocus`);
     },
-    [rowIndex, onRowFocus, saveFocus]
+    [rowIndex, onRowFocus, saveFocus, title, items]
   );
 
   const getItemRef = useCallback((index: number) => {
@@ -233,8 +244,15 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
         removeClippedSubviews
         onScrollToIndexFailed={(info) => {
           // Handle scroll failure gracefully
+          navLog.perfWarn(`TVContentRow[${title}].scrollToIndexFailed`, info.index);
+          navLog.log('SCROLL', 'SCROLL_TO_INDEX_FAILED:', {
+            index: info.index,
+            highestMeasuredFrameIndex: info.highestMeasuredFrameIndex,
+            averageItemLength: info.averageItemLength,
+          });
           const wait = new Promise((resolve) => setTimeout(resolve, 100));
           wait.then(() => {
+            navLog.log('SCROLL', 'RETRY_SCROLL_TO_INDEX:', info.index);
             listRef.current?.scrollToIndex({
               index: info.index,
               animated: false,

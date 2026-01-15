@@ -44,6 +44,7 @@ import * as Haptics from 'expo-haptics';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { focusLog } from '../utils/focusPerformanceLogger';
+import { navLog } from '../utils/navigationDebugLogger';
 import { storageService } from '../services/storageService';
 import { getCatalogDisplayName, clearCustomNameCache } from '../utils/catalogNameUtils';
 import { useHomeCatalogs } from '../hooks/useHomeCatalogs';
@@ -184,6 +185,9 @@ const HomeScreen = () => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
+    navLog.dataFetchStart('HomeScreen.catalogs');
+    navLog.perfStart('HomeScreen.loadCatalogsProgressively');
+
     setCatalogsLoading(true);
     setCatalogs([]);
     setLoadedCatalogCount(0);
@@ -316,12 +320,15 @@ const HomeScreen = () => {
                   InteractionManager.runAfterInteractions(() => {
                     setLoadedCatalogCount(prev => {
                       const next = prev + 1;
+                      navLog.dataFetchEnd(`HomeScreen.catalog[${currentIndex}]`, next);
                       // Exit loading screen as soon as first catalog finishes
                       if (prev === 0) {
+                        navLog.dataProcess('HomeScreen.catalogs', 'first catalog loaded, exiting loading state');
                         setCatalogsLoading(false);
                       }
                       // ** Crucial: If all catalogs processed, release the fetch guard **
                       if (next >= totalCatalogsRef.current) {
+                        navLog.dataFetchEnd('HomeScreen.catalogs', next);
                         isFetchingRef.current = false;
                       }
                       return next;
@@ -352,9 +359,12 @@ const HomeScreen = () => {
       });
 
       // Start all catalog requests in parallel
+      navLog.dataProcess('HomeScreen.catalogs', `launching ${catalogIndex} catalog loaders in parallel`);
       launchAllCatalogs();
+      navLog.perfEnd('HomeScreen.loadCatalogsProgressively');
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
+      navLog.perfWarn('HomeScreen.loadCatalogsProgressively failed');
       InteractionManager.runAfterInteractions(() => {
         setCatalogsLoading(false);
       });
@@ -895,20 +905,39 @@ const HomeScreen = () => {
   }, [sectionHandlesVersion]);
 
   const handleCatalogFocus = useCallback((index: number) => {
-    if (!isTVDevice || !flashListRef.current) return;
+    navLog.perfStart('HomeScreen.handleCatalogFocus');
+
+    if (!isTVDevice || !flashListRef.current) {
+      navLog.log('SCROLL', 'handleCatalogFocus: skipped (not TV or no ref)');
+      navLog.perfEnd('HomeScreen.handleCatalogFocus');
+      return;
+    }
 
     const currentListData = listDataRef.current;
 
     // Skip if same index to avoid unnecessary scrolls
-    if (lastFocusedIndexRef.current === index) return;
+    if (lastFocusedIndexRef.current === index) {
+      navLog.log('SCROLL', `handleCatalogFocus: skipped (same index ${index})`);
+      navLog.perfEnd('HomeScreen.handleCatalogFocus');
+      return;
+    }
 
     // Validate index is within bounds
-    if (index < 0 || index >= currentListData.length) return;
+    if (index < 0 || index >= currentListData.length) {
+      navLog.log('SCROLL', `handleCatalogFocus: skipped (index ${index} out of bounds, length=${currentListData.length})`);
+      navLog.perfEnd('HomeScreen.handleCatalogFocus');
+      return;
+    }
 
     // Skip scrolling for placeholder items (catalogs still loading)
     const item = currentListData[index];
-    if (!item || item.type === 'placeholder') return;
+    if (!item || item.type === 'placeholder') {
+      navLog.log('SCROLL', `handleCatalogFocus: skipped (placeholder or null item at ${index})`);
+      navLog.perfEnd('HomeScreen.handleCatalogFocus');
+      return;
+    }
 
+    const prevIndex = lastFocusedIndexRef.current;
     lastFocusedIndexRef.current = index;
 
     // TV Prefetch: Auto-load more catalogs when approaching the end
@@ -916,34 +945,44 @@ const HomeScreen = () => {
     const catalogItemsFromEnd = lastCatalogIndex - index;
 
     if (catalogItemsFromEnd <= prefetchThreshold && catalogs.length > visibleCatalogCount) {
+      navLog.dataProcess('HomeScreen', `prefetching more catalogs (${catalogItemsFromEnd} from end)`);
       setVisibleCatalogCount(prev => Math.min(prev + 4, catalogs.length));
     }
 
-    // Only scroll if item is near edges or outside visible range
-    // This prevents unnecessary scroll adjustments when item is already well-positioned
+    // For TV: Always scroll to keep focused item consistently positioned
+    // This prevents the "jumpy" feeling where focus changes but scroll lags behind
     const { first, last } = visibleRangeRef.current;
-    const isNearTop = index <= first + 1;
-    const isNearBottom = index >= last - 1;
-    const needsScroll = isNearTop || isNearBottom;
 
-    if (needsScroll) {
-      // Debounce rapid scroll calls (100ms minimum between scrolls)
-      const now = Date.now();
-      if (now - lastScrollTimeRef.current < 100) {
-        return;
-      }
-      lastScrollTimeRef.current = now;
+    navLog.log('SCROLL', 'handleCatalogFocus: executing scroll', {
+      index,
+      prevIndex,
+      visibleFirst: first,
+      visibleLast: last,
+    });
 
-      try {
-        flashListRef.current.scrollToIndex({
-          index,
-          animated: false,
-          viewPosition: 0.3,
-        });
-      } catch (e) {
-        // FlashList may throw if index is out of bounds during loading
-      }
+    // Minimal debounce (16ms ~1 frame) to batch very rapid events but still feel responsive
+    const now = Date.now();
+    const timeSinceLastScroll = now - lastScrollTimeRef.current;
+    if (timeSinceLastScroll < 16) {
+      navLog.scrollSkipped('HomeScreen.FlashList', `debounced (${timeSinceLastScroll}ms < 16ms)`);
+      navLog.perfEnd('HomeScreen.handleCatalogFocus');
+      return;
     }
+    lastScrollTimeRef.current = now;
+
+    navLog.scrollToFocus('HomeScreen.FlashList', index, prevIndex);
+    try {
+      flashListRef.current.scrollToIndex({
+        index,
+        animated: false,
+        viewPosition: 0.3,
+      });
+      navLog.log('SCROLL', 'scrollToIndex completed');
+    } catch (e) {
+      navLog.perfWarn('HomeScreen.scrollToIndex failed');
+    }
+
+    navLog.perfEnd('HomeScreen.handleCatalogFocus');
   }, [isTVDevice, prefetchThreshold, catalogs.length, visibleCatalogCount]);
 
   // Track visible items to optimize scroll decisions
@@ -972,6 +1011,10 @@ const HomeScreen = () => {
         const isLastCatalog = isTVDevice && !hasLoadMore && index === lastCatalogIndex;
         // Get adjacent section handles for explicit vertical navigation
         const { prevHandle, nextHandle } = isTVDevice ? getAdjacentSectionHandles(index) : { prevHandle: null, nextHandle: null };
+        // Log when FlashList renders a catalog section (helps debug render timing)
+        if (isTVDevice) {
+          navLog.log('RENDER', `FlashList rendering catalog[${index}]: ${item.catalog.name}`);
+        }
         return (
           <CatalogSection
             catalog={item.catalog}
@@ -1122,8 +1165,8 @@ const HomeScreen = () => {
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           nestedScrollEnabled={true}
-          estimatedItemSize={300}
-          drawDistance={isTVDevice ? 900 : 250}
+          estimatedItemSize={isTVDevice ? 400 : 300}
+          drawDistance={isTVDevice ? 2500 : 250}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}

@@ -2,6 +2,7 @@ import React, { useRef, useCallback } from 'react';
 import { View, ViewStyle, StyleProp } from 'react-native';
 import { useTVScroll } from '../../contexts/TVScrollContext';
 import { useIsTV } from '../../contexts/TVContext';
+import { navLog } from '../../utils/navigationDebugLogger';
 
 interface TVFocusSectionProps {
   children: React.ReactNode;
@@ -27,23 +28,33 @@ export const TVFocusSection: React.FC<TVFocusSectionProps> = ({
   const hasFocusWithin = useRef<boolean>(false);
 
   const handleFocusCapture = useCallback(() => {
-    if (!isTV || !tvScroll?.scrollToElement) return;
+    if (!isTV || !tvScroll?.scrollToElement) {
+      navLog.log('FOCUS', 'TVFocusSection.focusCapture: skipped (not TV or no scroll context)');
+      return;
+    }
 
     // Only scroll when focus ENTERS the section from outside
     // Don't scroll when navigating between items within the section
     if (!hasFocusWithin.current) {
+      navLog.focus('TVFocusSection', { action: 'ENTER_SECTION', triggersScroll: true });
+      navLog.perfStart('TVFocusSection.scrollToElement');
       hasFocusWithin.current = true;
       tvScroll.scrollToElement(sectionRef);
+      navLog.perfEnd('TVFocusSection.scrollToElement');
+    } else {
+      navLog.log('FOCUS', 'TVFocusSection: focus within section, skip scroll');
     }
   }, [isTV, tvScroll]);
 
   const handleBlurCapture = useCallback(() => {
+    navLog.log('FOCUS', 'TVFocusSection.blurCapture: checking if focus left section');
     // Use a small delay to check if focus moved to another item within the section
     // or if it truly left the section
     setTimeout(() => {
       if (sectionRef.current) {
         // Check if the section still contains the focused element
         // If not, mark as no longer having focus within
+        navLog.blur('TVFocusSection', { action: 'LEAVE_SECTION_CHECK' });
         hasFocusWithin.current = false;
       }
     }, 50);
