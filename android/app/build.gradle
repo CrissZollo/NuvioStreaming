@@ -189,6 +189,9 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // FFmpeg decoder extension for ExoPlayer - adds support for additional container formats and codecs
+    implementation files('libs/lib-decoder-ffmpeg-release.aar')
+
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
     def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
