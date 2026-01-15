@@ -315,14 +315,19 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
   // When any item in this section gets focus, update the last focused row
   // so pressing right from menu returns to this row's first item
   const handleSectionItemFocus = useCallback(() => {
-    const focusTime = performance.now();
-    if (__DEV__) console.log(`[SCROLL] @${focusTime.toFixed(0)}ms CatalogSection[${catalog.name}] item focused`);
+    const startTime = focusLog.start(`CatalogSection[${catalog.name}].handleSectionItemFocus`);
 
     if (isTVDevice && firstItemRef.current) {
+      focusLog.mark('setLastFocusedRowView START');
       setLastFocusedRowView(firstItemRef.current);
+      focusLog.mark('setLastFocusedRowView END');
     }
 
+    focusLog.mark('onSectionFocus callback START');
     onSectionFocus?.();
+    focusLog.mark('onSectionFocus callback END');
+
+    focusLog.end(`CatalogSection[${catalog.name}].handleSectionItemFocus`, startTime);
   }, [isTVDevice, setLastFocusedRowView, onSectionFocus, catalog.name]);
 
   const handleContentPress = useCallback((id: string, type: string) => {
@@ -411,9 +416,8 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
     let downHandle: number | null | undefined;
 
     if (isFirstRow) {
-      // First row: UP goes to previous section - let native focus engine find nearest item
-      // by not setting explicit handle (undefined lets native handle it)
-      upHandle = undefined;
+      // First row: UP goes to previous section
+      upHandle = prevSectionFirstItemHandle;
       // First row: DOWN goes to same column in row 1 (within section)
       // Calculate target flat index: next row, same column
       const targetFlatIndex = (rowIndex + 1) * itemsPerRow + colIndex;
@@ -427,8 +431,8 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
       upHandle = itemNodeHandles.current.get(targetFlatIndex) || undefined;
 
       if (isLastRowInCatalog) {
-        // Last row: DOWN goes to next section - let native focus engine find nearest item
-        downHandle = undefined;
+        // Last row: DOWN goes to next section
+        downHandle = nextSectionFirstItemHandle;
       } else {
         // Not last row: DOWN goes to same column in next row (within section)
         const targetFlatIndex = (rowIndex + 1) * itemsPerRow + colIndex;
@@ -523,11 +527,9 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
   const ItemSeparator = useCallback(() => <View style={{ width: separatorWidth }} />, [separatorWidth]);
 
   // Memoize the keyExtractor to prevent re-creation
-  // Include catalog.id to ensure uniqueness across catalogs and prevent duplicate key warnings
-  const keyExtractor = useCallback((item: StreamingContent, index: number) => {
+  const keyExtractor = useCallback((item: StreamingContent) => {
     if (item.id === VIEW_ALL_ITEM_ID) return `view-all-${catalog.id}`;
-    // Include index as fallback in case same item appears twice in same catalog (data issue)
-    return `${catalog.id}-${item.id}-${item.type}-${index}`;
+    return `${item.id}-${item.type}`;
   }, [catalog.id]);
 
   // Calculate item width including separator for getItemLayout
@@ -609,7 +611,7 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
                 const flatIndex = rowIndex * tvGridLayout.itemsPerRow + colIndex;
                 return (
                   <View
-                    key={keyExtractor(item, flatIndex)}
+                    key={keyExtractor(item)}
                     style={{
                       marginRight: colIndex < row.length - 1 ? tvGridLayout.itemSpacing : 0,
                     }}

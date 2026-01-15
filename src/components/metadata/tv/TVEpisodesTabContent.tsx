@@ -144,7 +144,7 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
       const offset = index * (CARD_WIDTH + CARD_SPACING);
       flatListRef.current.scrollToOffset({
         offset: Math.max(0, offset - 48),
-        animated: false,
+        animated: true,
       });
     }
   }, []);

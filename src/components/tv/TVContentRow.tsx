@@ -150,7 +150,7 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
       listRef.current?.scrollToIndex({
         index,
         viewPosition: 0.3, // Keep item towards left
-        animated: false,
+        animated: true,
       });
     },
     [rowIndex, onRowFocus, saveFocus]
@@ -237,7 +237,7 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
           wait.then(() => {
             listRef.current?.scrollToIndex({
               index: info.index,
-              animated: false,
+              animated: true,
             });
           });
         }}

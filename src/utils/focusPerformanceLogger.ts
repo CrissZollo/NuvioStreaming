@@ -14,7 +14,7 @@
  *   [FOCUS] Focusable.handleFocus completed in 3.1ms
  */
 
-const LOG_ENABLED = false; // Disabled - use SCROLL_LOG_ENABLED for scroll debugging
+const LOG_ENABLED = __DEV__;
 
 interface LogEntry {
   timestamp: number;

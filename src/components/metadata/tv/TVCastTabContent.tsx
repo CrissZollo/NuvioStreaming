@@ -48,7 +48,7 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
       const offset = index * (CAST_CARD_WIDTH + CAST_SPACING);
       flatListRef.current.scrollToOffset({
         offset: Math.max(0, offset - 24),
-        animated: false,
+        animated: true,
       });
     }
   }, []);
