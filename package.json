@@ -18,7 +18,7 @@
     "@expo/vector-icons": "^15.0.2",
     "@gorhom/bottom-sheet": "^5.2.6",
     "@legendapp/list": "^2.0.13",
-    "@lottiefiles/dotlottie-react": "^0.17.7",
+    "@lottiefiles/dotlottie-react": "^0.13.5",
     "@react-native-community/blur": "^4.4.1",
     "@react-native-community/netinfo": "^11.4.1",
     "@react-native-community/slider": "^5.1.1",
@@ -98,7 +98,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/crypto-js": "^4.2.2",
-    "@types/react": "~18.3.12",
+    "@types/react": "^19.1.0",
     "@types/react-native": "^0.72.8",
     "@types/react-native-vector-icons": "^6.4.18",
     "babel-plugin-transform-remove-console": "^6.9.4",
