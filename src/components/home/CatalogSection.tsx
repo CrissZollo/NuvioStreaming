@@ -272,11 +272,14 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
   // This ensures row 0 items can see row 1 handles for downward navigation
   const [handlesReady, setHandlesReady] = useState(false);
   const expectedItemCount = useRef(0);
+  // Ref to track if we've scheduled the handlesReady update
+  const handlesReadyScheduled = useRef(false);
 
   // Reset node handles when catalog items change
   useEffect(() => {
     itemNodeHandles.current.clear();
     firstItemNodeHandleRef.current = null;
+    handlesReadyScheduled.current = false;
     setHandlesReady(false);
   }, [catalog.items.length]);
 
@@ -304,8 +307,13 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
 
         // When all items have registered, trigger re-render so row 0 items
         // can get row 1 handles for downward navigation (TV only)
-        if (isTVDevice && !handlesReady && itemNodeHandles.current.size >= expectedItemCount.current) {
-          setHandlesReady(true);
+        // Use requestAnimationFrame to batch this update and avoid multiple re-renders
+        if (isTVDevice && !handlesReady && !handlesReadyScheduled.current &&
+            itemNodeHandles.current.size >= expectedItemCount.current) {
+          handlesReadyScheduled.current = true;
+          requestAnimationFrame(() => {
+            setHandlesReady(true);
+          });
         }
       }
     }

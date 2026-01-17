@@ -47,17 +47,11 @@ export const TVFocusSection: React.FC<TVFocusSectionProps> = ({
   }, [isTV, tvScroll]);
 
   const handleBlurCapture = useCallback(() => {
-    navLog.log('FOCUS', 'TVFocusSection.blurCapture: checking if focus left section');
-    // Use a small delay to check if focus moved to another item within the section
-    // or if it truly left the section
-    setTimeout(() => {
-      if (sectionRef.current) {
-        // Check if the section still contains the focused element
-        // If not, mark as no longer having focus within
-        navLog.blur('TVFocusSection', { action: 'LEAVE_SECTION_CHECK' });
-        hasFocusWithin.current = false;
-      }
-    }, 50);
+    // Reset focus flag immediately - if focus moves to another item in this section,
+    // handleFocusCapture will be called and set hasFocusWithin back to true
+    // before any scroll decision is made. This avoids the setTimeout overhead
+    // that was causing input lag during fast D-pad navigation.
+    hasFocusWithin.current = false;
   }, []);
 
   // On non-TV, just render children without the wrapper logic

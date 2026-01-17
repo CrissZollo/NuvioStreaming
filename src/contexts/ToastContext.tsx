@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import ToastManager from '../components/ui/ToastManager';
 import { ToastConfig } from '../components/ui/Toast';
 import { toastService } from '../services/toastService';
@@ -44,7 +44,9 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const contextValue: ToastContextType = {
+  // Memoize context value - toastService methods are stable singleton references
+  // This prevents cascading re-renders of all toast consumers on every provider render
+  const contextValue = useMemo<ToastContextType>(() => ({
     showSuccess: toastService.success.bind(toastService),
     showError: toastService.error.bind(toastService),
     showWarning: toastService.warning.bind(toastService),
@@ -60,12 +62,15 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     showAuthError: toastService.showAuthError.bind(toastService),
     showSyncSuccess: toastService.showSyncSuccess.bind(toastService),
     showProgressSaved: toastService.showProgressSaved.bind(toastService),
-  };
+  }), []); // Empty deps - toastService is a singleton with stable methods
+
+  // Memoize onRemoveToast to avoid recreating on every render
+  const onRemoveToast = useMemo(() => toastService.remove.bind(toastService), []);
 
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      <ToastManager toasts={toasts} onRemoveToast={toastService.remove.bind(toastService)} />
+      <ToastManager toasts={toasts} onRemoveToast={onRemoveToast} />
     </ToastContext.Provider>
   );
 };

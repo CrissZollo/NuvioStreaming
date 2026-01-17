@@ -3,17 +3,21 @@ import {
   View,
   Text,
   StyleSheet,
-  Animated,
   BackHandler,
   Image,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTVFocus } from '../../contexts/TVFocusContext';
-import { navLog } from '../../utils/navigationDebugLogger';
 
 // Nuvio logo
 const NuvioLogo = require('../../assets/IMG_0762.png');
@@ -69,9 +73,11 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   const insets = useSafeAreaInsets();
   const [isExpanded, setIsExpanded] = useState(false);
   const [railHasFocus, setRailHasFocus] = useState(false);
-  const widthAnim = useRef(new Animated.Value(COLLAPSED_WIDTH)).current;
-  const gradientWidthAnim = useRef(new Animated.Value(0)).current; // 0 when collapsed, 350 when expanded
-  const gradientOpacityAnim = useRef(new Animated.Value(0)).current;
+
+  // Use Reanimated shared values for UI-thread animations (much smoother on TV)
+  const widthAnim = useSharedValue(COLLAPSED_WIDTH);
+  const gradientWidthAnim = useSharedValue(0);
+  const gradientOpacityAnim = useSharedValue(0);
 
   // Create stable refs for each nav item's underlying View
   const navItemViewRefs = useMemo(() =>
@@ -82,39 +88,39 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   const [refsReady, setRefsReady] = useState(false);
 
   // Mark refs as ready after mount and expose the first menu item view
+  // Use requestAnimationFrame instead of setTimeout for faster registration
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const frameId = requestAnimationFrame(() => {
       setRefsReady(true);
       // Expose the first nav item view (Home) to the context
       // The context will get the node handle from it
       if (navItemViewRefs[0]?.current) {
         setMenuFirstItemView(navItemViewRefs[0].current);
       }
-    }, 150);
-    return () => clearTimeout(timer);
+    });
+    return () => cancelAnimationFrame(frameId);
   }, [navItemViewRefs, setMenuFirstItemView]);
 
 
-  // Animate rail width and gradient on expand/collapse
+  // Fast animation config for responsive TV feel
+  const animConfig = { duration: 100, easing: Easing.out(Easing.ease) };
+
+  // Animate rail width and gradient on expand/collapse using Reanimated (UI thread)
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(widthAnim, {
-        toValue: isExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(gradientWidthAnim, {
-        toValue: isExpanded ? 350 : 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(gradientOpacityAnim, {
-        toValue: isExpanded ? 1 : 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  }, [isExpanded, widthAnim, gradientWidthAnim, gradientOpacityAnim]);
+    widthAnim.value = withTiming(isExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH, animConfig);
+    gradientWidthAnim.value = withTiming(isExpanded ? 350 : 0, animConfig);
+    gradientOpacityAnim.value = withTiming(isExpanded ? 1 : 0, animConfig);
+  }, [isExpanded]);
+
+  // Animated styles for UI-thread rendering
+  const animatedRailStyle = useAnimatedStyle(() => ({
+    width: widthAnim.value,
+  }));
+
+  const animatedGradientStyle = useAnimatedStyle(() => ({
+    width: gradientWidthAnim.value,
+    opacity: gradientOpacityAnim.value,
+  }));
 
   // Handle back button to collapse rail or go back
   useEffect(() => {
@@ -136,8 +142,6 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
 
   const handleItemFocus = useCallback(
     (index: number) => {
-      navLog.focus(`TVSideRail.item[${index}]`, { label: NAV_ITEMS[index]?.label });
-
       // Clear any pending blur timeout since we're still in the rail
       if (blurTimeoutRef.current) {
         clearTimeout(blurTimeoutRef.current);
@@ -150,7 +154,6 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
       // Only update state if not already in focused/expanded state
       // This prevents re-renders when moving between items within the rail
       if (!wasAlreadyFocused) {
-        navLog.log('FOCUS', 'TVSideRail: expanding rail');
         setRailHasFocus(true);
         setIsExpanded(true);
         onRailFocus?.();
@@ -160,17 +163,15 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   );
 
   const handleItemBlur = useCallback(() => {
-    navLog.blur('TVSideRail.item');
-    // Use timeout to check if focus moved to another rail item
+    // Use short timeout to check if focus moved to another rail item
     // If another rail item gets focus, the timeout will be cleared
-    // Using a longer timeout to handle fast navigation
+    // Reduced from 300ms to 50ms for faster response
     blurTimeoutRef.current = setTimeout(() => {
-      navLog.log('FOCUS', 'TVSideRail: collapsing rail (focus left)');
       focusedItemRef.current = null;
       setRailHasFocus(false);
       setIsExpanded(false);
       onRailBlur?.();
-    }, 300);
+    }, 50);
   }, [onRailBlur]);
 
   // Cleanup timeout on unmount
@@ -197,19 +198,14 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
       <Animated.View
         style={[
           styles.sideRail,
-          {
-            width: widthAnim,
-          },
+          animatedRailStyle,
         ]}
       >
         {/* Gradient background - only visible when expanded */}
         <Animated.View
           style={[
             styles.railGradient,
-            {
-              width: gradientWidthAnim,
-              opacity: gradientOpacityAnim,
-            },
+            animatedGradientStyle,
           ]}
         >
           <LinearGradient
