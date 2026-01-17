@@ -13,7 +13,8 @@
  */
 
 // Toggle this to enable/disable all navigation debug logs
-export const NAV_DEBUG_ENABLED = true;
+// IMPORTANT: Keep this false for production builds - causes severe performance issues on TV
+export const NAV_DEBUG_ENABLED = __DEV__ && false;
 
 // Individual category toggles (only apply when NAV_DEBUG_ENABLED is true)
 const CATEGORIES = {

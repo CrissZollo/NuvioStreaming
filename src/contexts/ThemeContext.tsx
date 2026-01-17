@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { settingsEmitter } from '../hooks/useSettings';
 import { colors as defaultColors } from '../styles/colors';
@@ -189,8 +189,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => {};
   }, []);
 
-  // Set current theme
-  const setCurrentTheme = async (themeId: string) => {
+  // Set current theme - memoized to prevent context value recreation
+  const setCurrentTheme = useCallback(async (themeId: string) => {
     const theme = availableThemes.find(t => t.id === themeId);
     if (theme) {
       setCurrentThemeState(theme);
@@ -204,26 +204,26 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       await mmkvStorage.setItem(CURRENT_THEME_KEY, themeId);
       // Do not emit global settings sync for themes (sync on app restart only)
     }
-  };
+  }, [availableThemes]);
 
-  // Add custom theme
-  const addCustomTheme = async (themeData: Omit<Theme, 'id' | 'isEditable'>) => {
+  // Add custom theme - memoized to prevent context value recreation
+  const addCustomTheme = useCallback(async (themeData: Omit<Theme, 'id' | 'isEditable'>) => {
     try {
       // Generate unique ID
       const id = `custom_${Date.now()}`;
-      
+
       // Create new theme object
       const newTheme: Theme = {
         id,
         ...themeData,
         isEditable: true,
       };
-      
+
       // Add to available themes
       const customThemes = availableThemes.filter(t => t.isEditable);
       const updatedCustomThemes = [...customThemes, newTheme];
       const updatedAllThemes = [...DEFAULT_THEMES, ...updatedCustomThemes];
-      
+
       // Save to storage (scoped app_settings + legacy key)
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const key = `@user:${scope}:app_settings`;
@@ -232,10 +232,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       settings.customThemes = updatedCustomThemes;
       await mmkvStorage.setItem(key, JSON.stringify(settings));
       await mmkvStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updatedCustomThemes));
-      
+
       // Update state
       setAvailableThemes(updatedAllThemes);
-      
+
       // Set as current theme
       setCurrentThemeState(newTheme);
       await mmkvStorage.setItem(CURRENT_THEME_KEY, id);
@@ -243,24 +243,24 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (__DEV__) console.error('Failed to add custom theme:', error);
     }
-  };
+  }, [availableThemes]);
 
-  // Update custom theme
-  const updateCustomTheme = async (updatedTheme: Theme) => {
+  // Update custom theme - memoized to prevent context value recreation
+  const updateCustomTheme = useCallback(async (updatedTheme: Theme) => {
     try {
       if (!updatedTheme.isEditable) {
         throw new Error('Cannot edit built-in themes');
       }
-      
+
       // Find and update the theme
       const customThemes = availableThemes.filter(t => t.isEditable);
-      const updatedCustomThemes = customThemes.map(t => 
+      const updatedCustomThemes = customThemes.map(t =>
         t.id === updatedTheme.id ? updatedTheme : t
       );
-      
+
       // Update available themes
       const updatedAllThemes = [...DEFAULT_THEMES, ...updatedCustomThemes];
-      
+
       // Save to storage (scoped app_settings + legacy key)
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const key = `@user:${scope}:app_settings`;
@@ -269,10 +269,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       settings.customThemes = updatedCustomThemes;
       await mmkvStorage.setItem(key, JSON.stringify(settings));
       await mmkvStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updatedCustomThemes));
-      
+
       // Update state
       setAvailableThemes(updatedAllThemes);
-      
+
       // Update current theme if needed
       if (currentTheme.id === updatedTheme.id) {
         setCurrentThemeState(updatedTheme);
@@ -281,22 +281,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (__DEV__) console.error('Failed to update custom theme:', error);
     }
-  };
+  }, [availableThemes, currentTheme.id]);
 
-  // Delete custom theme
-  const deleteCustomTheme = async (themeId: string) => {
+  // Delete custom theme - memoized to prevent context value recreation
+  const deleteCustomTheme = useCallback(async (themeId: string) => {
     try {
       // Find theme to delete
       const themeToDelete = availableThemes.find(t => t.id === themeId);
-      
+
       if (!themeToDelete || !themeToDelete.isEditable) {
         throw new Error('Cannot delete built-in themes or theme not found');
       }
-      
+
       // Filter out the theme
       const customThemes = availableThemes.filter(t => t.isEditable && t.id !== themeId);
       const updatedAllThemes = [...DEFAULT_THEMES, ...customThemes];
-      
+
       // Save to storage (scoped app_settings + legacy key)
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const key = `@user:${scope}:app_settings`;
@@ -305,10 +305,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       settings.customThemes = customThemes;
       await mmkvStorage.setItem(key, JSON.stringify(settings));
       await mmkvStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(customThemes));
-      
+
       // Update state
       setAvailableThemes(updatedAllThemes);
-      
+
       // Reset to default theme if current theme was deleted
       if (currentTheme.id === themeId) {
         setCurrentThemeState(DEFAULT_THEMES[0]);
@@ -318,19 +318,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (__DEV__) console.error('Failed to delete custom theme:', error);
     }
-  };
+  }, [availableThemes, currentTheme.id]);
+
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  const contextValue = useMemo(() => ({
+    currentTheme,
+    availableThemes,
+    setCurrentTheme,
+    addCustomTheme,
+    updateCustomTheme,
+    deleteCustomTheme,
+  }), [currentTheme, availableThemes, setCurrentTheme, addCustomTheme, updateCustomTheme, deleteCustomTheme]);
 
   return (
-    <ThemeContext.Provider
-      value={{
-        currentTheme,
-        availableThemes,
-        setCurrentTheme,
-        addCustomTheme,
-        updateCustomTheme,
-        deleteCustomTheme,
-      }}
-    >
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

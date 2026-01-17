@@ -1166,7 +1166,9 @@ const HomeScreen = () => {
           scrollEventThrottle={16}
           nestedScrollEnabled={true}
           estimatedItemSize={isTVDevice ? 400 : 300}
-          drawDistance={isTVDevice ? 2500 : 250}
+          // Reduced drawDistance on TV from 2500 to 1200 to limit mounted components
+          // 2500px was keeping 6-7 catalog rows (~200 items) mounted causing sluggishness
+          drawDistance={isTVDevice ? 1200 : 250}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}
@@ -1731,13 +1733,30 @@ const styles = StyleSheet.create<any>({
 
 import { DeviceEventEmitter } from 'react-native';
 
+// Debounce helper to prevent rapid-fire events
+let focusSyncTimeout: ReturnType<typeof setTimeout> | null = null;
+
 const HomeScreenWithFocusSync = (props: any) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      DeviceEventEmitter.emit('watchedStatusChanged');
+      // Debounce the watchedStatusChanged event to prevent cascading re-renders
+      // On TV, rapid navigation can trigger multiple focus events
+      if (focusSyncTimeout) {
+        clearTimeout(focusSyncTimeout);
+      }
+      focusSyncTimeout = setTimeout(() => {
+        DeviceEventEmitter.emit('watchedStatusChanged');
+        focusSyncTimeout = null;
+      }, Platform.isTV ? 300 : 100); // Longer debounce on TV
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (focusSyncTimeout) {
+        clearTimeout(focusSyncTimeout);
+        focusSyncTimeout = null;
+      }
+    };
   }, [navigation]);
   return <HomeScreen {...props} />;
 };

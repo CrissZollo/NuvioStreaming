@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react';
 
-const DEBUG_MODE = true; // Temporarily enable for debugging seek
+const DEBUG_MODE = __DEV__ && false; // Set to true only when debugging seek issues
 const END_EPSILON = 0.3;
 
 export const usePlayerControls = (

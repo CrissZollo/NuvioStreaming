@@ -3,10 +3,10 @@ import { useEffect } from 'react';
 import { SubtitleCue } from './playerTypes';
 import { parseSRT as parseSRTEnhanced, parseSubtitle } from './subtitleParser';
 
-// Debug flag - set back to false to disable verbose logging
-// WARNING: Setting this to true currently causes infinite render loops
+// Debug flag - set to false to disable verbose logging
+// WARNING: Setting this to true can cause performance issues and infinite render loops
 // Use selective logging instead if debugging is needed
-export const DEBUG_MODE = true;
+export const DEBUG_MODE = __DEV__ && false;
 
 // Safer debug function that won't cause render loops
 // Call this with any debugging info you need instead of using inline DEBUG_MODE checks

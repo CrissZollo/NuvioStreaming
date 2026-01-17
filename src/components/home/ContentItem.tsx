@@ -115,57 +115,86 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const actualViewRef = focusRef || internalViewRef;
 
   // Register node handle when component mounts (for sibling navigation)
+  // Use requestAnimationFrame instead of setTimeout for faster registration
   useEffect(() => {
     if (isTVDevice && onRegisterNodeHandle) {
-      // Small delay to ensure the view is fully mounted
-      const timer = setTimeout(() => {
-        if (actualViewRef.current) {
-          onRegisterNodeHandle(actualViewRef.current);
-        }
-      }, 100);
-      return () => clearTimeout(timer);
+      // Register synchronously if ref is ready, otherwise use rAF
+      if (actualViewRef.current) {
+        onRegisterNodeHandle(actualViewRef.current);
+      } else {
+        const frameId = requestAnimationFrame(() => {
+          if (actualViewRef.current) {
+            onRegisterNodeHandle(actualViewRef.current);
+          }
+        });
+        return () => cancelAnimationFrame(frameId);
+      }
     }
   }, [isTVDevice, onRegisterNodeHandle, actualViewRef, item.id, focusRef]);
   const [isWatched, setIsWatched] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  // On TV, defer subscriptions to reduce initial render overhead
-  // Only subscribe after a delay to allow smooth scrolling first
+  // Subscribe to library updates - use rAF on TV to not block initial render
   useEffect(() => {
-    if (isTVDevice) {
-      // On TV, delay subscription setup for performance
-      const timer = setTimeout(() => {
-        const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
-          const found = items.find((libItem) => libItem.id === item.id && libItem.type === item.type);
-          const newInLibrary = !!found;
-          setInLibrary(prev => prev !== newInLibrary ? newInLibrary : prev);
-        });
-        return () => unsubscribe();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
+    let unsubscribe: (() => void) | undefined;
 
-    // Mobile: immediate subscription
-    const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
-      const found = items.find((libItem) => libItem.id === item.id && libItem.type === item.type);
-      const newInLibrary = !!found;
-      setInLibrary(prev => prev !== newInLibrary ? newInLibrary : prev);
-    });
-    return () => unsubscribe();
-  }, [item.id, item.type, isTVDevice]);
-
-  // Load watched state - defer on TV for performance
-  useEffect(() => {
-    const updateWatched = () => {
-      mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then((val: string | null) => setIsWatched(val === 'true'));
+    const setupSubscription = () => {
+      unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
+        const found = items.find((libItem) => libItem.id === item.id && libItem.type === item.type);
+        const newInLibrary = !!found;
+        setInLibrary(prev => prev !== newInLibrary ? newInLibrary : prev);
+      });
     };
 
     if (isTVDevice) {
-      // On TV, delay to reduce initial overhead
-      const timer = setTimeout(updateWatched, 300);
-      const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
+      // On TV, defer subscription to next frame to not block initial render
+      const frameId = requestAnimationFrame(setupSubscription);
       return () => {
-        clearTimeout(timer);
+        cancelAnimationFrame(frameId);
+        unsubscribe?.();
+      };
+    }
+
+    // Mobile: immediate subscription
+    setupSubscription();
+    return () => unsubscribe?.();
+  }, [item.id, item.type, isTVDevice]);
+
+  // Load watched state - defer on TV for performance
+  // Use ref to track if component is still mounted and avoid duplicate reads
+  const watchedCheckPending = useRef(false);
+  useEffect(() => {
+    const updateWatched = () => {
+      // Prevent duplicate reads if one is already pending
+      if (watchedCheckPending.current) return;
+      watchedCheckPending.current = true;
+
+      // Use requestAnimationFrame to batch reads and avoid blocking the JS thread
+      requestAnimationFrame(() => {
+        mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then((val: string | null) => {
+          watchedCheckPending.current = false;
+          setIsWatched(val === 'true');
+        }).catch(() => {
+          watchedCheckPending.current = false;
+        });
+      });
+    };
+
+    if (isTVDevice) {
+      // On TV, defer to next frame to not block initial render
+      const frameId = requestAnimationFrame(updateWatched);
+      // Throttle event-driven updates to avoid cascading re-renders
+      let lastUpdate = 0;
+      const sub = DeviceEventEmitter.addListener('watchedStatusChanged', () => {
+        const now = Date.now();
+        // Only update if at least 100ms has passed since last update
+        if (now - lastUpdate > 100) {
+          lastUpdate = now;
+          updateWatched();
+        }
+      });
+      return () => {
+        cancelAnimationFrame(frameId);
         sub.remove();
       };
     }

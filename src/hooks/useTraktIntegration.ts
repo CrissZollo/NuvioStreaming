@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import {
   traktService,
@@ -657,7 +657,9 @@ export function useTraktIntegration() {
     return await fetchAndMergeTraktProgress();
   }, [isAuthenticated, fetchAndMergeTraktProgress]);
 
-  return {
+  // Memoize the return value to prevent unnecessary re-renders of consumers
+  // This is critical for TV performance since TraktContext is used by many ContentItems
+  return useMemo(() => ({
     isAuthenticated,
     isLoading,
     userProfile,
@@ -694,5 +696,41 @@ export function useTraktIntegration() {
     removeFromCollection,
     isInWatchlist,
     isInCollection
-  };
+  }), [
+    isAuthenticated,
+    isLoading,
+    userProfile,
+    watchedMovies,
+    watchedShows,
+    watchlistMovies,
+    watchlistShows,
+    collectionMovies,
+    collectionShows,
+    continueWatching,
+    ratedContent,
+    checkAuthStatus,
+    loadWatchedItems,
+    loadAllCollections,
+    isMovieWatched,
+    isEpisodeWatched,
+    markMovieAsWatched,
+    markEpisodeAsWatched,
+    refreshAuthStatus,
+    startWatching,
+    updateProgress,
+    updateProgressImmediate,
+    stopWatching,
+    stopWatchingImmediate,
+    syncProgress,
+    getTraktPlaybackProgress,
+    syncAllProgress,
+    fetchAndMergeTraktProgress,
+    forceSyncTraktProgress,
+    addToWatchlist,
+    removeFromWatchlist,
+    addToCollection,
+    removeFromCollection,
+    isInWatchlist,
+    isInCollection
+  ]);
 }

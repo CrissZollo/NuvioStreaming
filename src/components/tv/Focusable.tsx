@@ -199,72 +199,36 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       return handle ?? undefined;
     };
 
+    // Optimized focus handler - removed all logging calls for TV performance
+    // Even disabled logging functions have call overhead on low-end devices
     const handleFocus = useCallback(() => {
-      const startTime = focusLog.start('Focusable.handleFocus');
-      navLog.perfStart('Focusable.handleFocus');
-      navLog.focus(testID || 'Focusable', { autoFocus, hasRenderProp: needsFocusState });
-
       isFocusedRef.current = true;
-      focusLog.mark('ref updated');
 
       // Only update state if we have a render prop that needs it
       if (needsFocusState) {
-        focusLog.mark('setState(true) START');
-        navLog.perfStart('Focusable.setState.focus');
         setIsFocusedState(true);
-        navLog.perfEnd('Focusable.setState.focus');
-        focusLog.mark('setState(true) END');
       }
 
-      // Use fast timing instead of spring for better performance
-      focusLog.mark('animation START');
-      navLog.perfStart('Focusable.animation.focus');
-      focusProgress.value = withTiming(1, { duration: 100 });
-      navLog.perfEnd('Focusable.animation.focus');
-      focusLog.mark('animation END');
+      // Very fast animation for responsive feel on low-end TV devices
+      focusProgress.value = withTiming(1, { duration: 50 });
 
-      focusLog.mark('onFocus callback START');
-      navLog.perfStart('Focusable.onFocusCallback');
       onFocus?.();
-      navLog.perfEnd('Focusable.onFocusCallback');
-      focusLog.mark('onFocus callback END');
+    }, [onFocus, focusProgress, needsFocusState]);
 
-      focusLog.end('Focusable.handleFocus', startTime);
-      navLog.perfEnd('Focusable.handleFocus');
-    }, [onFocus, focusProgress, needsFocusState, testID, autoFocus]);
-
+    // Optimized blur handler - removed all logging calls for TV performance
     const handleBlur = useCallback(() => {
-      const startTime = focusLog.start('Focusable.handleBlur');
-      navLog.perfStart('Focusable.handleBlur');
-      navLog.blur(testID || 'Focusable');
-
       isFocusedRef.current = false;
-      focusLog.mark('ref updated');
 
       // Only update state if we have a render prop that needs it
       if (needsFocusState) {
-        focusLog.mark('setState(false) START');
-        navLog.perfStart('Focusable.setState.blur');
         setIsFocusedState(false);
-        navLog.perfEnd('Focusable.setState.blur');
-        focusLog.mark('setState(false) END');
       }
 
-      focusLog.mark('animation START');
-      navLog.perfStart('Focusable.animation.blur');
-      focusProgress.value = withTiming(0, { duration: 150 });
-      navLog.perfEnd('Focusable.animation.blur');
-      focusLog.mark('animation END');
+      // Very fast animation for responsive feel on low-end TV devices
+      focusProgress.value = withTiming(0, { duration: 50 });
 
-      focusLog.mark('onBlur callback START');
-      navLog.perfStart('Focusable.onBlurCallback');
       onBlur?.();
-      navLog.perfEnd('Focusable.onBlurCallback');
-      focusLog.mark('onBlur callback END');
-
-      focusLog.end('Focusable.handleBlur', startTime);
-      navLog.perfEnd('Focusable.handleBlur');
-    }, [onBlur, focusProgress, needsFocusState, testID]);
+    }, [onBlur, focusProgress, needsFocusState]);
 
     // Expose focus methods via ref
     useImperativeHandle(ref, () => ({
@@ -273,7 +237,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         if (needsFocusState) {
           setIsFocusedState(true);
         }
-        focusProgress.value = withTiming(1, { duration: 100 });
+        focusProgress.value = withTiming(1, { duration: 50 });
         if (actualRef.current) {
           (actualRef.current as any).setNativeProps?.({
             hasTVPreferredFocus: true,
@@ -285,7 +249,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         if (needsFocusState) {
           setIsFocusedState(false);
         }
-        focusProgress.value = withTiming(0, { duration: 100 });
+        focusProgress.value = withTiming(0, { duration: 50 });
       },
       isFocused: () => isFocusedRef.current,
       getViewRef: () => actualRef,
