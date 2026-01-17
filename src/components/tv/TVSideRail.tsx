@@ -5,6 +5,7 @@ import {
   StyleSheet,
   BackHandler,
   Image,
+  findNodeHandle,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -84,16 +85,23 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
     NAV_ITEMS.map(() => React.createRef<View>()),
     []
   );
-  // Force re-render when refs are populated to apply directional focus
-  const [refsReady, setRefsReady] = useState(false);
 
-  // Mark refs as ready after mount and expose the first menu item view
-  // Use requestAnimationFrame instead of setTimeout for faster registration
+  // Store resolved node handles for directional focus
+  const [navItemHandles, setNavItemHandles] = useState<(number | null)[]>([]);
+
+  // Resolve all nav item handles after mount and expose first item to context
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
-      setRefsReady(true);
+      // Resolve all nav item handles
+      const handles = navItemViewRefs.map(ref => {
+        if (ref.current) {
+          return findNodeHandle(ref.current);
+        }
+        return null;
+      });
+      setNavItemHandles(handles);
+
       // Expose the first nav item view (Home) to the context
-      // The context will get the node handle from it
       if (navItemViewRefs[0]?.current) {
         setMenuFirstItemView(navItemViewRefs[0].current);
       }
@@ -256,8 +264,9 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
                 showFocusBorder={true}
                 blockUp={isFirst}
                 blockDown={isLast}
-                nextFocusUp={refsReady && !isFirst ? navItemViewRefs[index - 1] : undefined}
-                nextFocusDown={refsReady && !isLast ? navItemViewRefs[index + 1] : undefined}
+                blockLeft={true}
+                nextFocusUpId={!isFirst && navItemHandles[index - 1] ? navItemHandles[index - 1] : undefined}
+                nextFocusDownId={!isLast && navItemHandles[index + 1] ? navItemHandles[index + 1] : undefined}
               >
                 {(focused) => {
                   const iconColor = focused
@@ -271,11 +280,13 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
                   return (
                   <>
                     <View style={styles.navItemContent}>
-                      <IconComponent
-                        name={item.icon as any}
-                        size={22}
-                        color={iconColor}
-                      />
+                      <View style={styles.iconContainer}>
+                        <IconComponent
+                          name={item.icon as any}
+                          size={22}
+                          color={iconColor}
+                        />
+                      </View>
                       {isExpanded && (
                         <Animated.Text
                           style={[
@@ -364,8 +375,11 @@ const styles = StyleSheet.create({
   navItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  iconContainer: {
+    width: COLLAPSED_WIDTH - 8,  // 52px (accounting for navItems paddingHorizontal: 4)
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
   },
   navLabel: {
     fontSize: 18,

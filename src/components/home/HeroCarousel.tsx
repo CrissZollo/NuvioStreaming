@@ -791,6 +791,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false, con
                   nextFocusLeftId={leftNodeHandle}
                   nextFocusRightId={rightNodeHandle}
                   onRegisterNodeHandle={(view) => registerTVItemNodeHandle(logicalIndex, view)}
+                  autoFocus={isFirstItem}
                 />
               );
             }
@@ -1101,6 +1102,8 @@ interface TVHeroCardWrapperProps {
   nextFocusRightId?: number | null;
   /** Callback to register this item's node handle */
   onRegisterNodeHandle?: (view: View | null) => void;
+  /** Auto focus this item on mount */
+  autoFocus?: boolean;
 }
 
 const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
@@ -1118,6 +1121,7 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
   nextFocusLeftId,
   nextFocusRightId,
   onRegisterNodeHandle,
+  autoFocus = false,
 }) => {
   // Border padding - space between poster and focus border frame
   const borderPadding = 4;
@@ -1149,6 +1153,7 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
         blockLeft={blockLeft}
         nextFocusLeftId={nextFocusLeftId}
         nextFocusRightId={nextFocusRightId}
+        autoFocus={autoFocus}
       >
         <TVSimpleCard
           item={item}
@@ -1168,7 +1173,8 @@ const TVHeroCardWrapper: React.FC<TVHeroCardWrapperProps> = memo(({
          prevProps.viewRef === nextProps.viewRef &&
          prevProps.nextFocusLeftId === nextProps.nextFocusLeftId &&
          prevProps.nextFocusRightId === nextProps.nextFocusRightId &&
-         prevProps.blockLeft === nextProps.blockLeft;
+         prevProps.blockLeft === nextProps.blockLeft &&
+         prevProps.autoFocus === nextProps.autoFocus;
 });
 
 const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet, isTVDevice = false }) => {

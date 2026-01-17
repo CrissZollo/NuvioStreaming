@@ -48,6 +48,7 @@ import ScreenHeader from '../components/common/ScreenHeader';
 import { useIsTV } from '../contexts/TVContext';
 import { Focusable } from '../components/tv/Focusable';
 import { useTVKeyEvent } from '../hooks/useTVKeyEvent';
+import { useTVFocus } from '../contexts/TVFocusContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -225,6 +226,7 @@ const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = true;
   const isTVDevice = useIsTV();
+  const { getMenuFirstItemNodeHandle } = useTVFocus();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GroupedSearchResults>({ byAddon: [], allResults: [] });
   const [searching, setSearching] = useState(false);
@@ -643,6 +645,7 @@ const SearchScreen = () => {
                 showFocusBorder={true}
                 blockDown={isLast}
                 autoFocus={isFirst}
+                nextFocusLeftId={getMenuFirstItemNodeHandle() ?? undefined}
               >
                 {(focused) => (
                   <>
@@ -698,7 +701,7 @@ const SearchScreen = () => {
     );
   };
 
-  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme, isTVDevice, isFirst, isLast, isFirstRow, searchButtonRef, searchButtonNodeHandle, onFirstRowFocus, onFirstRowBlur }: {
+  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme, isTVDevice, isFirst, isLast, isFirstRow, searchButtonRef, searchButtonNodeHandle, menuNodeHandle, onFirstRowFocus, onFirstRowBlur }: {
     item: StreamingContent;
     index: number;
     navigation: any;
@@ -711,6 +714,7 @@ const SearchScreen = () => {
     isFirstRow?: boolean;
     searchButtonRef?: React.RefObject<View>;
     searchButtonNodeHandle?: number | null;
+    menuNodeHandle?: number | null;
     onFirstRowFocus?: () => void;
     onFirstRowBlur?: () => void;
   }) => {
@@ -825,6 +829,7 @@ const SearchScreen = () => {
             showFocusBorder={true}
             blockRight={isLast}
             nextFocusUpId={isFirstRow ? searchButtonNodeHandle : undefined}
+            nextFocusLeftId={isFirst && menuNodeHandle ? menuNodeHandle : undefined}
           >
             <View style={[styles.horizontalItemPosterContainer, {
               width: itemWidth,
@@ -910,6 +915,7 @@ const SearchScreen = () => {
     isFirstAddon,
     searchButtonRef,
     searchButtonNodeHandle,
+    menuNodeHandle,
     onFirstRowFocus,
     onFirstRowBlur
   }: {
@@ -918,6 +924,7 @@ const SearchScreen = () => {
     isFirstAddon?: boolean;
     searchButtonRef?: React.RefObject<View>;
     searchButtonNodeHandle?: number | null;
+    menuNodeHandle?: number | null;
     onFirstRowFocus?: () => void;
     onFirstRowBlur?: () => void;
   }) => {
@@ -978,6 +985,7 @@ const SearchScreen = () => {
                   isFirstRow={isFirstAddon}
                   searchButtonRef={searchButtonRef}
                   searchButtonNodeHandle={searchButtonNodeHandle}
+                  menuNodeHandle={menuNodeHandle}
                   onFirstRowFocus={onFirstRowFocus}
                   onFirstRowBlur={onFirstRowBlur}
                 />
@@ -1021,6 +1029,7 @@ const SearchScreen = () => {
                   isFirstRow={isFirstAddon && movieResults.length === 0}
                   searchButtonRef={searchButtonRef}
                   searchButtonNodeHandle={searchButtonNodeHandle}
+                  menuNodeHandle={menuNodeHandle}
                   onFirstRowFocus={onFirstRowFocus}
                   onFirstRowBlur={onFirstRowBlur}
                 />
@@ -1064,6 +1073,7 @@ const SearchScreen = () => {
                   isFirstRow={isFirstAddon && movieResults.length === 0 && seriesResults.length === 0}
                   searchButtonRef={searchButtonRef}
                   searchButtonNodeHandle={searchButtonNodeHandle}
+                  menuNodeHandle={menuNodeHandle}
                   onFirstRowFocus={onFirstRowFocus}
                   onFirstRowBlur={onFirstRowBlur}
                 />
@@ -1080,7 +1090,7 @@ const SearchScreen = () => {
     );
   }, (prev, next) => {
     // Only re-render if this section's reference changed
-    return prev.addonGroup === next.addonGroup && prev.addonIndex === next.addonIndex && prev.isFirstAddon === next.isFirstAddon && prev.searchButtonRef === next.searchButtonRef && prev.searchButtonNodeHandle === next.searchButtonNodeHandle && prev.onFirstRowFocus === next.onFirstRowFocus && prev.onFirstRowBlur === next.onFirstRowBlur;
+    return prev.addonGroup === next.addonGroup && prev.addonIndex === next.addonIndex && prev.isFirstAddon === next.isFirstAddon && prev.searchButtonRef === next.searchButtonRef && prev.searchButtonNodeHandle === next.searchButtonNodeHandle && prev.menuNodeHandle === next.menuNodeHandle && prev.onFirstRowFocus === next.onFirstRowFocus && prev.onFirstRowBlur === next.onFirstRowBlur;
   });
 
   // Set up listeners for watched status and library updates
@@ -1149,6 +1159,7 @@ const SearchScreen = () => {
                   animateBackground={false}
                   showFocusBorder={true}
                   blockUp={true}
+                  nextFocusLeftId={getMenuFirstItemNodeHandle() ?? undefined}
                   viewRef={searchButtonRef}
                 >
                   <MaterialIcons
@@ -1180,6 +1191,7 @@ const SearchScreen = () => {
                     animateBackground={false}
                     showFocusBorder={true}
                     blockUp={true}
+                    nextFocusLeftId={getMenuFirstItemNodeHandle() ?? undefined}
                   >
                     <MaterialIcons
                       name="close"
@@ -1297,6 +1309,7 @@ const SearchScreen = () => {
                 isFirstAddon={addonIndex === 0}
                 searchButtonRef={searchButtonRef}
                 searchButtonNodeHandle={searchButtonNodeHandle}
+                menuNodeHandle={getMenuFirstItemNodeHandle()}
                 onFirstRowFocus={handleFirstRowFocus}
                 onFirstRowBlur={handleFirstRowBlur}
               />

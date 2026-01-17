@@ -40,6 +40,7 @@ import { TraktLoadingSpinner } from '../components/common/TraktLoadingSpinner';
 import { useSettings } from '../hooks/useSettings';
 import { useIsTV } from '../contexts/TVContext';
 import { Focusable } from '../components/tv/Focusable';
+import { useTVFocus } from '../contexts/TVFocusContext';
 
 interface LibraryItem extends StreamingContent {
   progress?: number;
@@ -265,6 +266,7 @@ const LibraryScreen = () => {
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
+  const { getMenuFirstItemNodeHandle } = useTVFocus();
 
   const {
     isAuthenticated: traktAuthenticated,
@@ -994,7 +996,7 @@ const LibraryScreen = () => {
           focusScale={1.05}
           animateBackground={false}
           showFocusBorder={true}
-          blockLeft={isFirst}
+          nextFocusLeftId={isFirst ? getMenuFirstItemNodeHandle() ?? undefined : undefined}
           blockRight={isLast}
           autoFocus={isFirst}
         >
@@ -1027,6 +1029,7 @@ const LibraryScreen = () => {
     if (filteredItems.length === 0) {
       const emptyTitle = filter === 'movies' ? 'No movies yet' : filter === 'series' ? 'No TV shows yet' : 'No content yet';
       const emptySubtitle = 'Add some content to your library to see it here';
+
       return (
         <View style={styles.emptyContainer}>
           <MaterialIcons
@@ -1040,16 +1043,18 @@ const LibraryScreen = () => {
           <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
             {emptySubtitle}
           </Text>
-          <TouchableOpacity
-            style={[styles.exploreButton, {
-              backgroundColor: currentTheme.colors.primary,
-              shadowColor: currentTheme.colors.black
-            }]}
-            onPress={() => navigation.navigate('Search')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Find something to watch</Text>
-          </TouchableOpacity>
+          {!isTVDevice && (
+            <TouchableOpacity
+              style={[styles.exploreButton, {
+                backgroundColor: currentTheme.colors.primary,
+                shadowColor: currentTheme.colors.black
+              }]}
+              onPress={() => navigation.navigate('Search')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Find something to watch</Text>
+            </TouchableOpacity>
+          )}
         </View>
       );
     }

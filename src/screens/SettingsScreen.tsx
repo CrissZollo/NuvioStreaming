@@ -43,6 +43,7 @@ import MDBListIcon from '../components/icons/MDBListIcon';
 import { campaignService } from '../services/campaignService';
 import { Focusable } from '../components/tv/Focusable';
 import { useIsTV } from '../contexts/TVContext';
+import { useTVFocus } from '../contexts/TVFocusContext';
 import QRCode from 'react-native-qrcode-svg';
 import { SpatialNavTest } from '../components/tv/SpatialNavTest';
 
@@ -255,9 +256,10 @@ interface SidebarProps {
   categories: typeof SETTINGS_CATEGORIES;
   extraTopPadding?: number;
   isTV?: boolean;
+  menuNodeHandle?: number | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories, extraTopPadding = 0, isTV = false }) => {
+const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories, extraTopPadding = 0, isTV = false, menuNodeHandle }) => {
   const renderCategoryItem = (category: typeof SETTINGS_CATEGORIES[0], focused: boolean = false) => {
     const isActive = selectedCategory === category.id;
     return (
@@ -322,7 +324,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
       </View>
 
       <ScrollView style={styles.sidebarContent} showsVerticalScrollIndicator={false}>
-        {categories.map((category) => (
+        {categories.map((category, index) => (
           isTV ? (
             <Focusable
               key={category.id}
@@ -335,6 +337,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
               borderRadius={10}
               focusScale={1.03}
               animateBackground={true}
+              autoFocus={index === 0}
+              nextFocusLeftId={menuNodeHandle ?? undefined}
             >
               {(focused) => renderCategoryItem(category, focused)}
             </Focusable>
@@ -364,6 +368,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
 const SettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const isTVDevice = useIsTV();
+  const { getMenuFirstItemNodeHandle } = useTVFocus();
   const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -1154,6 +1159,7 @@ const SettingsScreen: React.FC = () => {
             categories={visibleCategories}
             extraTopPadding={tabletNavOffset}
             isTV={isTVDevice}
+            menuNodeHandle={getMenuFirstItemNodeHandle()}
           />
 
           <View style={[

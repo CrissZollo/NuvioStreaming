@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Focusable } from '../components/tv/Focusable';
+import { useTVFocus } from '../contexts/TVFocusContext';
 import QRCode from 'react-native-qrcode-svg';
 import { Feather } from '@expo/vector-icons';
 
@@ -16,12 +17,23 @@ const KOFI_URL = 'https://ko-fi.com/crisszollo';
 
 const SupportProjectScreen = () => {
   const { currentTheme } = useTheme();
+  const { getMenuFirstItemNodeHandle } = useTVFocus();
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <View style={styles.content}>
+      <Focusable
+        style={styles.content}
+        autoFocus={true}
+        nextFocusLeftId={getMenuFirstItemNodeHandle() ?? undefined}
+        focusScale={1.0}
+        animateBackground={false}
+        showFocusBorder={false}
+        blockUp={true}
+        blockDown={true}
+        blockRight={true}
+      >
         {/* Left side - Text content */}
         <View style={styles.textContainer}>
           <View style={styles.headerRow}>
@@ -91,7 +103,7 @@ const SupportProjectScreen = () => {
             </Text>
           </View>
         </View>
-      </View>
+      </Focusable>
     </View>
   );
 };
