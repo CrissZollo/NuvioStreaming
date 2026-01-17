@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '../../contexts/ToastContext';
-import { DeviceEventEmitter } from 'react-native';
+import { DeviceEventEmitter, PixelRatio } from 'react-native';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Share } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
@@ -338,18 +338,35 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   }, []);
 
   // Memoize optimized poster URL to prevent recalculating
+  // Use pixel ratio to determine the right TMDB image size
   const optimizedPosterUrl = React.useMemo(() => {
     if (!item.poster || item.poster.includes('placeholder')) {
       return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
     }
     if (item.poster.includes('image.tmdb.org')) {
-      return item.poster.replace(/\/w\d+\//, '/w154/');
+      // Calculate physical pixels needed for the poster
+      const pixelRatio = PixelRatio.get();
+      // Cap at 2x to avoid unnecessarily large images
+      const effectiveRatio = Math.min(pixelRatio, 2);
+      const physicalWidth = finalWidth * effectiveRatio;
+
+      // Select the smallest TMDB size that covers the physical pixels needed
+      // TMDB sizes: w92, w154, w185, w342, w500, w780
+      let size = 'w185';
+      if (physicalWidth <= 92) size = 'w92';
+      else if (physicalWidth <= 154) size = 'w154';
+      else if (physicalWidth <= 185) size = 'w185';
+      else if (physicalWidth <= 342) size = 'w342';
+      else if (physicalWidth <= 500) size = 'w500';
+      else size = 'w780';
+
+      return item.poster.replace(/\/(w\d+|original)\//, `/${size}/`);
     }
     if (item.poster.includes('placeholder')) {
       return item.poster.replace('/medium/', '/small/');
     }
     return item.poster;
-  }, [item.poster, item.id]);
+  }, [item.poster, item.id, finalWidth]);
 
   if (!isLoaded) {
     return (

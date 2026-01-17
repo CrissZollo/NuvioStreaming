@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, PixelRatio } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { logger } from '../../utils/logger';
 
@@ -17,8 +17,10 @@ interface OptimizedImageProps {
 }
 
 const { width: screenWidth } = Dimensions.get('window');
+const pixelRatio = PixelRatio.get();
 
-// Image size optimization based on container size
+// Image size optimization based on container size AND pixel ratio
+// This ensures we request the right size image for the actual physical pixels needed
 const getOptimizedImageUrl = (originalUrl: string, containerWidth?: number, containerHeight?: number): string => {
   if (!originalUrl || originalUrl.includes('placeholder')) {
     return originalUrl;
@@ -26,26 +28,36 @@ const getOptimizedImageUrl = (originalUrl: string, containerWidth?: number, cont
 
   // For TMDB images, we can request specific sizes
   if (originalUrl.includes('image.tmdb.org')) {
-    const width = containerWidth || 300;
+    const logicalWidth = containerWidth || 300;
+    // Calculate physical pixels needed, but cap the ratio to avoid requesting
+    // unnecessarily large images on very high DPI devices
+    const effectiveRatio = Math.min(pixelRatio, 2);
+    const physicalWidth = logicalWidth * effectiveRatio;
+
     let size = 'w300';
-    
-    if (width <= 92) size = 'w92';
-    else if (width <= 154) size = 'w154';
-    else if (width <= 185) size = 'w185';
-    else if (width <= 342) size = 'w342';
-    else if (width <= 500) size = 'w500';
-    else if (width <= 780) size = 'w780';
+
+    // Select the smallest TMDB size that covers the physical pixels needed
+    if (physicalWidth <= 92) size = 'w92';
+    else if (physicalWidth <= 154) size = 'w154';
+    else if (physicalWidth <= 185) size = 'w185';
+    else if (physicalWidth <= 342) size = 'w342';
+    else if (physicalWidth <= 500) size = 'w500';
+    else if (physicalWidth <= 780) size = 'w780';
     else size = 'w1280';
-    
-    // Replace the size in the URL
-    return originalUrl.replace(/\/w\d+\//, `/${size}/`);
+
+    // Replace the size in the URL (handles both /wXXX/ and /original/)
+    return originalUrl.replace(/\/(w\d+|original)\//, `/${size}/`);
   }
 
   // For other image services, add query parameters if supported
+  const effectiveRatio = Math.min(pixelRatio, 2);
+  const physicalWidth = Math.round((containerWidth || 300) * effectiveRatio);
+  const physicalHeight = Math.round((containerHeight || 450) * effectiveRatio);
+
   if (originalUrl.includes('?')) {
-    return `${originalUrl}&w=${containerWidth || 300}&h=${containerHeight || 450}&q=80`;
+    return `${originalUrl}&w=${physicalWidth}&h=${physicalHeight}&q=80`;
   } else {
-    return `${originalUrl}?w=${containerWidth || 300}&h=${containerHeight || 450}&q=80`;
+    return `${originalUrl}?w=${physicalWidth}&h=${physicalHeight}&q=80`;
   }
 };
 

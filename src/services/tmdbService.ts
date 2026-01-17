@@ -644,15 +644,17 @@ export class TMDBService {
 
   /**
    * Get image URL for TMDB images
+   * Supports common sizes: w92, w154, w185, w300, w342, w500, w780, w1280, original
+   * For backdrops, w1280 is recommended over original for better performance
    */
-  getImageUrl(path: string | null, size: 'original' | 'w500' | 'w300' | 'w185' | 'profile' = 'original'): string | null {
+  getImageUrl(path: string | null, size: 'original' | 'w1280' | 'w780' | 'w500' | 'w342' | 'w300' | 'w185' | 'w154' | 'w92' | 'profile' = 'original'): string | null {
     if (!path) {
       return null;
     }
-    
+
     const baseImageUrl = 'https://image.tmdb.org/t/p/';
     const fullUrl = `${baseImageUrl}${size}${path}`;
-    
+
     return fullUrl;
   }
 

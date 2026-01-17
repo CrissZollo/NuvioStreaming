@@ -2248,8 +2248,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                         id: `tmdb:${part.id}`,
                         type: 'movie',
                         name: part.title,
-                        poster: part.poster_path ? tmdbService.getImageUrl(part.poster_path, 'w500') : 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
-                        banner: movieBackdropUrl || (part.backdrop_path ? tmdbService.getImageUrl(part.backdrop_path, 'original') : undefined),
+                        poster: part.poster_path ? tmdbService.getImageUrl(part.poster_path, 'w342') : 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
+                        banner: movieBackdropUrl || (part.backdrop_path ? tmdbService.getImageUrl(part.backdrop_path, 'w1280') : undefined),
                         year: part.release_date ? new Date(part.release_date).getFullYear() : undefined,
                         description: part.overview,
                         collection: {

@@ -445,16 +445,16 @@ const TMDBSettingsScreen = () => {
         setIsPreviewFallback(false);
       }
 
-      // Get TMDB banner (backdrop)
+      // Get TMDB banner (backdrop) - use w1280 for better performance
       if (imagesData.backdrops && imagesData.backdrops.length > 0) {
         const backdropPath = imagesData.backdrops[0].file_path;
-        setTmdbBanner(`https://image.tmdb.org/t/p/original${backdropPath}`);
+        setTmdbBanner(`https://image.tmdb.org/t/p/w1280${backdropPath}`);
       } else {
         const detailsResponse = await fetch(`https://api.themoviedb.org/3/${endpoint}/${tmdbId}?api_key=${apiKey}`);
         const details = await detailsResponse.json();
 
         if (details.backdrop_path) {
-          setTmdbBanner(`https://image.tmdb.org/t/p/original${details.backdrop_path}`);
+          setTmdbBanner(`https://image.tmdb.org/t/p/w1280${details.backdrop_path}`);
         }
       }
     } catch (err) {

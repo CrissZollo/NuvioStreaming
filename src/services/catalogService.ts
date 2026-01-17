@@ -615,9 +615,11 @@ class CatalogService {
       id,
       type: type === 'movie' ? 'movie' : 'series',
       name: name || 'Unknown',
-      poster: posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
+      // Use w342 as default - components will optimize further based on actual display size
+      poster: posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
       posterShape: 'poster',
-      banner: item.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : undefined,
+      // Use w1280 for backdrops instead of original - sufficient for 1080p displays and much smaller file size
+      banner: item.backdrop_path ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}` : undefined,
       year: type === 'movie'
         ? (item.release_date ? new Date(item.release_date).getFullYear() : undefined)
         : (item.first_air_date ? new Date(item.first_air_date).getFullYear() : undefined),

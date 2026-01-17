@@ -56,7 +56,8 @@ export const fetchBannerFromTMDB = async (
     if (tmdbType === 'movie') {
       const movieDetails = await tmdbService.getMovieDetails(tmdbId.toString());
       if (movieDetails && movieDetails.backdrop_path) {
-        bannerUrl = tmdbService.getImageUrl(movieDetails.backdrop_path, 'original');
+        // Use w1280 instead of original for better performance on TV/mobile
+        bannerUrl = tmdbService.getImageUrl(movieDetails.backdrop_path, 'w1280');
         logger.log(`[logoUtils] Found backdrop_path: ${movieDetails.backdrop_path}`);
       } else {
         logger.warn(`[logoUtils] No backdrop_path found in movie details for ID ${tmdbId}`);
@@ -64,7 +65,8 @@ export const fetchBannerFromTMDB = async (
     } else {
       const showDetails = await tmdbService.getTVShowDetails(Number(tmdbId));
       if (showDetails && showDetails.backdrop_path) {
-        bannerUrl = tmdbService.getImageUrl(showDetails.backdrop_path, 'original');
+        // Use w1280 instead of original for better performance on TV/mobile
+        bannerUrl = tmdbService.getImageUrl(showDetails.backdrop_path, 'w1280');
         logger.log(`[logoUtils] Found backdrop_path: ${showDetails.backdrop_path}`);
       } else {
         logger.warn(`[logoUtils] No backdrop_path found in TV show details for ID ${tmdbId}`);
