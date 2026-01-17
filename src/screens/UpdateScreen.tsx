@@ -23,10 +23,11 @@ import UpdateService from '../services/updateService';
 import CustomAlert from '../components/CustomAlert';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useGithubMajorUpdate } from '../hooks/useGithubMajorUpdate';
-import { getDisplayedAppVersion } from '../utils/version';
-import { isAnyUpgrade, GITHUB_RELEASE_SOURCES, GithubReleaseSourceKey, getStoredGithubReleaseSource, setGithubReleaseSource } from '../services/githubReleaseService';
+import { getDisplayedAppVersion, getNuvioTVVersion } from '../utils/version';
+import { isNewerVersion, GITHUB_RELEASE_SOURCES, GithubReleaseSourceKey, getStoredGithubReleaseSource, setGithubReleaseSource } from '../services/githubReleaseService';
 import { useIsTV } from '../contexts/TVContext';
 import { Focusable, FocusableRef } from '../components/tv/Focusable';
+import { downloadAndInstallUpdate, DownloadProgress } from '../services/apkInstallService';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -132,6 +133,11 @@ const UpdateScreen: React.FC = () => {
   // GitHub release source setting
   const [releaseSource, setReleaseSource] = useState<GithubReleaseSourceKey>(isTV ? 'crisszollo' : 'tapframe');
 
+  // APK Download state
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStatus, setDownloadStatus] = useState<string>('');
+
   // Load notification settings on mount
   useEffect(() => {
     (async () => {
@@ -213,6 +219,56 @@ const UpdateScreen: React.FC = () => {
     }
   };
 
+  // Handle downloading and installing APK update
+  const handleDownloadUpdate = async () => {
+    if (!github.releaseUrl || isDownloading) return;
+
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    setDownloadStatus('Starting download...');
+
+    const success = await downloadAndInstallUpdate(
+      github.releaseUrl,
+      (progress: DownloadProgress) => {
+        setDownloadProgress(progress.progress);
+        const mb = (progress.totalBytesWritten / (1024 * 1024)).toFixed(1);
+        const totalMb = progress.totalBytesExpectedToWrite > 0
+          ? (progress.totalBytesExpectedToWrite / (1024 * 1024)).toFixed(1)
+          : '?';
+        setDownloadStatus(`Downloading: ${mb}MB / ${totalMb}MB`);
+      },
+      (status, message) => {
+        switch (status) {
+          case 'fetching':
+            setDownloadStatus(message || 'Finding download...');
+            break;
+          case 'downloading':
+            setDownloadStatus(message || 'Downloading...');
+            break;
+          case 'installing':
+            setDownloadStatus(message || 'Opening installer...');
+            setDownloadProgress(100);
+            break;
+          case 'done':
+            setDownloadStatus('');
+            setDownloadProgress(0);
+            setIsDownloading(false);
+            showInfo('Update', 'APK installer should now be open');
+            break;
+          case 'error':
+            setDownloadStatus(`Error: ${message}`);
+            setIsDownloading(false);
+            openAlert('Download Failed', message || 'Failed to download update. Please try again.');
+            break;
+        }
+      }
+    );
+
+    if (!success) {
+      setIsDownloading(false);
+    }
+  };
+
   const checkForUpdates = async () => {
     try {
       setIsChecking(true);
@@ -251,13 +307,16 @@ const UpdateScreen: React.FC = () => {
         try { await mmkvStorage.removeItem('@update_badge_pending'); } catch { }
       })();
     }
-    checkForUpdates();
-    // Also refresh GitHub section on mount (works in dev and prod)
+    // Only check OTA updates for non-TV devices
+    if (!isTV) {
+      checkForUpdates();
+    }
+    // Always refresh GitHub section on mount (works in dev and prod)
     try { github.refresh(); } catch { }
-    if (Platform.OS === 'android') {
+    if (Platform.OS === 'android' && !isTV) {
       showInfo('Checking for Updates', 'Checking for updates…');
     }
-  }, []);
+  }, [isTV]);
 
   const installUpdate = async () => {
     try {
@@ -442,14 +501,21 @@ const UpdateScreen: React.FC = () => {
           <Focusable
             ref={backButtonRef}
             onPress={() => navigation.goBack()}
-            style={styles.backButton}
             autoFocus
             nextFocusDown={checkUpdatesRef.current?.getViewRef()}
             borderRadius={8}
             focusScale={1.05}
+            showFocusBorder={false}
+            animateBackground={false}
           >
             {(focused) => (
-              <>
+              <View style={[
+                styles.backButton,
+                {
+                  backgroundColor: focused ? '#fff' : 'transparent',
+                  borderRadius: 8,
+                }
+              ]}>
                 <MaterialIcons
                   name="arrow-back"
                   size={24}
@@ -461,7 +527,7 @@ const UpdateScreen: React.FC = () => {
                 ]}>
                   Settings
                 </Text>
-              </>
+              </View>
             )}
           </Focusable>
         ) : (
@@ -492,6 +558,8 @@ const UpdateScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
+          {/* OTA Updates - Hide for TV, focus on GitHub releases */}
+          {!isTV && (
           <SettingsCard title="APP UPDATES" isTablet={isTablet}>
             {/* Main Update Card */}
             <View style={styles.updateMainCard}>
@@ -724,129 +792,249 @@ const UpdateScreen: React.FC = () => {
 
             {/* Developer Logs removed */}
           </SettingsCard>
+          )}
 
-          {/* GitHub Release (compact) – only show when update is available */}
-          {github.latestTag && isAnyUpgrade(getDisplayedAppVersion(), github.latestTag) ? (
-            <SettingsCard title="GITHUB RELEASE" isTablet={isTablet}>
-              <View style={styles.infoSection}>
-                <View style={styles.infoItem}>
-                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                    <MaterialIcons name="new-releases" size={14} color={currentTheme.colors.primary} />
-                  </View>
-                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current:</Text>
-                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                    {getDisplayedAppVersion()}
-                  </Text>
-                </View>
+          {/* GitHub Release - Always show for TV, only when update available for mobile */}
+          {(() => {
+            const currentVersion = isTV ? getNuvioTVVersion() : getDisplayedAppVersion();
+            const hasUpdate = github.latestTag && isNewerVersion(currentVersion, github.latestTag);
+            const shouldShow = isTV || hasUpdate;
 
-                <View style={styles.infoItem}>
-                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                    <MaterialIcons name="tag" size={14} color={currentTheme.colors.primary} />
-                  </View>
-                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Latest:</Text>
-                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                    {github.latestTag}
-                  </Text>
-                </View>
+            if (!shouldShow) return null;
 
-                {github.releaseNotes ? (
-                  <View style={{ marginTop: 4 }}>
-                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Notes:</Text>
-                    <Text
-                      numberOfLines={3}
-                      style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
-                    >
-                      {github.releaseNotes}
-                    </Text>
-                  </View>
-                ) : null}
-
-                <View style={[styles.actionSection, { marginTop: 8 }]}>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    {isTV ? (
-                      <Focusable
-                        ref={viewReleaseRef}
-                        onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
-                        style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
-                        borderRadius={12}
-                        focusScale={1.05}
-                        animateBackground={false}
-                        nextFocusUp={checkUpdatesRef.current?.getViewRef()}
-                        nextFocusDown={otaToggleRef.current?.getViewRef()}
-                      >
-                        {(focused) => (
-                          <>
-                            <MaterialIcons name="open-in-new" size={18} color={focused ? '#000' : 'white'} />
-                            <Text style={[
-                              styles.modernButtonText,
-                              focused && { color: '#000' }
-                            ]}>View Release</Text>
-                          </>
-                        )}
-                      </Focusable>
-                    ) : (
-                      <TouchableOpacity
-                        style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
-                        onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
-                        activeOpacity={0.8}
-                      >
-                        <MaterialIcons name="open-in-new" size={18} color="white" />
-                        <Text style={styles.modernButtonText}>View Release</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </View>
-            </SettingsCard>
-          ) : null}
-
-          {/* Update Notification Settings */}
-          <SettingsCard title="NOTIFICATION SETTINGS" isTablet={isTablet}>
-            {/* OTA Updates Toggle */}
-            {isTV ? (
-              <Focusable
-                ref={otaToggleRef}
-                onPress={() => handleOtaAlertsToggle(!otaAlertsEnabled)}
-                style={styles.settingRow}
-                borderRadius={8}
-                focusScale={1}
-                animateBackground={true}
-                showFocusBorder={true}
-                nextFocusUp={checkUpdatesRef.current?.getViewRef()}
-                nextFocusDown={majorToggleRef.current?.getViewRef()}
-              >
-                {(focused) => (
-                  <>
-                    <View style={styles.settingInfo}>
-                      <Text style={[
-                        styles.settingLabel,
-                        { color: focused ? '#000' : currentTheme.colors.highEmphasis }
-                      ]}>
-                        OTA Update Alerts
-                      </Text>
-                      <Text style={[
-                        styles.settingDescription,
-                        { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
-                      ]}>
-                        Show notifications for over-the-air updates
-                      </Text>
-                    </View>
-                    <View style={styles.tvSwitchContainer}>
-                      <View style={[
-                        styles.tvSwitchTrack,
-                        { backgroundColor: focused ? (otaAlertsEnabled ? '#333' : '#666') : (otaAlertsEnabled ? currentTheme.colors.primary : '#505050') }
-                      ]}>
-                        <View style={[
-                          styles.tvSwitchThumb,
-                          otaAlertsEnabled ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                          { backgroundColor: focused ? '#000' : '#fff' }
-                        ]} />
+            return (
+              <SettingsCard title={isTV ? "SOFTWARE UPDATE" : "GITHUB RELEASE"} isTablet={isTablet}>
+                <View style={styles.infoSection}>
+                  {/* TV: Large prominent version display */}
+                  {isTV && (
+                    <View style={styles.tvVersionDisplay}>
+                      <View style={[styles.tvVersionBox, { backgroundColor: currentTheme.colors.elevation2 }]}>
+                        <Text style={[styles.tvVersionLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                          Installed Version
+                        </Text>
+                        <Text style={[styles.tvVersionNumber, { color: currentTheme.colors.highEmphasis }]}>
+                          {currentVersion}
+                        </Text>
+                      </View>
+                      <MaterialIcons
+                        name={github.isChecking ? "sync" : (hasUpdate ? "arrow-forward" : "check-circle")}
+                        size={32}
+                        color={github.isChecking ? currentTheme.colors.mediumEmphasis : (hasUpdate ? currentTheme.colors.primary : (currentTheme.colors.success || '#4CAF50'))}
+                        style={styles.tvVersionArrow}
+                      />
+                      <View style={[styles.tvVersionBox, { backgroundColor: hasUpdate ? `${currentTheme.colors.primary}15` : currentTheme.colors.elevation2 }]}>
+                        <Text style={[styles.tvVersionLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                          {github.isChecking ? 'Checking' : (hasUpdate ? 'Available' : 'Latest')}
+                        </Text>
+                        <Text style={[styles.tvVersionNumber, { color: hasUpdate ? currentTheme.colors.primary : currentTheme.colors.highEmphasis }]}>
+                          {github.isChecking ? '...' : (github.latestTag || (github.hasError ? 'Error' : 'Unknown'))}
+                        </Text>
                       </View>
                     </View>
-                  </>
-                )}
-              </Focusable>
-            ) : (
+                  )}
+
+                  {/* Mobile: Compact version info */}
+                  {!isTV && (
+                    <>
+                      <View style={styles.infoItem}>
+                        <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                          <MaterialIcons name="new-releases" size={14} color={currentTheme.colors.primary} />
+                        </View>
+                        <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current:</Text>
+                        <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                          {currentVersion}
+                        </Text>
+                      </View>
+
+                      <View style={styles.infoItem}>
+                        <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                          <MaterialIcons name="tag" size={14} color={currentTheme.colors.primary} />
+                        </View>
+                        <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Latest:</Text>
+                        <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                          {github.latestTag}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+
+                  {/* Status message for TV */}
+                  {isTV && !github.isChecking && (
+                    <View style={[styles.tvStatusBanner, {
+                      backgroundColor: github.hasError
+                        ? `${currentTheme.colors.error || '#ff4444'}15`
+                        : (hasUpdate ? `${currentTheme.colors.primary}15` : `${currentTheme.colors.success || '#4CAF50'}15`)
+                    }]}>
+                      <MaterialIcons
+                        name={github.hasError ? "error-outline" : (hasUpdate ? "system-update" : "check-circle")}
+                        size={24}
+                        color={github.hasError
+                          ? (currentTheme.colors.error || '#ff4444')
+                          : (hasUpdate ? currentTheme.colors.primary : (currentTheme.colors.success || '#4CAF50'))}
+                      />
+                      <Text style={[styles.tvStatusText, {
+                        color: github.hasError
+                          ? (currentTheme.colors.error || '#ff4444')
+                          : (hasUpdate ? currentTheme.colors.primary : (currentTheme.colors.success || '#4CAF50'))
+                      }]}>
+                        {github.hasError
+                          ? 'Could not check for updates'
+                          : (hasUpdate ? 'A new version is available!' : 'Your app is up to date')}
+                      </Text>
+                    </View>
+                  )}
+
+                  {github.releaseNotes && !github.isChecking ? (
+                    <View style={{ marginTop: isTV ? 16 : 4 }}>
+                      <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis, fontSize: isTV ? 16 : 14 }]}>
+                        Release Notes:
+                      </Text>
+                      <Text
+                        numberOfLines={isTV ? 4 : 3}
+                        style={[styles.infoValue, { color: currentTheme.colors.highEmphasis, fontSize: isTV ? 15 : 14, lineHeight: isTV ? 22 : 20, marginTop: 4 }]}
+                      >
+                        {github.releaseNotes}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Action buttons for TV */}
+                  {isTV && (
+                    <View style={[styles.actionSection, { marginTop: 20 }]}>
+                      <View style={{ flexDirection: 'row', gap: 16 }}>
+                        {/* Check for Updates button */}
+                        <Focusable
+                          ref={checkUpdatesRef}
+                          onPress={() => github.refresh()}
+                          disabled={github.isChecking}
+                          style={{ flex: 1 }}
+                          autoFocus
+                          borderRadius={12}
+                          focusScale={1.02}
+                          showFocusBorder={false}
+                          animateBackground={false}
+                          nextFocusUp={backButtonRef.current?.getViewRef()}
+                          nextFocusDown={majorToggleRef.current?.getViewRef()}
+                          nextFocusRight={viewReleaseRef.current?.getViewRef()}
+                        >
+                          {(focused) => (
+                            <View style={[
+                              styles.tvButtonInner,
+                              {
+                                backgroundColor: focused ? currentTheme.colors.primary : currentTheme.colors.elevation2,
+                                borderWidth: 3,
+                                borderColor: focused ? '#fff' : 'transparent',
+                              }
+                            ]}>
+                              <MaterialIcons
+                                name={github.isChecking ? "sync" : "refresh"}
+                                size={22}
+                                color={focused ? '#fff' : currentTheme.colors.highEmphasis}
+                              />
+                              <Text style={[
+                                styles.modernButtonText,
+                                styles.tvButtonText,
+                                { color: focused ? '#fff' : currentTheme.colors.highEmphasis }
+                              ]}>
+                                {github.isChecking ? 'Checking...' : 'Check for Updates'}
+                              </Text>
+                            </View>
+                          )}
+                        </Focusable>
+
+                        {/* Download/Reinstall button - show when update available OR when up to date (reinstall option) */}
+                        {(hasUpdate || (!hasUpdate && github.latestTag && !github.isChecking)) && (
+                          <Focusable
+                            ref={viewReleaseRef}
+                            onPress={handleDownloadUpdate}
+                            disabled={isDownloading}
+                            style={{ flex: 1 }}
+                            borderRadius={12}
+                            focusScale={1.02}
+                            showFocusBorder={false}
+                            animateBackground={false}
+                            nextFocusUp={checkUpdatesRef.current?.getViewRef()}
+                            nextFocusDown={majorToggleRef.current?.getViewRef()}
+                            nextFocusLeft={checkUpdatesRef.current?.getViewRef()}
+                          >
+                            {(focused) => (
+                              <View style={[
+                                styles.tvButtonInner,
+                                {
+                                  backgroundColor: focused ? '#fff' : (hasUpdate ? currentTheme.colors.primary : currentTheme.colors.elevation2),
+                                  borderWidth: 3,
+                                  borderColor: focused ? (hasUpdate ? currentTheme.colors.primary : '#fff') : 'transparent',
+                                  opacity: isDownloading ? 0.7 : 1,
+                                }
+                              ]}>
+                                <MaterialIcons
+                                  name={isDownloading ? "downloading" : "download"}
+                                  size={22}
+                                  color={focused ? (hasUpdate ? currentTheme.colors.primary : '#000') : (hasUpdate ? '#fff' : currentTheme.colors.highEmphasis)}
+                                />
+                                <Text style={[
+                                  styles.modernButtonText,
+                                  styles.tvButtonText,
+                                  { color: focused ? (hasUpdate ? currentTheme.colors.primary : '#000') : (hasUpdate ? '#fff' : currentTheme.colors.highEmphasis) }
+                                ]}>
+                                  {isDownloading
+                                    ? `${downloadProgress}%`
+                                    : (hasUpdate ? 'Download & Install' : 'Reinstall')}
+                                </Text>
+                              </View>
+                            )}
+                          </Focusable>
+                        )}
+                      </View>
+
+                      {/* Download progress indicator */}
+                      {isDownloading && (
+                        <View style={{ marginTop: 16 }}>
+                          <View style={[styles.downloadProgressBar, { backgroundColor: currentTheme.colors.elevation2 }]}>
+                            <View
+                              style={[
+                                styles.downloadProgressFill,
+                                {
+                                  backgroundColor: currentTheme.colors.primary,
+                                  width: `${downloadProgress}%`,
+                                }
+                              ]}
+                            />
+                          </View>
+                          <Text style={[styles.downloadStatusText, { color: currentTheme.colors.mediumEmphasis }]}>
+                            {downloadStatus}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Action buttons for Mobile */}
+                  {!isTV && (hasUpdate || (!hasUpdate && github.latestTag && !github.isChecking)) && (
+                    <View style={[styles.actionSection, { marginTop: 8 }]}>
+                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <TouchableOpacity
+                          style={[styles.modernButton, { backgroundColor: hasUpdate ? currentTheme.colors.primary : currentTheme.colors.elevation2, flex: 1 }]}
+                          onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
+                          activeOpacity={0.8}
+                        >
+                          <MaterialIcons name={hasUpdate ? "open-in-new" : "refresh"} size={18} color={hasUpdate ? "white" : currentTheme.colors.highEmphasis} />
+                          <Text style={[styles.modernButtonText, !hasUpdate && { color: currentTheme.colors.highEmphasis }]}>
+                            {hasUpdate ? 'View Release' : 'Reinstall Anyway'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </SettingsCard>
+            );
+          })()}
+
+          {/* Update Notification Settings */}
+          <SettingsCard title={isTV ? "UPDATE NOTIFICATIONS" : "NOTIFICATION SETTINGS"} isTablet={isTablet}>
+            {/* OTA Updates Toggle - Only for non-TV */}
+            {!isTV && (
               <View style={styles.settingRow}>
                 <View style={styles.settingInfo}>
                   <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
@@ -866,33 +1054,44 @@ const UpdateScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Major Updates Toggle */}
+            {/* Update Alerts Toggle */}
             {isTV ? (
               <Focusable
                 ref={majorToggleRef}
                 onPress={() => handleMajorAlertsToggle(!majorAlertsEnabled)}
-                style={[styles.settingRow, { borderBottomWidth: 0 }]}
+                style={{ marginHorizontal: 4 }}
                 borderRadius={8}
                 focusScale={1}
-                animateBackground={true}
-                showFocusBorder={true}
-                nextFocusUp={otaToggleRef.current?.getViewRef()}
+                animateBackground={false}
+                showFocusBorder={false}
+                nextFocusUp={checkUpdatesRef.current?.getViewRef()}
                 nextFocusDown={releaseSourceTapframeRef.current?.getViewRef()}
               >
                 {(focused) => (
-                  <>
+                  <View style={[
+                    styles.settingRow,
+                    {
+                      borderBottomWidth: 0,
+                      borderRadius: 8,
+                      backgroundColor: focused ? '#fff' : 'transparent',
+                      borderWidth: 2,
+                      borderColor: focused ? '#fff' : 'transparent',
+                    }
+                  ]}>
                     <View style={styles.settingInfo}>
                       <Text style={[
                         styles.settingLabel,
+                        styles.tvSettingLabel,
                         { color: focused ? '#000' : currentTheme.colors.highEmphasis }
                       ]}>
-                        Major Update Alerts
+                        Update Notifications
                       </Text>
                       <Text style={[
                         styles.settingDescription,
+                        styles.tvSettingDescription,
                         { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
                       ]}>
-                        Show notifications for new app versions on GitHub
+                        Show popup when a new version is available
                       </Text>
                     </View>
                     <View style={styles.tvSwitchContainer}>
@@ -907,7 +1106,7 @@ const UpdateScreen: React.FC = () => {
                         ]} />
                       </View>
                     </View>
-                  </>
+                  </View>
                 )}
               </Focusable>
             ) : (
@@ -959,16 +1158,24 @@ const UpdateScreen: React.FC = () => {
               <Focusable
                 ref={releaseSourceTapframeRef}
                 onPress={() => handleReleaseSourceChange('tapframe')}
-                style={styles.settingRow}
+                style={{ marginHorizontal: 4 }}
                 borderRadius={8}
                 focusScale={1}
-                animateBackground={true}
-                showFocusBorder={true}
+                animateBackground={false}
+                showFocusBorder={false}
                 nextFocusUp={majorToggleRef.current?.getViewRef()}
                 nextFocusDown={releaseSourceCrisszolloRef.current?.getViewRef()}
               >
                 {(focused) => (
-                  <>
+                  <View style={[
+                    styles.settingRow,
+                    {
+                      borderRadius: 8,
+                      backgroundColor: focused ? '#fff' : 'transparent',
+                      borderWidth: 2,
+                      borderColor: focused ? '#fff' : 'transparent',
+                    }
+                  ]}>
                     <View style={styles.settingInfo}>
                       <Text style={[
                         styles.settingLabel,
@@ -996,7 +1203,7 @@ const UpdateScreen: React.FC = () => {
                         )}
                       </View>
                     </View>
-                  </>
+                  </View>
                 )}
               </Focusable>
             ) : (
@@ -1031,15 +1238,24 @@ const UpdateScreen: React.FC = () => {
               <Focusable
                 ref={releaseSourceCrisszolloRef}
                 onPress={() => handleReleaseSourceChange('crisszollo')}
-                style={[styles.settingRow, { borderBottomWidth: 0 }]}
+                style={{ marginHorizontal: 4 }}
                 borderRadius={8}
                 focusScale={1}
-                animateBackground={true}
-                showFocusBorder={true}
+                animateBackground={false}
+                showFocusBorder={false}
                 nextFocusUp={releaseSourceTapframeRef.current?.getViewRef()}
               >
                 {(focused) => (
-                  <>
+                  <View style={[
+                    styles.settingRow,
+                    {
+                      borderBottomWidth: 0,
+                      borderRadius: 8,
+                      backgroundColor: focused ? '#fff' : 'transparent',
+                      borderWidth: 2,
+                      borderColor: focused ? '#fff' : 'transparent',
+                    }
+                  ]}>
                     <View style={styles.settingInfo}>
                       <Text style={[
                         styles.settingLabel,
@@ -1067,7 +1283,7 @@ const UpdateScreen: React.FC = () => {
                         )}
                       </View>
                     </View>
-                  </>
+                  </View>
                 )}
               </Focusable>
             ) : (
@@ -1555,6 +1771,85 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
+  },
+
+  // TV-specific version display styles
+  tvVersionDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 16,
+  },
+  tvVersionBox: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  tvVersionLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  tvVersionNumber: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  tvVersionArrow: {
+    marginHorizontal: 8,
+  },
+  tvStatusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 12,
+    marginTop: 8,
+  },
+  tvStatusText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  tvDownloadButton: {
+    paddingVertical: 0,
+  },
+  tvButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: '100%',
+  },
+  tvButtonText: {
+    fontSize: 18,
+  },
+  tvSettingLabel: {
+    fontSize: 18,
+  },
+  tvSettingDescription: {
+    fontSize: 15,
+  },
+
+  // Download progress styles
+  downloadProgressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  downloadProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  downloadStatusText: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

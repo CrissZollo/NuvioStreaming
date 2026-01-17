@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
 import * as Updates from 'expo-updates';
-import { getDisplayedAppVersion } from '../utils/version';
-import { fetchLatestGithubRelease, isAnyUpgrade } from '../services/githubReleaseService';
+import { getDisplayedAppVersion, getNuvioTVVersion } from '../utils/version';
+import { fetchLatestGithubRelease, isNewerVersion } from '../services/githubReleaseService';
+import { isAndroidTV } from '../utils/tvDetection';
 
 const DISMISSED_KEY = '@github_major_update_dismissed_version';
 
@@ -12,6 +13,8 @@ export interface MajorUpdateData {
   latestTag?: string;
   releaseNotes?: string;
   releaseUrl?: string;
+  isChecking: boolean;
+  hasError: boolean;
   onDismiss: () => void;
   onLater: () => void;
   refresh: () => void;
@@ -22,35 +25,58 @@ export function useGithubMajorUpdate(): MajorUpdateData {
   const [latestTag, setLatestTag] = useState<string | undefined>();
   const [releaseNotes, setReleaseNotes] = useState<string | undefined>();
   const [releaseUrl, setReleaseUrl] = useState<string | undefined>();
+  const [isChecking, setIsChecking] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const check = useCallback(async () => {
+    // Only skip iOS - Android (including Android TV) should check
     if (Platform.OS === 'ios') return;
+
+    setIsChecking(true);
+    setHasError(false);
+
     try {
-      // Check if major update alerts are disabled
-      const majorAlertsEnabled = await mmkvStorage.getItem('@major_updates_alerts_enabled');
-      if (majorAlertsEnabled === 'false') {
-        return; // Major update alerts are disabled by user
+      // Use TV version for Android TV, regular app version otherwise
+      const current = isAndroidTV()
+        ? getNuvioTVVersion()
+        : (getDisplayedAppVersion() || Updates.runtimeVersion || '0.0.0');
+
+      const info = await fetchLatestGithubRelease();
+      if (!info?.tag_name) {
+        setHasError(true);
+        setIsChecking(false);
+        return;
       }
 
-      // Always compare with Settings screen version
-      const current = getDisplayedAppVersion() || Updates.runtimeVersion || '0.0.0';
-      const info = await fetchLatestGithubRelease();
-      if (!info?.tag_name) return;
+      // Always set the latest tag for display purposes
+      setLatestTag(info.tag_name);
+      setReleaseNotes(info.body);
+      setReleaseUrl(info.html_url);
+
+      // Check if major update alerts are disabled (for popup only)
+      const majorAlertsEnabled = await mmkvStorage.getItem('@major_updates_alerts_enabled');
+      if (majorAlertsEnabled === 'false') {
+        setIsChecking(false);
+        return; // Don't show popup, but we still set latestTag for the settings screen
+      }
 
       const dismissed = await mmkvStorage.getItem(DISMISSED_KEY);
-      if (dismissed === info.tag_name) return;
+      if (dismissed === info.tag_name) {
+        setIsChecking(false);
+        return;
+      }
 
       // "Later" is session-only now, no persisted snooze
 
-      const shouldShow = isAnyUpgrade(current, info.tag_name);
+      // Use new version comparison that handles pre-releases
+      const shouldShow = isNewerVersion(current, info.tag_name);
       if (shouldShow) {
-        setLatestTag(info.tag_name);
-        setReleaseNotes(info.body);
-        setReleaseUrl(info.html_url);
         setVisible(true);
       }
     } catch {
-      // ignore
+      setHasError(true);
+    } finally {
+      setIsChecking(false);
     }
   }, []);
 
@@ -67,7 +93,7 @@ export function useGithubMajorUpdate(): MajorUpdateData {
     setVisible(false);
   }, []);
 
-  return { visible, latestTag, releaseNotes, releaseUrl, onDismiss, onLater, refresh: check };
+  return { visible, latestTag, releaseNotes, releaseUrl, isChecking, hasError, onDismiss, onLater, refresh: check };
 }
 
 

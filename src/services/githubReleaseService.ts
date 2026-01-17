@@ -21,10 +21,10 @@ export const GITHUB_RELEASE_SOURCES = {
   },
   crisszollo: {
     label: 'TV Fork (CrissZollo)',
-    apiUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreaming/releases/latest',
-    releasesUrl: 'https://github.com/CrissZollo/NuvioStreaming/releases',
-    contributorsUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreaming/contributors',
-    allReleasesApiUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreaming/releases',
+    apiUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreamingTV/releases',
+    releasesUrl: 'https://github.com/CrissZollo/NuvioStreamingTV/releases',
+    contributorsUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreamingTV/contributors',
+    allReleasesApiUrl: 'https://api.github.com/repos/CrissZollo/NuvioStreamingTV/releases',
   },
 } as const;
 
@@ -71,12 +71,18 @@ export async function fetchLatestGithubRelease(sourceOverride?: GithubReleaseSou
     });
     if (!res.ok) return null;
     const json = await res.json();
+
+    // Handle both array (all releases) and single object (latest) responses
+    // Using array endpoint to include pre-releases
+    const release = Array.isArray(json) ? json[0] : json;
+    if (!release) return null;
+
     return {
-      tag_name: json.tag_name,
-      name: json.name,
-      body: json.body,
-      html_url: json.html_url,
-      published_at: json.published_at,
+      tag_name: release.tag_name,
+      name: release.name,
+      body: release.body,
+      html_url: release.html_url,
+      published_at: release.published_at,
     };
   } catch {
     return null;
@@ -87,6 +93,84 @@ export function parseSemver(version: string): [number, number, number] | null {
   const m = version.trim().replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
   if (!m) return null;
   return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+}
+
+// Pre-release type ordering (higher = more stable)
+const PRERELEASE_ORDER: Record<string, number> = {
+  alpha: 1,
+  beta: 2,
+  rc: 3,
+};
+
+export interface ParsedVersion {
+  major: number;
+  minor: number;
+  patch: number;
+  prerelease?: { type: string; num: number };
+}
+
+/**
+ * Parse versions like "v1.0.0-beta-3", "1.0.0 BETA 3", "1.0.0-rc.1"
+ */
+export function parseVersionWithPrerelease(version: string): ParsedVersion | null {
+  // Normalize: remove 'v' prefix, convert to lowercase, replace spaces with dashes
+  const normalized = version.trim().replace(/^v/, '').toLowerCase().replace(/\s+/g, '-');
+
+  // Match patterns like "1.0.0-beta-3" or "1.0.0"
+  const match = normalized.match(/^(\d+)\.(\d+)\.(\d+)(?:[-.]?(alpha|beta|rc)[-.]?(\d+)?)?/);
+  if (!match) return null;
+
+  const result: ParsedVersion = {
+    major: parseInt(match[1], 10),
+    minor: parseInt(match[2], 10),
+    patch: parseInt(match[3], 10),
+  };
+
+  if (match[4]) {
+    result.prerelease = {
+      type: match[4],
+      num: match[5] ? parseInt(match[5], 10) : 0,
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Compare two versions with pre-release support.
+ * Returns: positive if a > b, negative if a < b, 0 if equal
+ */
+export function compareVersions(a: string, b: string): number {
+  const va = parseVersionWithPrerelease(a);
+  const vb = parseVersionWithPrerelease(b);
+
+  if (!va || !vb) return 0;
+
+  // Compare major.minor.patch
+  if (va.major !== vb.major) return va.major - vb.major;
+  if (va.minor !== vb.minor) return va.minor - vb.minor;
+  if (va.patch !== vb.patch) return va.patch - vb.patch;
+
+  // Same base version - compare pre-release
+  // No pre-release (stable) > any pre-release
+  if (!va.prerelease && vb.prerelease) return 1;
+  if (va.prerelease && !vb.prerelease) return -1;
+  if (!va.prerelease && !vb.prerelease) return 0;
+
+  // Both have pre-release - compare type first (rc > beta > alpha)
+  const orderA = PRERELEASE_ORDER[va.prerelease!.type] || 0;
+  const orderB = PRERELEASE_ORDER[vb.prerelease!.type] || 0;
+  if (orderA !== orderB) return orderA - orderB;
+
+  // Same pre-release type - compare number
+  return va.prerelease!.num - vb.prerelease!.num;
+}
+
+/**
+ * Check if latest version is newer than current (with pre-release support)
+ */
+export function isNewerVersion(current: string, latest: string): boolean {
+  return compareVersions(latest, current) > 0;
 }
 
 export function isMajorOrMinorUpgrade(current: string, latest: string): boolean {

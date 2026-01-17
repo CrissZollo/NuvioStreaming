@@ -4,7 +4,7 @@
 export const APP_VERSION = '1.3.0';
 
 // Nuvio TV release version - update this for each release
-export const NUVIO_TV_VERSION = '1.0.0 BETA 3';
+export const NUVIO_TV_VERSION = 'v1.0.0-beta-4';
 
 export function getDisplayedAppVersion(): string {
   return APP_VERSION;
