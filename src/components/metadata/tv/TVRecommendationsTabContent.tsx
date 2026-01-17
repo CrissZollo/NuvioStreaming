@@ -21,12 +21,14 @@ const CARD_SPACING = 8;
 
 interface TVRecommendationsTabContentProps {
   recommendations: StreamingContent[];
+  loading?: boolean;
   firstContentItemRef: React.RefObject<View>;
   activeTabRef: React.RefObject<View>;
 }
 
 const TVRecommendationsTabContentComponent: React.FC<TVRecommendationsTabContentProps> = ({
   recommendations,
+  loading = false,
   firstContentItemRef,
   activeTabRef,
 }) => {
@@ -79,6 +81,9 @@ const TVRecommendationsTabContentComponent: React.FC<TVRecommendationsTabContent
     const isFirst = index === 0;
     const isLast = index === recommendations.length - 1;
 
+    // Use lower priority for items further from the start
+    const imagePriority = index < 6 ? FastImage.priority.high : FastImage.priority.low;
+
     return (
       <View style={[styles.cardWrapper, { marginRight: CARD_SPACING }]}>
         <Focusable
@@ -99,7 +104,11 @@ const TVRecommendationsTabContentComponent: React.FC<TVRecommendationsTabContent
           nextFocusRight={!isLast ? getItemRef(index + 1) : undefined}
         >
           <FastImage
-            source={{ uri: item.poster }}
+            source={{
+              uri: item.poster,
+              priority: imagePriority,
+              cache: FastImage.cacheControl.immutable,
+            }}
             style={styles.poster}
             resizeMode={FastImage.resizeMode.cover}
           />
@@ -126,6 +135,18 @@ const TVRecommendationsTabContentComponent: React.FC<TVRecommendationsTabContent
     index,
   }), []);
 
+  // Show loading state
+  if (loading) {
+    return (
+      <View style={styles.emptyContainer}>
+        <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+        <Text style={[styles.emptyText, { color: currentTheme.colors.textMuted, marginTop: 12 }]}>
+          Loading recommendations...
+        </Text>
+      </View>
+    );
+  }
+
   if (recommendations.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -147,10 +168,11 @@ const TVRecommendationsTabContentComponent: React.FC<TVRecommendationsTabContent
         showsHorizontalScrollIndicator={false}
         scrollEnabled={false} // D-pad controls focus
         contentContainerStyle={styles.listContent}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        windowSize={11}
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
+        windowSize={7}
         getItemLayout={getItemLayout}
+        removeClippedSubviews
       />
     </View>
   );

@@ -942,6 +942,7 @@ const MetadataScreen: React.FC = () => {
         onSeasonChange={handleSeasonChange}
         onSelectEpisode={handleEpisodeSelect}
         recommendations={recommendations}
+        loadingRecommendations={loadingRecommendations}
         cast={cast}
         tmdbId={tmdbId}
         imdbId={imdbId}

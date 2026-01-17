@@ -22,6 +22,7 @@ interface TVMetadataTabContentProps {
   onSelectEpisode?: (episode: Episode) => void;
   // Other sections
   recommendations: StreamingContent[];
+  loadingRecommendations?: boolean;
   cast: any[];
   tmdbId: number | null;
   contentId: string;
@@ -40,6 +41,7 @@ const TVMetadataTabContentComponent: React.FC<TVMetadataTabContentProps> = ({
   onSeasonChange,
   onSelectEpisode,
   recommendations,
+  loadingRecommendations = false,
   cast,
   tmdbId,
   contentId,
@@ -66,6 +68,7 @@ const TVMetadataTabContentComponent: React.FC<TVMetadataTabContentProps> = ({
         return (
           <TVRecommendationsTabContent
             recommendations={recommendations}
+            loading={loadingRecommendations}
             firstContentItemRef={firstContentItemRef}
             activeTabRef={activeTabRef}
           />

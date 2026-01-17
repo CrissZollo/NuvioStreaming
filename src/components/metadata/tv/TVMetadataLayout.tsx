@@ -65,6 +65,7 @@ export interface TVMetadataLayoutProps {
   onSelectEpisode?: (episode: Episode) => void;
   // Sections data
   recommendations: StreamingContent[];
+  loadingRecommendations?: boolean;
   cast: any[];
   tmdbId: number | null;
   imdbId: string | null;
@@ -99,6 +100,7 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
     onSeasonChange,
     onSelectEpisode,
     recommendations,
+    loadingRecommendations = false,
     cast,
     tmdbId,
     imdbId,
@@ -120,8 +122,8 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
   const isSeries = Object.keys(groupedEpisodes).length > 0;
   const tabs = isSeries ? SERIES_TABS : MOVIE_TABS;
 
-  // Tab state - no tab selected by default
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  // Tab state - first tab selected by default
+  const [activeTab, setActiveTab] = useState<string | null>(tabs[0]?.id || null);
 
   // Refs for focus navigation
   const playButtonRef = useRef<View>(null);
@@ -218,6 +220,7 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
               onSeasonChange={onSeasonChange}
               onSelectEpisode={onSelectEpisode}
               recommendations={recommendations}
+              loadingRecommendations={loadingRecommendations}
               cast={cast}
               tmdbId={tmdbId}
               contentId={contentId}
