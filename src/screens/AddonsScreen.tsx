@@ -23,7 +23,7 @@ import { stremioService, Manifest } from '../services/stremioService';
 import { MaterialIcons } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
@@ -229,6 +229,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  qrInstallButton: {
+    backgroundColor: colors.elevation1,
+    borderRadius: 12,
+    padding: 16,
+  },
+  qrInstallContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  qrInstallTextContainer: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  qrInstallTitle: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  qrInstallSubtitle: {
+    color: colors.mediumGray,
+    fontSize: 13,
+  },
   addonInput: {
     backgroundColor: colors.elevation1,
     borderRadius: 8,
@@ -278,6 +301,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     marginBottom: 16,
+  },
+  grabbedAddonItem: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.elevation3,
+    transform: [{ scale: 1.02 }],
+  },
+  grabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.elevation3,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  grabButtonText: {
+    color: colors.mediumGray,
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   addonHeader: {
     flexDirection: 'row',
@@ -620,6 +663,7 @@ const AddonsScreen = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertActions, setAlertActions] = useState<any[]>([]);
   const [reorderMode, setReorderMode] = useState(false);
+  const [grabbedAddonId, setGrabbedAddonId] = useState<string | null>(null);
   // Use ThemeContext
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
@@ -660,10 +704,13 @@ const AddonsScreen = () => {
     (typeof (a as any).url === 'string' && (a as any).url.includes('nuviostreams.hayd.uk'))
   );
 
-  useEffect(() => {
-    loadAddons();
-    loadCommunityAddons();
-  }, []);
+  // Reload addons whenever screen gains focus (e.g., returning from TVAddonInstallScreen)
+  useFocusEffect(
+    useCallback(() => {
+      loadAddons();
+      loadCommunityAddons();
+    }, [])
+  );
 
   const loadAddons = async () => {
     try {
@@ -960,6 +1007,33 @@ const AddonsScreen = () => {
 
   const toggleReorderMode = () => {
     setReorderMode(!reorderMode);
+    setGrabbedAddonId(null);
+  };
+
+  const handleGrabAddon = (addonId: string) => {
+    if (grabbedAddonId === addonId) {
+      // Drop the addon
+      setGrabbedAddonId(null);
+    } else {
+      // Grab the addon
+      setGrabbedAddonId(addonId);
+    }
+  };
+
+  const moveGrabbedAddonUp = () => {
+    if (!grabbedAddonId) return;
+    const addon = addons.find(a => a.id === grabbedAddonId);
+    if (addon) {
+      moveAddonUp(addon);
+    }
+  };
+
+  const moveGrabbedAddonDown = () => {
+    if (!grabbedAddonId) return;
+    const addon = addons.find(a => a.id === grabbedAddonId);
+    if (addon) {
+      moveAddonDown(addon);
+    }
   };
 
   const renderAddonItem = ({ item, index }: { item: ExtendedManifest, index: number }) => {
@@ -980,8 +1054,10 @@ const AddonsScreen = () => {
     const isFirstItem = index === 0;
     const isLastItem = index === addons.length - 1;
 
+    const isGrabbed = grabbedAddonId === item.id;
+
     return (
-      <View style={styles.addonItem}>
+      <View style={[styles.addonItem, isGrabbed && styles.grabbedAddonItem]}>
         {reorderMode && !isTV && (
           <View style={styles.reorderButtons}>
             <TouchableOpacity
@@ -1088,38 +1164,80 @@ const AddonsScreen = () => {
               <>
                 {isTV ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Focusable
-                      onPress={() => moveAddonUp(item)}
-                      style={[styles.reorderButton, isFirstItem && styles.disabledButton, { marginRight: 4 }]}
-                      borderRadius={15}
-                      focusScale={1.1}
-                      animateBackground={true}
-                      showFocusBorder={true}
-                    >
-                      {(focused) => (
-                        <MaterialIcons
-                          name="arrow-upward"
-                          size={20}
-                          color={focused ? '#000' : (isFirstItem ? colors.mediumGray : colors.white)}
-                        />
-                      )}
-                    </Focusable>
-                    <Focusable
-                      onPress={() => moveAddonDown(item)}
-                      style={[styles.reorderButton, isLastItem && styles.disabledButton]}
-                      borderRadius={15}
-                      focusScale={1.1}
-                      animateBackground={true}
-                      showFocusBorder={true}
-                    >
-                      {(focused) => (
-                        <MaterialIcons
-                          name="arrow-downward"
-                          size={20}
-                          color={focused ? '#000' : (isLastItem ? colors.mediumGray : colors.white)}
-                        />
-                      )}
-                    </Focusable>
+                    {grabbedAddonId === item.id ? (
+                      <>
+                        <Focusable
+                          onPress={moveGrabbedAddonUp}
+                          style={[styles.reorderButton, isFirstItem && styles.disabledButton, { marginRight: 4 }]}
+                          borderRadius={15}
+                          focusScale={1.1}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => (
+                            <MaterialIcons
+                              name="arrow-upward"
+                              size={20}
+                              color={focused ? '#000' : (isFirstItem ? colors.mediumGray : colors.white)}
+                            />
+                          )}
+                        </Focusable>
+                        <Focusable
+                          onPress={moveGrabbedAddonDown}
+                          style={[styles.reorderButton, isLastItem && styles.disabledButton, { marginRight: 4 }]}
+                          borderRadius={15}
+                          focusScale={1.1}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => (
+                            <MaterialIcons
+                              name="arrow-downward"
+                              size={20}
+                              color={focused ? '#000' : (isLastItem ? colors.mediumGray : colors.white)}
+                            />
+                          )}
+                        </Focusable>
+                        <Focusable
+                          onPress={() => handleGrabAddon(item.id)}
+                          style={[styles.reorderButton, { backgroundColor: colors.success }]}
+                          borderRadius={15}
+                          focusScale={1.1}
+                          animateBackground={true}
+                          showFocusBorder={true}
+                        >
+                          {(focused) => (
+                            <MaterialIcons
+                              name="check"
+                              size={20}
+                              color={focused ? '#000' : colors.white}
+                            />
+                          )}
+                        </Focusable>
+                      </>
+                    ) : (
+                      <Focusable
+                        onPress={() => handleGrabAddon(item.id)}
+                        style={[styles.grabButton, grabbedAddonId && styles.disabledButton]}
+                        borderRadius={8}
+                        focusScale={1.05}
+                        animateBackground={true}
+                        showFocusBorder={true}
+                      >
+                        {(focused) => (
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <MaterialIcons
+                              name="drag-indicator"
+                              size={20}
+                              color={focused ? '#000' : colors.mediumGray}
+                            />
+                            <Text style={[styles.grabButtonText, focused && { color: '#000' }]}>
+                              {grabbedAddonId ? 'Move' : 'Grab'}
+                            </Text>
+                          </View>
+                        )}
+                      </Focusable>
+                    )}
                     <View style={[styles.priorityBadge, { marginLeft: 8 }]}>
                       <Text style={styles.priorityText}>#{index + 1}</Text>
                     </View>
@@ -1316,10 +1434,17 @@ const AddonsScreen = () => {
       </Text>
 
       {reorderMode && (
-        <View style={styles.reorderInfoBanner}>
-          <MaterialIcons name="info-outline" size={18} color={colors.primary} />
-          <Text style={styles.reorderInfoText}>
-            Addons at the top have higher priority when loading content
+        <View style={[styles.reorderInfoBanner, grabbedAddonId && { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
+          <MaterialIcons
+            name={grabbedAddonId ? "drag-indicator" : "info-outline"}
+            size={18}
+            color={grabbedAddonId ? colors.success : colors.primary}
+          />
+          <Text style={[styles.reorderInfoText, grabbedAddonId && { color: colors.success }]}>
+            {isTV && grabbedAddonId
+              ? "Use arrows to move, then press check to drop"
+              : "Addons at the top have higher priority when loading content"
+            }
           </Text>
         </View>
       )}
@@ -1346,6 +1471,38 @@ const AddonsScreen = () => {
               <StatsCard value={catalogCount} label="Catalogs" />
             </View>
           </View>
+
+          {/* Install from Phone Section - TV Only */}
+          {isTV && !reorderMode && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>INSTALL FROM PHONE</Text>
+              <View style={styles.addAddonContainer}>
+                <Focusable
+                  onPress={() => navigation.navigate('TVAddonInstall' as never)}
+                  style={styles.qrInstallButton}
+                  borderRadius={12}
+                  focusScale={1.02}
+                  animateBackground={true}
+                  showFocusBorder={true}
+                >
+                  {(focused) => (
+                    <View style={styles.qrInstallContent}>
+                      <MaterialIcons name="qr-code-scanner" size={32} color={focused ? '#000' : colors.primary} />
+                      <View style={styles.qrInstallTextContainer}>
+                        <Text style={[styles.qrInstallTitle, focused && { color: '#000' }]}>
+                          Install Addons via QR Code
+                        </Text>
+                        <Text style={[styles.qrInstallSubtitle, focused && { color: '#333' }]}>
+                          Scan with your phone to browse and install addons
+                        </Text>
+                      </View>
+                      <MaterialIcons name="chevron-right" size={24} color={focused ? '#000' : colors.mediumGray} />
+                    </View>
+                  )}
+                </Focusable>
+              </View>
+            </View>
+          )}
 
           {/* Hide Add Addon Section in reorder mode */}
           {!reorderMode && (

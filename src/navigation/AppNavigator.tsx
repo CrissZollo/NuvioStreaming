@@ -73,6 +73,7 @@ import ContributorsScreen from '../screens/ContributorsScreen';
 import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
 import ContinueWatchingListScreen from '../screens/ContinueWatchingListScreen';
 import TVRestoreScreen from '../screens/TVRestoreScreen';
+import TVAddonInstallScreen from '../screens/TVAddonInstallScreen';
 import DebugSettingsScreen from '../screens/DebugSettingsScreen';
 
 // Optional Android immersive mode module
@@ -204,6 +205,7 @@ export type RootStackParamList = {
   DebridIntegration: undefined;
   ContinueWatchingList: undefined;
   TVRestore: undefined;
+  TVAddonInstall: undefined;
   DebugSettings: undefined;
 };
 
@@ -1595,6 +1597,20 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen
               name="TVRestore"
               component={TVRestoreScreen}
+              options={{
+                animation: 'fade',
+                animationDuration: 200,
+                presentation: 'card',
+                gestureEnabled: false,
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="TVAddonInstall"
+              component={TVAddonInstallScreen}
               options={{
                 animation: 'fade',
                 animationDuration: 200,

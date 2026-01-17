@@ -1830,6 +1830,20 @@ class StremioService {
     return false;
   }
 
+  // Set the complete addon order (for bulk reordering from web companion)
+  setAddonOrder(newOrder: string[]): void {
+    // Only include IDs that are actually installed
+    const validOrder = newOrder.filter(id => this.installedAddons.has(id));
+
+    // Add any installed addons that weren't in the new order to the end
+    const missingIds = Array.from(this.installedAddons.keys())
+      .filter(id => !validOrder.includes(id));
+
+    this.addonOrder = [...validOrder, ...missingIds];
+    this.saveAddonOrder();
+    addonEmitter.emit(ADDON_EVENTS.ORDER_CHANGED);
+  }
+
   // Check if any installed addons can provide streams (including embedded streams in metadata)
   async hasStreamProviders(type?: string): Promise<boolean> {
     await this.ensureInitialized();
