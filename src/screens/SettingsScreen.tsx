@@ -62,6 +62,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'backup', title: 'Backup & Restore', icon: 'archive' as string },
   { id: 'updates', title: 'Updates', icon: 'refresh-ccw' as string },
   { id: 'about', title: 'About', icon: 'info' as string },
+  { id: 'debug', title: 'Debug', icon: 'terminal' as string },
   { id: 'developer', title: 'Developer', icon: 'code' as string },
   { id: 'cache', title: 'Cache', icon: 'database' as string },
 ];
@@ -1107,6 +1108,22 @@ const SettingsScreen: React.FC = () => {
                 }
                 navigation.navigate('Update');
               }}
+              isLast={true}
+              isTablet={isTablet}
+              isTV={isTVDevice}
+            />
+          </SettingsCard>
+        );
+
+      case 'debug':
+        return (
+          <SettingsCard title="DEBUG" isTablet={isTablet}>
+            <SettingItem
+              title="Debug Logging"
+              description={settings.enableDebugLogging ? "Enabled - collecting logs" : "Disabled"}
+              icon="terminal"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('DebugSettings')}
               isLast={true}
               isTablet={isTablet}
               isTV={isTVDevice}

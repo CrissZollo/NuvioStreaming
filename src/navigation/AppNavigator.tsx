@@ -73,6 +73,7 @@ import ContributorsScreen from '../screens/ContributorsScreen';
 import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
 import ContinueWatchingListScreen from '../screens/ContinueWatchingListScreen';
 import TVRestoreScreen from '../screens/TVRestoreScreen';
+import DebugSettingsScreen from '../screens/DebugSettingsScreen';
 
 // Optional Android immersive mode module
 let RNImmersiveMode: any = null;
@@ -203,6 +204,7 @@ export type RootStackParamList = {
   DebridIntegration: undefined;
   ContinueWatchingList: undefined;
   TVRestore: undefined;
+  DebugSettings: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -1360,6 +1362,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen
               name="Contributors"
               component={ContributorsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="DebugSettings"
+              component={DebugSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

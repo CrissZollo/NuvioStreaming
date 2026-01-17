@@ -47,6 +47,7 @@ import * as Sentry from '@sentry/react-native';
 import UpdateService from './src/services/updateService';
 import { memoryMonitorService } from './src/services/memoryMonitorService';
 import { aiService } from './src/services/aiService';
+import { debugService } from './src/services/debugService';
 import { AccountProvider, useAccount } from './src/contexts/AccountContext';
 import { ToastProvider } from './src/contexts/ToastContext';
 import { mmkvStorage } from './src/services/mmkvStorage';
@@ -144,6 +145,11 @@ const ThemedApp = () => {
         // Initialize AI service
         await aiService.initialize();
         console.log('AI service initialized');
+
+        // Initialize debug service
+        await debugService.initialize();
+        debugService.setTVDetection(isAndroidTV());
+        console.log('Debug service initialized');
 
         // Check if announcement should be shown (version 1.0.0)
         // Skip announcement on TV devices

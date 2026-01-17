@@ -96,6 +96,8 @@ export interface AppSettings {
   defaultSubtitleEnabled: boolean; // Whether subtitles should be enabled by default
   // Android TV ExoPlayer settings
   enableAudioPassthrough: boolean; // Enable HDMI audio passthrough for AC3/EAC3/DTS (TV only)
+  // Debug settings
+  enableDebugLogging: boolean; // Enable debug logging for troubleshooting
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -165,6 +167,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultSubtitleEnabled: false, // Subtitles off by default
   // Android TV ExoPlayer settings
   enableAudioPassthrough: false, // Disabled by default - requires HDMI connection to compatible receiver
+  // Debug settings
+  enableDebugLogging: false, // Disabled by default
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
