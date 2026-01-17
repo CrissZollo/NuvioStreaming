@@ -291,20 +291,20 @@ const CastMoviesScreen: React.FC = () => {
     const buttonContent = (
       <View
         style={{
-          paddingHorizontal: isTV ? 24 : 18,
-          paddingVertical: isTV ? 14 : 10,
-          borderRadius: 25,
+          paddingHorizontal: isTV ? 16 : 18,
+          paddingVertical: isTV ? 8 : 10,
+          borderRadius: 20,
           backgroundColor: isSelected
             ? currentTheme.colors.primary
             : 'rgba(255, 255, 255, 0.08)',
-          marginRight: 12,
+          marginRight: isTV ? 0 : 12,
           borderWidth: isSelected ? 0 : 1,
           borderColor: 'rgba(255, 255, 255, 0.12)',
         }}
       >
         <Text style={{
           color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.85)',
-          fontSize: isTV ? 16 : 13,
+          fontSize: isTV ? 13 : 13,
           fontWeight: isSelected ? '700' : '600',
           letterSpacing: 0.3,
         }}>
@@ -315,11 +315,11 @@ const CastMoviesScreen: React.FC = () => {
 
     if (isTV) {
       return (
-        <Animated.View entering={FadeIn.delay(100)}>
+        <Animated.View entering={FadeIn.delay(100)} style={{ marginRight: 10 }}>
           <Focusable
             onPress={() => setSelectedFilter(filter)}
-            borderRadius={25}
-            focusScale={1.1}
+            borderRadius={20}
+            focusScale={1.0}
             showFocusBorder={true}
           >
             {buttonContent}
@@ -346,26 +346,26 @@ const CastMoviesScreen: React.FC = () => {
     const buttonContent = (
       <View
         style={{
-          paddingHorizontal: isTV ? 20 : 16,
-          paddingVertical: isTV ? 12 : 8,
-          borderRadius: 20,
+          paddingHorizontal: isTV ? 14 : 16,
+          paddingVertical: isTV ? 6 : 8,
+          borderRadius: 16,
           backgroundColor: isSelected
             ? 'rgba(255, 255, 255, 0.15)'
             : 'transparent',
-          marginRight: 12,
+          marginRight: isTV ? 0 : 12,
           flexDirection: 'row',
           alignItems: 'center',
         }}
       >
         <MaterialIcons
           name={icon as any}
-          size={isTV ? 20 : 16}
+          size={isTV ? 16 : 16}
           color={isSelected ? currentTheme.colors.primary : 'rgba(255, 255, 255, 0.6)'}
-          style={{ marginRight: 6 }}
+          style={{ marginRight: 5 }}
         />
         <Text style={{
           color: isSelected ? currentTheme.colors.primary : 'rgba(255, 255, 255, 0.8)',
-          fontSize: isTV ? 15 : 12,
+          fontSize: isTV ? 12 : 12,
           fontWeight: isSelected ? '700' : '500',
           letterSpacing: 0.2,
         }}>
@@ -376,11 +376,11 @@ const CastMoviesScreen: React.FC = () => {
 
     if (isTV) {
       return (
-        <Animated.View entering={FadeIn.delay(200)}>
+        <Animated.View entering={FadeIn.delay(200)} style={{ marginRight: 10 }}>
           <Focusable
             onPress={() => setSortBy(sort)}
-            borderRadius={20}
-            focusScale={1.1}
+            borderRadius={16}
+            focusScale={1.0}
             showFocusBorder={true}
           >
             {buttonContent}
@@ -580,7 +580,7 @@ const CastMoviesScreen: React.FC = () => {
         <View
           style={{
             width: posterWidth,
-            marginBottom: 12,
+            marginBottom: isTV ? 8 : 12,
             marginRight: (index + 1) % numColumns === 0 ? 0 : itemSpacing,
           }}
         >
@@ -589,7 +589,7 @@ const CastMoviesScreen: React.FC = () => {
             onFocus={() => handleItemFocus(index)}
             autoFocus={isFirstItem}
             borderRadius={posterBorderRadius}
-            focusScale={1.08}
+            focusScale={1.05}
             showFocusBorder={true}
             style={{
               width: posterWidth,
@@ -726,9 +726,9 @@ const CastMoviesScreen: React.FC = () => {
       <Animated.View
         style={[
           {
-            paddingTop: isTV ? 20 : safeAreaTop + 16,
+            paddingTop: isTV ? 12 : safeAreaTop + 16,
             paddingHorizontal: horizontalPadding,
-            paddingBottom: isTV ? 16 : 20,
+            paddingBottom: isTV ? 8 : 20,
             backgroundColor: currentTheme.colors.darkBackground,
             borderBottomWidth: 1,
             borderBottomColor: 'rgba(255, 255, 255, 0.05)',
@@ -840,12 +840,12 @@ const CastMoviesScreen: React.FC = () => {
         backgroundColor: currentTheme.colors.darkBackground,
       }}>
         {/* Filter Section */}
-        <View style={{ marginBottom: isTV ? 8 : 12 }}>
+        <View style={{ marginBottom: isTV ? 12 : 12 }}>
           <Text style={{
             color: 'rgba(255, 255, 255, 0.7)',
-            fontSize: isTV ? 14 : 12,
+            fontSize: isTV ? 12 : 12,
             fontWeight: '600',
-            marginBottom: isTV ? 10 : 8,
+            marginBottom: isTV ? 6 : 8,
             letterSpacing: 0.5,
             textTransform: 'uppercase',
           }}>
@@ -854,7 +854,7 @@ const CastMoviesScreen: React.FC = () => {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingRight: horizontalPadding }}
+            contentContainerStyle={{ paddingRight: horizontalPadding, paddingVertical: isTV ? 3 : 0 }}
           >
             {renderFilterButton('all', 'All', movies.length)}
             {renderFilterButton('movies', 'Movies', movieCount)}
@@ -866,9 +866,9 @@ const CastMoviesScreen: React.FC = () => {
         <View>
           <Text style={{
             color: 'rgba(255, 255, 255, 0.7)',
-            fontSize: isTV ? 14 : 12,
+            fontSize: isTV ? 12 : 12,
             fontWeight: '600',
-            marginBottom: isTV ? 10 : 8,
+            marginBottom: isTV ? 6 : 8,
             letterSpacing: 0.5,
             textTransform: 'uppercase',
           }}>
@@ -877,7 +877,7 @@ const CastMoviesScreen: React.FC = () => {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingRight: horizontalPadding }}
+            contentContainerStyle={{ paddingRight: horizontalPadding, paddingVertical: isTV ? 3 : 0 }}
           >
             {renderSortButton('popularity', 'Popular', 'trending-up')}
             {renderSortButton('latest', 'Latest', 'schedule')}
@@ -913,8 +913,8 @@ const CastMoviesScreen: React.FC = () => {
           key={numColumns}
           contentContainerStyle={{
             paddingHorizontal: horizontalPadding,
-            paddingTop: isTV ? 16 : 8,
-            paddingBottom: isTV ? 40 : (Platform.OS === 'ios' ? 120 : 100),
+            paddingTop: isTV ? 8 : 8,
+            paddingBottom: isTV ? 24 : (Platform.OS === 'ios' ? 120 : 100),
           }}
           onScroll={(event) => {
             scrollY.value = event.nativeEvent.contentOffset.y;
