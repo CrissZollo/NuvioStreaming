@@ -72,7 +72,6 @@ class MainActivity : ReactActivity() {
    * This is called before onKeyDown/onKeyUp and allows us to fully block repeat events
    */
   override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-
       val keyCode = event.keyCode
       val action = event.action
       val repeatCount = event.repeatCount
@@ -83,22 +82,25 @@ class MainActivity : ReactActivity() {
                            keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
                            keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
 
-      // Block repeat events for D-pad directions (unless player allows it)
+      // Block repeat events for D-pad directions (unless player explicitly allows it)
+      // Default to blocking if module not yet initialized
       if (isDpadDirection && action == KeyEvent.ACTION_DOWN && repeatCount > 0) {
-          val allowRepeat = TVKeyEventModule.getInstance()?.shouldAllowRepeat() ?: false
-          Log.d("NuvioKeyEvent", "D-pad repeat: keyCode=$keyCode, repeatCount=$repeatCount, allowRepeat=$allowRepeat")
+          val module = TVKeyEventModule.getInstance()
+          val allowRepeat = module?.shouldAllowRepeat() == true
           if (!allowRepeat) {
               // Fully consume the event - don't let it reach React Native at all
-              Log.d("NuvioKeyEvent", "BLOCKING repeat event")
               return true
           }
       }
 
-      // Send to JS for custom handling
-      if (action == KeyEvent.ACTION_DOWN) {
-          TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_DOWN, repeatCount)
-      } else if (action == KeyEvent.ACTION_UP) {
-          TVKeyEventModule.getInstance()?.sendKeyEvent(keyCode, KeyEvent.ACTION_UP, 0)
+      // Send first press to JS for custom handling (not repeats unless allowed)
+      val module = TVKeyEventModule.getInstance()
+      if (module != null) {
+          if (action == KeyEvent.ACTION_DOWN) {
+              module.sendKeyEvent(keyCode, KeyEvent.ACTION_DOWN, repeatCount)
+          } else if (action == KeyEvent.ACTION_UP) {
+              module.sendKeyEvent(keyCode, KeyEvent.ACTION_UP, 0)
+          }
       }
 
       // Let React Native handle the event for focus navigation
@@ -116,8 +118,9 @@ class MainActivity : ReactActivity() {
                            keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
                            keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
 
+      // Block repeat events - default to blocking if module not initialized
       if (isDpadDirection && repeatCount > 0) {
-          val allowRepeat = TVKeyEventModule.getInstance()?.shouldAllowRepeat() ?: false
+          val allowRepeat = TVKeyEventModule.getInstance()?.shouldAllowRepeat() == true
           if (!allowRepeat) {
               return true
           }
