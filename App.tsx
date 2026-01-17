@@ -55,6 +55,7 @@ import AnnouncementOverlay from './src/components/AnnouncementOverlay';
 import { CampaignManager } from './src/components/promotions/CampaignManager';
 import { isAndroidTV } from './src/utils/tvDetection';
 import ExitConfirmationPopup from './src/components/ExitConfirmationPopup';
+import HeroSectionPopup from './src/components/HeroSectionPopup';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -103,6 +104,7 @@ const ThemedApp = () => {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+  const [showHeroSectionPopup, setShowHeroSectionPopup] = useState(false);
 
   // Update popup functionality
   const {
@@ -161,7 +163,7 @@ const ThemedApp = () => {
           }, 1000);
         }
 
-      } catch (error) {
+        } catch (error) {
         console.error('Error initializing app:', error);
         // Default to showing onboarding if we can't check
         setHasCompletedOnboarding(false);
@@ -170,6 +172,30 @@ const ThemedApp = () => {
 
     initializeApp();
   }, []);
+
+  // Show hero section popup for TV after onboarding completes
+  useEffect(() => {
+    const checkHeroPopup = async () => {
+      if (hasCompletedOnboarding === true && isAndroidTV()) {
+        const hasSeenHeroPopup = await mmkvStorage.getItem('hasSeenHeroSectionPopup');
+        if (!hasSeenHeroPopup) {
+          setShowHeroSectionPopup(true);
+        }
+      }
+    };
+    checkHeroPopup();
+  }, [hasCompletedOnboarding]);
+
+  // Check for hero popup when navigation state changes (catches post-onboarding navigation)
+  const handleNavigationStateChange = async () => {
+    if (isAndroidTV()) {
+      const onboardingCompleted = await mmkvStorage.getItem('hasCompletedOnboarding');
+      const hasSeenHeroPopup = await mmkvStorage.getItem('hasSeenHeroSectionPopup');
+      if (onboardingCompleted === 'true' && !hasSeenHeroPopup && !showHeroSectionPopup) {
+        setShowHeroSectionPopup(true);
+      }
+    }
+  };
 
   // Create custom themes based on current theme
   const customDarkTheme = {
@@ -253,6 +279,7 @@ const ThemedApp = () => {
             ref={navigationRef}
             theme={customNavigationTheme}
             linking={undefined}
+            onStateChange={handleNavigationStateChange}
           >
             <DownloadsProvider>
               <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -287,6 +314,10 @@ const ThemedApp = () => {
                   visible={showExitConfirmation}
                   onConfirm={() => setShowExitConfirmation(false)}
                   onCancel={() => setShowExitConfirmation(false)}
+                />
+                <HeroSectionPopup
+                  visible={showHeroSectionPopup}
+                  onClose={() => setShowHeroSectionPopup(false)}
                 />
               </View>
             </DownloadsProvider>

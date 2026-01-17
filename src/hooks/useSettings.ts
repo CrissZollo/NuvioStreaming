@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { mmkvStorage } from '../services/mmkvStorage';
+import { isAndroidTV } from '../utils/tvDetection';
 
 // Simple event emitter for settings changes
 class SettingsEventEmitter {
@@ -100,7 +101,8 @@ export interface AppSettings {
   enableDebugLogging: boolean; // Enable debug logging for troubleshooting
 }
 
-export const DEFAULT_SETTINGS: AppSettings = {
+// Base defaults - showHeroSection is overridden for TV below
+const BASE_DEFAULT_SETTINGS: AppSettings = {
   enableDarkMode: true,
   enableNotifications: true,
   streamQuality: 'auto',
@@ -169,6 +171,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enableAudioPassthrough: false, // Disabled by default - requires HDMI connection to compatible receiver
   // Debug settings
   enableDebugLogging: false, // Disabled by default
+};
+
+// Platform-specific defaults: Hero section is off by default on TV for performance
+export const DEFAULT_SETTINGS: AppSettings = {
+  ...BASE_DEFAULT_SETTINGS,
+  showHeroSection: !isAndroidTV(), // Off on TV, on for mobile
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
