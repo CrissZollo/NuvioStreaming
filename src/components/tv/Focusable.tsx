@@ -333,15 +333,21 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     const BORDER_WIDTH = 3;
 
     // Focus border animated style - applies directly to the Pressable
-    // Use transparent border when unfocused, white border when focused
-    // This avoids layout shifts since border width is always present
+    // Uses accelerated curve so border appears/disappears faster than scale animation
+    // This keeps border in sync with scroll during rapid navigation
     const animatedFocusBorderStyle = useAnimatedStyle(() => {
       'worklet';
-      // Round to avoid extremely small floating point values that cause Reanimated errors
-      const opacity = Math.round(interpolate(focusProgress.value, [0, 1], [0, 100])) / 100;
+      // Accelerated curve: border reaches full opacity faster (at 40% of animation)
+      // and starts fading earlier (at 60% of animation going out)
+      // This makes the border feel more responsive while scale still animates smoothly
+      const opacity = interpolate(
+        focusProgress.value,
+        [0, 0.4, 1],
+        [0, 1, 1]
+      );
       return {
         borderWidth: BORDER_WIDTH,
-        borderColor: opacity > 0 ? `rgba(255, 255, 255, ${opacity})` : 'transparent',
+        borderColor: `rgba(255, 255, 255, ${opacity})`,
       };
     });
 

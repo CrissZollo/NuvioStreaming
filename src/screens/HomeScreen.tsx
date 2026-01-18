@@ -917,14 +917,8 @@ const HomeScreen = () => {
       setVisibleCatalogCount(prev => Math.min(prev + 4, catalogs.length));
     }
 
-    // Minimal debounce (16ms ~1 frame) to batch very rapid events but still feel responsive
-    const now = Date.now();
-    const timeSinceLastScroll = now - lastScrollTimeRef.current;
-    if (timeSinceLastScroll < 16) {
-      return;
-    }
-    lastScrollTimeRef.current = now;
-
+    // Scroll to the focused catalog - use scrollToIndex for accurate positioning
+    // If item is not mounted (beyond drawDistance), fall back to scrollToOffset
     try {
       flashListRef.current.scrollToIndex({
         index,
@@ -932,7 +926,15 @@ const HomeScreen = () => {
         viewPosition: 0.3,
       });
     } catch (e) {
-      // Silent failure - scroll is best-effort
+      // Fallback: scrollToOffset when item not mounted
+      // Uses estimated item height to calculate approximate position
+      const ESTIMATED_ITEM_HEIGHT = 350;
+      const viewportHeight = Dimensions.get('window').height;
+      const targetOffset = Math.max(0, index * ESTIMATED_ITEM_HEIGHT - viewportHeight * 0.3);
+      flashListRef.current.scrollToOffset({
+        offset: targetOffset,
+        animated: false,
+      });
     }
   }, [isTVDevice, prefetchThreshold, catalogs.length, visibleCatalogCount]);
 
@@ -1114,9 +1116,9 @@ const HomeScreen = () => {
           scrollEventThrottle={16}
           nestedScrollEnabled={true}
           estimatedItemSize={isTVDevice ? 350 : 300}
-          // Aggressively reduced drawDistance on TV from 1200 to 600 to limit mounted components
-          // This reduces memory usage and improves scrolling performance on low-end devices
-          drawDistance={isTVDevice ? 600 : 250}
+          // TV needs larger drawDistance to ensure scrollToIndex works for items further down
+          // 1500px = ~4-5 catalog rows pre-rendered, balancing memory vs scroll reliability
+          drawDistance={isTVDevice ? 1500 : 250}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}
