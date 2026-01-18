@@ -12,11 +12,14 @@
 <br />
 <div align="center">
   <img src="assets/titlelogo.png" alt="Nuvio Logo" width="120" />
-  <h1 align="center">🎬 Nuvio Media Hub</h1>
+  <h1 align="center">Nuvio TV</h1>
   <p align="center">
-    A modern media hub built with React Native and Expo
+    A TV-optimized media hub built with React Native and Expo
     <br />
-    Stremio Addon ecosystem • Cross‑platform • Offline metadata & sync
+    Fork of <a href="https://github.com/tapframe/NuvioStreaming">NuvioStream</a> by Tapframe
+    <br />
+    <br />
+    Stremio Addon ecosystem • TV & Big Screen optimized • D-pad navigation
     <br />
     <br />
     <a href="#getting-started"><strong>Get Started »</strong></a>
@@ -34,48 +37,36 @@
 <details>
   <summary>Table of Contents</summary>
   <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-    </li>
+    <li><a href="#about-the-project">About The Project</a></li>
+    <li><a href="#features">TV Features</a></li>
     <li><a href="#installation">Installation</a></li>
     <li><a href="#demo">Screenshots</a></li>
     <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#support">Support</a></li>
     <li><a href="#license">License</a></li>
-    <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
     <li><a href="#built-with">Built With</a></li>
   </ol>
-  </details>
+</details>
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-Nuvio Media Hub is a cross‑platform app for managing, discovering, and streaming your media via a flexible addon ecosystem. Built with React Native + Expo, it integrates providers and sync services while keeping a simple, fast UI.
+**Nuvio TV** is a fork of [NuvioStream](https://github.com/tapframe/NuvioStreaming) by [Tapframe](https://github.com/tapframe), specifically optimized for TV and big screen experiences. Built with React Native + Expo, it brings the flexible addon ecosystem of NuvioStream to your living room with full D-pad/remote navigation support.
 
- 
+This project adapts the original mobile-first NuvioStream application to work seamlessly on Android TV, Fire TV, and other TV platforms while maintaining compatibility with the Stremio addon ecosystem.
 
-<!-- INSTALLATION -->
-## Installation
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### Android
-[![Download APK](https://img.shields.io/badge/Download-APK-green?style=for-the-badge)](https://github.com/tapframe/NuvioStreaming/releases/latest)
+<!-- TV FEATURES -->
+## Features
 
-Download the latest APK from [GitHub Releases](https://github.com/tapframe/NuvioStreaming/releases/latest)
-
-### iOS
-
-#### TestFlight (Recommended)
-<img src="https://upload.wikimedia.org/wikipedia/fr/b/bc/TestFlight-icon.png" width="24" height="24" align="left"> [![Join TestFlight](https://img.shields.io/badge/Join-TestFlight-blue?style=for-the-badge)](https://testflight.apple.com/join/QkKMGRqp)
-
-#### AltStore
-<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="24" height="24" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
-
-#### SideStore
-<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="24" height="24" align="left"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
-
-**Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
+- **TV-Optimized UI** - Interface designed for 10-foot viewing experience
+- **D-pad Navigation** - Full remote control and gamepad support
+- **Focus Management** - Clear visual focus indicators for navigation
+- **Stremio Addons** - Compatible with the Stremio addon ecosystem
+- **Large Screen Layout** - Optimized layouts for TV resolutions
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -85,7 +76,7 @@ Download the latest APK from [GitHub Releases](https://github.com/tapframe/Nuvio
 
 | Home | Details |
 |:----:|:-------:|
-| ![Home](screenshots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details](screenshots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) |
+| ![Home](screenshots/tv-home.png) | ![Details](screenshots/tv-details.png) |
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -100,8 +91,8 @@ Follow the steps below to run the app locally for development.
   <summary>Build from Source</summary>
 
 ```bash
-git clone https://github.com/tapframe/NuvioStreaming.git
-cd NuvioStreaming
+git clone https://github.com/your-username/NuvioStreamingTv.git
+cd NuvioStreamingTv
 npm install
 # If you hit peer dependency conflicts:
 # npm install --legacy-peer-deps
@@ -110,19 +101,16 @@ npx expo start
 
 ```bash
 npx expo prebuild
-npx expo run:android  # Android
-npx expo run:ios      # iOS
+npx expo run:android  # Android TV
 ```
 
 </details>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
- 
-
 ## Contributing
 
-Contributions make the open‑source community amazing! Any contributions are greatly appreciated.
+Contributions make the open-source community amazing! Any contributions are greatly appreciated.
 
 1. Fork the project
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -134,10 +122,10 @@ Contributions make the open‑source community amazing! Any contributions are gr
 
 ## Support
 
-If you find Nuvio helpful, consider supporting development:
+If you find Nuvio TV helpful, consider supporting the original project:
 
-* **Ko‑Fi** – `https://ko-fi.com/tapframe`
-* **GitHub Star** – Star the repo to show support
+* **Ko-Fi** – `https://ko-fi.com/tapframe`
+* **GitHub Star** – Star both this repo and the [original NuvioStream](https://github.com/tapframe/NuvioStreaming)
 * **Share** – Tell others about the project
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -148,22 +136,15 @@ Distributed under the GNU GPLv3 License. See `LICENSE` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Contact
-
-**Project Links:**
-* GitHub: `https://github.com/tapframe`
-* Issues: `https://github.com/tapframe/NuvioStreaming/issues`
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 ## Acknowledgments
 
+* [NuvioStream](https://github.com/tapframe/NuvioStreaming) by [Tapframe](https://github.com/tapframe) - The original project this is forked from
 * [React Native](https://reactnative.dev/)
 * [Expo](https://expo.dev/)
 * [TypeScript](https://www.typescriptlang.org/)
 * Community contributors and testers
 
-**Disclaimer:** This application functions as a media hub with addon/plugin support. It does not contain any built‑in content or host media content. Content access is only available through user‑installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
+**Disclaimer:** This application functions as a media hub with addon/plugin support. It does not contain any built-in content or host media content. Content access is only available through user-installed plugins and addons. Any legal concerns should be directed to the specific websites providing the content.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -175,17 +156,7 @@ Distributed under the GNU GPLv3 License. See `LICENSE` for more information.
   </a>
   <br/>
   React Native • Expo • TypeScript
-  </p>
-
-  ## Star History
-
-<a href="https://www.star-history.com/#tapframe/NuvioStreaming&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tapframe/NuvioStreaming&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tapframe/NuvioStreaming&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=tapframe/NuvioStreaming&type=date&legend=top-left" />
- </picture>
-</a>
+</p>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
