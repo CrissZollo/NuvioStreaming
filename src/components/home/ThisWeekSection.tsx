@@ -494,9 +494,9 @@ export const ThisWeekSection = React.memo(() => {
         snapToInterval={computedItemWidth + itemSpacing}
         decelerationRate="fast"
         snapToAlignment="start"
-        initialNumToRender={isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3}
-        windowSize={isTV ? 4 : isLargeTablet ? 4 : 3}
-        maxToRenderPerBatch={isTV ? 4 : isLargeTablet ? 4 : 3}
+        initialNumToRender={isTV ? 4 : isLargeTablet ? 4 : isTablet ? 4 : 3}
+        windowSize={isTV ? 3 : isLargeTablet ? 3 : 3}
+        maxToRenderPerBatch={isTV ? 3 : isLargeTablet ? 3 : 3}
         removeClippedSubviews
         getItemLayout={(data, index) => {
           const length = computedItemWidth + itemSpacing;

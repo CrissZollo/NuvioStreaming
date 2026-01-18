@@ -382,9 +382,10 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
         showsHorizontalScrollIndicator={false}
         scrollEnabled={false} // D-pad controls focus, not scrolling
         contentContainerStyle={styles.listContent}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={11}
+        initialNumToRender={4}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        removeClippedSubviews={true}
         getItemLayout={getItemLayout}
       />
     </View>

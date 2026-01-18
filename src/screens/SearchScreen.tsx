@@ -85,8 +85,9 @@ const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/222222/CCCCCC?text=No+P
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-const SkeletonLoader = () => {
-  const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
+// Memoized SkeletonLoader to prevent recreation of animation values
+const SkeletonLoader = React.memo(() => {
+  const pulseAnim = React.useMemo(() => new RNAnimated.Value(0), []);
   const { currentTheme } = useTheme();
 
   React.useEffect(() => {
@@ -153,15 +154,15 @@ const SkeletonLoader = () => {
       ))}
     </View>
   );
-};
+});
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
-// Create a simple, elegant animation component
-const SimpleSearchAnimation = () => {
-  // Simple animation values that work reliably
-  const spinAnim = React.useRef(new RNAnimated.Value(0)).current;
-  const fadeAnim = React.useRef(new RNAnimated.Value(0)).current;
+// Create a simple, elegant animation component - memoized for performance
+const SimpleSearchAnimation = React.memo(() => {
+  // Simple animation values that work reliably - use useMemo to prevent recreation
+  const spinAnim = React.useMemo(() => new RNAnimated.Value(0), []);
+  const fadeAnim = React.useMemo(() => new RNAnimated.Value(0), []);
   const { currentTheme } = useTheme();
 
   React.useEffect(() => {
@@ -220,7 +221,7 @@ const SimpleSearchAnimation = () => {
       </View>
     </RNAnimated.View>
   );
-};
+});
 
 const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();

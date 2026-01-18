@@ -12,9 +12,9 @@ class MemoryMonitorService {
   private memoryCheckInterval: NodeJS.Timeout | null = null;
   private backgroundCleanupInterval: NodeJS.Timeout | null = null;
   private lastMemoryWarning: number = 0;
-  private readonly MEMORY_CHECK_INTERVAL = 30 * 1000; // 30 seconds
-  private readonly BACKGROUND_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-  private readonly MEMORY_WARNING_COOLDOWN = 60 * 1000; // 1 minute
+  private readonly MEMORY_CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutes (was 30 seconds - too aggressive)
+  private readonly BACKGROUND_CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutes (was 5 minutes)
+  private readonly MEMORY_WARNING_COOLDOWN = 5 * 60 * 1000; // 5 minutes (was 1 minute)
 
   private constructor() {
     this.startMonitoring();
@@ -41,7 +41,7 @@ class MemoryMonitorService {
       this.performBackgroundCleanup();
     }, this.BACKGROUND_CLEANUP_INTERVAL);
 
-    logger.log('[MemoryMonitor] Started memory monitoring service');
+    if (__DEV__) logger.log('[MemoryMonitor] Started memory monitoring service');
   }
 
   private handleAppStateChange = (nextAppState: AppStateStatus) => {
@@ -49,13 +49,11 @@ class MemoryMonitorService {
       switch (nextAppState) {
         case 'background':
           // App going to background - aggressive cleanup
-          logger.log('[MemoryMonitor] App backgrounded, performing aggressive cleanup');
           this.performAggressiveCleanup();
           break;
-          
+
         case 'active':
-          // App coming to foreground - light cleanup
-          logger.log('[MemoryMonitor] App activated, performing light cleanup');
+          // App coming to foreground - light cleanup (no logging, this is normal)
           memoryManager.checkMemoryPressure();
           break;
           
@@ -71,90 +69,49 @@ class MemoryMonitorService {
 
   private performMemoryCheck(): void {
     try {
-      // Check if we should perform cleanup
-      const shouldCleanup = memoryManager.checkMemoryPressure();
-      
-      if (shouldCleanup) {
-        logger.log('[MemoryMonitor] Memory pressure detected, performing cleanup');
-      }
-
-      // Detect potential memory issues
-      this.detectMemoryIssues();
+      // Check if we should perform cleanup - silent operation, no logging needed
+      memoryManager.checkMemoryPressure();
+      // Note: Removed detectMemoryIssues() call - the random 10% cleanup was causing unnecessary churn
     } catch (error) {
-      logger.error('[MemoryMonitor] Error during memory check:', error);
+      if (__DEV__) logger.error('[MemoryMonitor] Error during memory check:', error);
     }
   }
 
   private detectMemoryIssues(): void {
-    try {
-      // Check for large object accumulation indicators
-      const now = Date.now();
-      
-      // Simulate memory pressure detection (in a real app, you might check actual memory usage)
-      // For React Native, we can't directly access memory stats, so we use heuristics
-      
-      // Check if we should issue a memory warning
-      if (now - this.lastMemoryWarning > this.MEMORY_WARNING_COOLDOWN) {
-        // In a production app, you might want to track things like:
-        // - Number of React components mounted
-        // - Size of Redux store
-        // - Number of network requests in flight
-        // - Image cache size
-        
-        // For this implementation, we'll trigger preventive cleanup periodically
-        if (Math.random() < 0.1) { // 10% chance to trigger preventive cleanup
-          this.issueMemoryWarning();
-        }
-      }
-    } catch (error) {
-      logger.error('[MemoryMonitor] Error detecting memory issues:', error);
-    }
+    // This function is now disabled - the random 10% cleanup was causing
+    // unnecessary churn and logging on idle screens. Real memory pressure
+    // should be detected through actual system callbacks, not random chance.
   }
 
   private issueMemoryWarning(): void {
     const now = Date.now();
     this.lastMemoryWarning = now;
-    
-    logger.warn('[MemoryMonitor] Memory usage warning - performing preventive cleanup');
-    
+
+    // Perform cleanup silently - only log in dev
+    if (__DEV__) logger.warn('[MemoryMonitor] Memory usage warning - performing preventive cleanup');
+
     // Perform immediate cleanup
     this.performAggressiveCleanup();
   }
 
   private performBackgroundCleanup(): void {
     try {
-      logger.log('[MemoryMonitor] Performing scheduled background cleanup');
-      
-      // Force garbage collection
+      // Silent background cleanup - no logging needed for routine maintenance
       memoryManager.forceGarbageCollection();
-      
-      // Clear any global caches that might have accumulated
       this.clearGlobalCaches();
-      
     } catch (error) {
-      logger.error('[MemoryMonitor] Error during background cleanup:', error);
+      if (__DEV__) logger.error('[MemoryMonitor] Error during background cleanup:', error);
     }
   }
 
   private performAggressiveCleanup(): void {
     try {
-      logger.log('[MemoryMonitor] Performing aggressive memory cleanup');
-      
-      // Multiple garbage collection cycles
-      for (let i = 0; i < 3; i++) {
-        memoryManager.forceGarbageCollection();
-        // Small delay between GC cycles
-        setTimeout(() => {}, 100);
-      }
-      
-      // Clear all possible caches
+      // Silent aggressive cleanup - only run once, not 3x in a loop
+      memoryManager.forceGarbageCollection();
       this.clearGlobalCaches();
-      
-      // Clear image caches if available
       this.clearImageCaches();
-      
     } catch (error) {
-      logger.error('[MemoryMonitor] Error during aggressive cleanup:', error);
+      if (__DEV__) logger.error('[MemoryMonitor] Error during aggressive cleanup:', error);
     }
   }
 
@@ -164,16 +121,16 @@ class MemoryMonitorService {
       if (global && (global as any).__APP_CACHE__) {
         (global as any).__APP_CACHE__ = {};
       }
-      
+
       if (global && (global as any).__METADATA_CACHE__) {
         (global as any).__METADATA_CACHE__ = {};
       }
-      
+
       if (global && (global as any).__EPISODE_CACHE__) {
         (global as any).__EPISODE_CACHE__ = {};
       }
     } catch (error) {
-      logger.warn('[MemoryMonitor] Could not clear global caches:', error);
+      // Silent failure - cache clearing is best-effort
     }
   }
 
@@ -183,14 +140,8 @@ class MemoryMonitorService {
       if (global && (global as any).__IMAGE_CACHE__) {
         (global as any).__IMAGE_CACHE__ = {};
       }
-      
-      // Clear Expo Image cache if available
-      // Note: Expo Image has its own cache management, but we can suggest cleanup
-      if (global && (global as any).expo && (global as any).expo.ImagePicker) {
-        // This is just an example - actual cache clearing would depend on the library
-      }
     } catch (error) {
-      logger.warn('[MemoryMonitor] Could not clear image caches:', error);
+      // Silent failure - cache clearing is best-effort
     }
   }
 
@@ -198,7 +149,6 @@ class MemoryMonitorService {
    * Manually trigger memory cleanup (for external use)
    */
   public forceCleanup(): void {
-    logger.log('[MemoryMonitor] Manual cleanup triggered');
     this.performAggressiveCleanup();
   }
 
@@ -242,14 +192,14 @@ class MemoryMonitorService {
       this.backgroundCleanupInterval = null;
     }
     
-    logger.log('[MemoryMonitor] Stopped memory monitoring service');
+    if (__DEV__) logger.log('[MemoryMonitor] Stopped memory monitoring service');
   }
 
   /**
    * Handle low memory warnings from the system
    */
   public handleLowMemoryWarning(): void {
-    logger.warn('[MemoryMonitor] System low memory warning received');
+    // This is a legitimate system warning, so we do perform cleanup
     this.performAggressiveCleanup();
   }
 }

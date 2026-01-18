@@ -251,8 +251,9 @@ const HomeScreen = () => {
 
                   const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
                   if (metas && metas.length > 0) {
-                    // Aggressively limit items per catalog on Android to reduce memory usage
-                    const limit = Platform.OS === 'android' ? 18 : 30;
+                    // Aggressively limit items per catalog to reduce memory usage
+                    // TV devices need even fewer items due to weaker hardware
+                    const limit = Platform.isTV ? 14 : Platform.OS === 'android' ? 18 : 30;
                     const limitedMetas = metas.slice(0, limit);
 
                     const items = limitedMetas.map((meta: any) => ({
@@ -304,35 +305,28 @@ const HomeScreen = () => {
                       items
                     };
 
-                    // Update the catalog at its specific position - ensure on main thread
-                    InteractionManager.runAfterInteractions(() => {
-                      setCatalogs(prevCatalogs => {
-                        const newCatalogs = [...prevCatalogs];
-                        newCatalogs[currentIndex] = catalogContent;
-                        return newCatalogs;
-                      });
+                    // Update the catalog at its specific position
+                    setCatalogs(prevCatalogs => {
+                      const newCatalogs = [...prevCatalogs];
+                      newCatalogs[currentIndex] = catalogContent;
+                      return newCatalogs;
                     });
                   }
                 } catch (error) {
                   if (__DEV__) console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
                 } finally {
-                  // Update loading count - ensure on main thread
-                  InteractionManager.runAfterInteractions(() => {
-                    setLoadedCatalogCount(prev => {
-                      const next = prev + 1;
-                      navLog.dataFetchEnd(`HomeScreen.catalog[${currentIndex}]`, next);
-                      // Exit loading screen as soon as first catalog finishes
-                      if (prev === 0) {
-                        navLog.dataProcess('HomeScreen.catalogs', 'first catalog loaded, exiting loading state');
-                        setCatalogsLoading(false);
-                      }
-                      // ** Crucial: If all catalogs processed, release the fetch guard **
-                      if (next >= totalCatalogsRef.current) {
-                        navLog.dataFetchEnd('HomeScreen.catalogs', next);
-                        isFetchingRef.current = false;
-                      }
-                      return next;
-                    });
+                  // Update loading count
+                  setLoadedCatalogCount(prev => {
+                    const next = prev + 1;
+                    // Exit loading screen as soon as first catalog finishes
+                    if (prev === 0) {
+                      setCatalogsLoading(false);
+                    }
+                    // Release the fetch guard when all catalogs processed
+                    if (next >= totalCatalogsRef.current) {
+                      isFetchingRef.current = false;
+                    }
+                    return next;
                   });
                 }
               };
@@ -353,15 +347,11 @@ const HomeScreen = () => {
         return;
       }
 
-      // Initialize catalogs array with proper length - ensure on main thread
-      InteractionManager.runAfterInteractions(() => {
-        setCatalogs(new Array(catalogIndex).fill(null));
-      });
+      // Initialize catalogs array with proper length
+      setCatalogs(new Array(catalogIndex).fill(null));
 
       // Start all catalog requests in parallel
-      navLog.dataProcess('HomeScreen.catalogs', `launching ${catalogIndex} catalog loaders in parallel`);
       launchAllCatalogs();
-      navLog.perfEnd('HomeScreen.loadCatalogsProgressively');
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
       navLog.perfWarn('HomeScreen.loadCatalogsProgressively failed');
@@ -1165,10 +1155,10 @@ const HomeScreen = () => {
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           nestedScrollEnabled={true}
-          estimatedItemSize={isTVDevice ? 400 : 300}
-          // Reduced drawDistance on TV from 2500 to 1200 to limit mounted components
-          // 2500px was keeping 6-7 catalog rows (~200 items) mounted causing sluggishness
-          drawDistance={isTVDevice ? 1200 : 250}
+          estimatedItemSize={isTVDevice ? 350 : 300}
+          // Aggressively reduced drawDistance on TV from 1200 to 600 to limit mounted components
+          // This reduces memory usage and improves scrolling performance on low-end devices
+          drawDistance={isTVDevice ? 600 : 250}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}

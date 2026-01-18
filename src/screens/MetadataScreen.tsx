@@ -94,10 +94,7 @@ const MetadataScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { id, type, episodeId, addonId } = route.params;
 
-  // Log route parameters for debugging
-  React.useEffect(() => {
-    console.log('🔍 [MetadataScreen] Route params:', { id, type, episodeId, addonId });
-  }, [id, type, episodeId, addonId]);
+  // Route params logging removed for performance
 
   // Consolidated hooks for better performance
   const { settings } = useSettings();
@@ -112,23 +109,25 @@ const MetadataScreen: React.FC = () => {
   // Trakt integration
   const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();
 
-  // Enhanced responsive sizing for tablets and TV screens
-  const deviceWidth = Dimensions.get('window').width;
-  const deviceHeight = Dimensions.get('window').height;
+  // Enhanced responsive sizing for tablets and TV screens - memoized for performance
+  const { deviceWidth, deviceHeight, deviceType, isTablet, isLargeTablet, isTV, isLargeScreen } = useMemo(() => {
+    const width = Dimensions.get('window').width;
+    const height = Dimensions.get('window').height;
+    let type: 'phone' | 'tablet' | 'largeTablet' | 'tv' = 'phone';
+    if (width >= BREAKPOINTS.tv) type = 'tv';
+    else if (width >= BREAKPOINTS.largeTablet) type = 'largeTablet';
+    else if (width >= BREAKPOINTS.tablet) type = 'tablet';
 
-  // Determine device type based on width
-  const getDeviceType = useCallback(() => {
-    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
-    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
-    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
-    return 'phone';
-  }, [deviceWidth]);
-
-  const deviceType = getDeviceType();
-  const isTablet = deviceType === 'tablet';
-  const isLargeTablet = deviceType === 'largeTablet';
-  const isTV = deviceType === 'tv';
-  const isLargeScreen = isTablet || isLargeTablet || isTV;
+    return {
+      deviceWidth: width,
+      deviceHeight: height,
+      deviceType: type,
+      isTablet: type === 'tablet',
+      isLargeTablet: type === 'largeTablet',
+      isTV: type === 'tv',
+      isLargeScreen: type === 'tablet' || type === 'largeTablet' || type === 'tv',
+    };
+  }, []);
 
   // Enhanced spacing and padding for production sections
   const horizontalPadding = useMemo(() => {
@@ -168,14 +167,7 @@ const MetadataScreen: React.FC = () => {
   const [postCastDelayDone, setPostCastDelayDone] = useState(false);
 
 
-  // Debug state changes
-  React.useEffect(() => {
-    console.log('MetadataScreen: commentBottomSheetVisible changed to:', commentBottomSheetVisible);
-  }, [commentBottomSheetVisible]);
-
-  React.useEffect(() => {
-    console.log('MetadataScreen: selectedComment changed to:', selectedComment?.id);
-  }, [selectedComment]);
+  // Debug state change logging removed for performance
 
   const {
     metadata,
@@ -201,23 +193,7 @@ const MetadataScreen: React.FC = () => {
   } = useMetadata({ id, type, addonId });
 
 
-  // Log useMetadata hook state changes for debugging
-  React.useEffect(() => {
-    console.log('🔍 [MetadataScreen] useMetadata state:', {
-      loading,
-      hasMetadata: !!metadata,
-      metadataId: metadata?.id,
-      metadataName: metadata?.name,
-      error: metadataError,
-      hasCast: cast.length > 0,
-      hasEpisodes: episodes.length > 0,
-      seasonsCount: Object.keys(groupedEpisodes).length,
-      imdbId,
-      tmdbId,
-      hasNetworks: !!(metadata as any)?.networks,
-      networksCount: metadata?.networks ? metadata.networks.length : 0
-    });
-  }, [loading, metadata, metadataError, cast.length, episodes.length, Object.keys(groupedEpisodes).length, imdbId, tmdbId]);
+  // useMetadata state logging removed for performance
 
   // Animate network section when data becomes available (for series)
   useEffect(() => {
@@ -546,16 +522,7 @@ const MetadataScreen: React.FC = () => {
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
 
-  // Log readiness state for debugging
-  React.useEffect(() => {
-    console.log('🔍 [MetadataScreen] Readiness state:', {
-      isReady,
-      loading,
-      hasMetadata: !!metadata,
-      hasError: !!metadataError,
-      errorMessage: metadataError
-    });
-  }, [isReady, loading, metadata, metadataError]);
+  // Readiness state logging removed for performance
 
   // Optimized content ready state management
   useEffect(() => {
@@ -717,15 +684,9 @@ const MetadataScreen: React.FC = () => {
   }, [isScreenFocused]);
 
   const handleCommentPress = useCallback((comment: any) => {
-    console.log('MetadataScreen: handleCommentPress called with comment:', comment?.id);
-    if (!isScreenFocused) {
-      console.log('MetadataScreen: Screen not focused, ignoring');
-      return;
-    }
-    console.log('MetadataScreen: Setting selected comment and opening bottomsheet');
+    if (!isScreenFocused) return;
     setSelectedComment(comment);
     setCommentBottomSheetVisible(true);
-    console.log('MetadataScreen: State should be updated now');
   }, [isScreenFocused]);
 
   const handleCommentBottomSheetClose = useCallback(() => {
@@ -775,8 +736,6 @@ const MetadataScreen: React.FC = () => {
 
     // Parse error to extract code and user-friendly message
     const parseError = (error: string) => {
-      console.log('🔍 Parsing error in MetadataScreen:', error);
-
       // Check for HTTP status codes - handle multiple formats
       // Match patterns like: "status code 500", "status": 500, "Request failed with status code 500"
       const statusCodeMatch = error.match(/status code (\d+)/) ||
@@ -786,7 +745,6 @@ const MetadataScreen: React.FC = () => {
 
       if (statusCodeMatch) {
         const code = parseInt(statusCodeMatch[1]);
-        console.log('✅ Found status code:', code);
         switch (code) {
           case 404:
             return { code: '404', message: 'Content not found', userMessage: 'This content doesn\'t exist or may have been removed.' };
@@ -894,25 +852,11 @@ const MetadataScreen: React.FC = () => {
 
   // Show error if exists
   if (metadataError || (!loading && !metadata)) {
-    console.log('🔍 [MetadataScreen] Showing error component:', {
-      hasError: !!metadataError,
-      errorMessage: metadataError,
-      isLoading: loading,
-      hasMetadata: !!metadata,
-      loadingState: loading
-    });
     return ErrorComponent;
   }
 
   // Show loading screen if metadata is not yet available or exit animation hasn't completed
   if (loading || !isContentReady || !loadingScreenExited) {
-    console.log('🔍 [MetadataScreen] Showing loading screen:', {
-      isLoading: loading,
-      isContentReady,
-      loadingScreenExited,
-      hasMetadata: !!metadata,
-      errorMessage: metadataError
-    });
     return (
       <MetadataLoadingScreen
         ref={loadingScreenRef}

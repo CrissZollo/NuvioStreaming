@@ -647,10 +647,10 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
           ItemSeparatorComponent={ItemSeparator}
           getItemLayout={getItemLayout}
           removeClippedSubviews={true}
-          initialNumToRender={isLargeTablet ? 5 : isTablet ? 4 : 3}
-          maxToRenderPerBatch={isLargeTablet ? 4 : 3}
-          windowSize={isLargeTablet ? 4 : 3}
-          updateCellsBatchingPeriod={50}
+          initialNumToRender={isLargeTablet ? 4 : isTablet ? 3 : 3}
+          maxToRenderPerBatch={isLargeTablet ? 3 : 2}
+          windowSize={isLargeTablet ? 3 : 2}
+          updateCellsBatchingPeriod={100}
         />
       )}
     </View>

@@ -1837,10 +1837,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                   paddingRight: horizontalPadding
                 }
               ]}
-              removeClippedSubviews={!isTVDevice}
-              initialNumToRender={isTVDevice ? 10 : 3}
-              maxToRenderPerBatch={isTVDevice ? 10 : 5}
-              windowSize={isTVDevice ? 21 : 5}
+              removeClippedSubviews={true}
+              initialNumToRender={isTVDevice ? 6 : 3}
+              maxToRenderPerBatch={isTVDevice ? 4 : 5}
+              windowSize={isTVDevice ? 7 : 5}
               snapToInterval={isTVDevice ? undefined : horizontalCardWidth + horizontalItemSpacing}
               snapToAlignment={isTVDevice ? undefined : "start"}
               decelerationRate={isTVDevice ? undefined : "fast"}

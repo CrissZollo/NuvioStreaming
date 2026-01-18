@@ -168,9 +168,9 @@ const TVRecommendationsTabContentComponent: React.FC<TVRecommendationsTabContent
         showsHorizontalScrollIndicator={false}
         scrollEnabled={false} // D-pad controls focus
         contentContainerStyle={styles.listContent}
-        initialNumToRender={6}
-        maxToRenderPerBatch={4}
-        windowSize={7}
+        initialNumToRender={4}
+        maxToRenderPerBatch={3}
+        windowSize={5}
         getItemLayout={getItemLayout}
         removeClippedSubviews
       />

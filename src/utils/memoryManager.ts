@@ -33,7 +33,7 @@ export class MemoryManager {
         this.triggerGCInDev();
       }
     } catch (error) {
-      logger.warn('[MemoryManager] Could not force garbage collection:', error);
+      // Silent failure - GC is best-effort
     }
   }
 
@@ -133,16 +133,11 @@ export class MemoryManager {
    */
   private performMemoryCleanup(): void {
     try {
-      logger.log('[MemoryManager] Performing memory cleanup');
-      
-      // Force garbage collection
+      // Silent cleanup - no logging needed for routine maintenance
       this.forceGarbageCollection();
-      
-      // Clear any global caches if they exist
       this.clearGlobalCaches();
-      
     } catch (error) {
-      logger.error('[MemoryManager] Error during memory cleanup:', error);
+      if (__DEV__) logger.error('[MemoryManager] Error during memory cleanup:', error);
     }
   }
 
@@ -161,7 +156,7 @@ export class MemoryManager {
         (global as any).__APP_CACHE__ = {};
       }
     } catch (error) {
-      logger.warn('[MemoryManager] Could not clear global caches:', error);
+      // Silent failure - cache clearing is best-effort
     }
   }
 
@@ -225,7 +220,7 @@ export class MemoryManager {
       return array;
     }
     
-    logger.warn(`[MemoryManager] Array size (${array.length}) exceeds limit (${maxSize}), truncating`);
+    if (__DEV__) logger.warn(`[MemoryManager] Array size (${array.length}) exceeds limit (${maxSize}), truncating`);
     return array.slice(0, maxSize);
   }
 

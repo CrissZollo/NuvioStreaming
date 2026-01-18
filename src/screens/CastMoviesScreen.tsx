@@ -923,10 +923,10 @@ const CastMoviesScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.8}
-          removeClippedSubviews={false}
-          initialNumToRender={isTV ? 48 : 30}
-          maxToRenderPerBatch={isTV ? 32 : 20}
-          windowSize={isTV ? 5 : 7}
+          removeClippedSubviews={true}
+          initialNumToRender={isTV ? 16 : 24}
+          maxToRenderPerBatch={isTV ? 8 : 12}
+          windowSize={isTV ? 3 : 5}
           onScrollToIndexFailed={(info) => {
             // Handle scroll to index failure gracefully
             setTimeout(() => {

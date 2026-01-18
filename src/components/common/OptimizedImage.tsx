@@ -71,7 +71,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   onError,
   contentFit = 'cover',
   transition = 0,
-  cachePolicy = 'memory'
+  cachePolicy = 'memory-disk'
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -100,14 +100,17 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     }
   }, [sourceUrl, containerWidth, containerHeight]);
 
-  // Lazy loading intersection observer simulation
+  // Lazy loading - simplified for TV performance
+  // On TV, we reduce delays significantly to prevent visible loading jank
   useEffect(() => {
     if (lazy && !isVisible) {
+      // Much shorter delays - images should appear quickly
+      const delay = priority === 'high' ? 50 : priority === 'normal' ? 100 : 200;
       const timer = setTimeout(() => {
         if (mountedRef.current) {
           setIsVisible(true);
         }
-      }, priority === 'high' ? 200 : priority === 'normal' ? 500 : 1000);
+      }, delay);
 
       return () => clearTimeout(timer);
     }

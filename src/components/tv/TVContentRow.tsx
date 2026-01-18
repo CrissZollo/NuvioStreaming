@@ -238,9 +238,9 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         getItemLayout={getItemLayout}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        windowSize={5}
+        initialNumToRender={5}
+        maxToRenderPerBatch={4}
+        windowSize={3}
         removeClippedSubviews
         onScrollToIndexFailed={(info) => {
           // Handle scroll failure gracefully
