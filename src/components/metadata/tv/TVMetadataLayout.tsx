@@ -1,4 +1,5 @@
-import React, { useState, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, memo, useEffect } from 'react';
+import { findNodeHandle } from 'react-native';
 import {
   View,
   Text,
@@ -122,7 +123,7 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
   const isSeries = Object.keys(groupedEpisodes).length > 0;
   const tabs = isSeries ? SERIES_TABS : MOVIE_TABS;
 
-  // Tab state - first tab selected by default
+  // Tab state - default to first tab so content is always visible (prevents layout jump)
   const [activeTab, setActiveTab] = useState<string | null>(tabs[0]?.id || null);
 
   // Refs for focus navigation
@@ -130,6 +131,20 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
   const firstTabRef = useRef<View>(null);
   const activeTabRef = useRef<View>(null);
   const firstContentItemRef = useRef<View>(null);
+
+  // Track first tab's node handle for action button navigation
+  // Using state so action buttons re-render with the correct handle after tabs mount
+  const [firstTabNodeHandle, setFirstTabNodeHandle] = useState<number | null>(null);
+
+  // Callback when first tab mounts and we can get its node handle
+  const onFirstTabReady = useCallback(() => {
+    if (firstTabRef.current) {
+      const handle = findNodeHandle(firstTabRef.current);
+      if (handle && handle !== firstTabNodeHandle) {
+        setFirstTabNodeHandle(handle);
+      }
+    }
+  }, [firstTabNodeHandle]);
 
   // Handle tab change
   const handleTabChange = useCallback((tabId: string) => {
@@ -174,7 +189,7 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
               navigation={navigation}
               handleBack={handleBack}
               playButtonRef={playButtonRef}
-              firstTabRef={firstTabRef}
+              firstTabNodeHandle={firstTabNodeHandle}
               contentId={contentId}
               groupedEpisodes={groupedEpisodes}
             />
@@ -206,6 +221,7 @@ const TVMetadataLayoutComponent: React.FC<TVMetadataLayoutProps> = (props) => {
             activeTabRef={activeTabRef}
             playButtonRef={playButtonRef}
             firstContentItemRef={firstContentItemRef}
+            onFirstTabReady={onFirstTabReady}
           />
 
           {/* Tab Content */}

@@ -36,7 +36,7 @@ interface TVMetadataHeroPanelProps {
   navigation: any;
   handleBack: () => void;
   playButtonRef: React.RefObject<View>;
-  firstTabRef: React.RefObject<View>;
+  firstTabNodeHandle?: number | null;
   contentId: string;
   groupedEpisodes?: { [season: number]: Episode[] };
 }
@@ -60,7 +60,7 @@ const TVMetadataHeroPanelComponent: React.FC<TVMetadataHeroPanelProps> = ({
   navigation,
   handleBack,
   playButtonRef,
-  firstTabRef,
+  firstTabNodeHandle,
   contentId,
   groupedEpisodes,
 }) => {
@@ -217,7 +217,7 @@ const TVMetadataHeroPanelComponent: React.FC<TVMetadataHeroPanelProps> = ({
           onToggleWatchlist={onToggleWatchlist}
           onToggleCollection={onToggleCollection}
           playButtonRef={playButtonRef}
-          firstTabRef={firstTabRef}
+          firstTabNodeHandle={firstTabNodeHandle}
           groupedEpisodes={groupedEpisodes}
           contentId={contentId}
         />

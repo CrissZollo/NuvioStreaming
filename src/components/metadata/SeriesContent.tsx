@@ -177,6 +177,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   }, [deviceType]);
 
   const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number; lastUpdated: number } }>({});
+  // PERFORMANCE: Ref to access episodeProgress without adding it as callback dependency
+  // This prevents renderHorizontalEpisodeCard from recreating on every progress update
+  const episodeProgressRef = useRef(episodeProgress);
+  episodeProgressRef.current = episodeProgress;
+
   // Delay item entering animations to avoid FlashList initial layout glitches
   const [enableItemAnimations, setEnableItemAnimations] = useState(false);
   // Local TMDB hydration for rating/runtime when addon (Cinemeta) lacks these
@@ -222,9 +227,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   }, []);
 
   // TV focus state for scrolling on focus
-  const [tvFocusedEpisodeIndex, setTvFocusedEpisodeIndex] = useState(0);
+  // PERFORMANCE: Removed tvFocusedEpisodeIndex state - it was updated but never used,
+  // causing unnecessary re-renders on every focus change
   const lastTVFocusTime = useRef<number>(0);
-  const TV_FOCUS_DEBOUNCE_MS = 80;
+  const TV_FOCUS_DEBOUNCE_MS = 50; // Reduced from 80ms for snappier navigation
 
   // Handle TV episode focus - scroll to keep focused item visible
   const handleTVEpisodeFocus = useCallback((index: number) => {
@@ -235,9 +241,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     }
     lastTVFocusTime.current = now;
 
-    setTvFocusedEpisodeIndex(index);
-
-    // Scroll to focused episode
+    // Scroll to focused episode (no state update - just scroll)
     if (effectiveEpisodeLayout === 'horizontal' && horizontalEpisodeScrollViewRef.current) {
       const itemWidth = horizontalCardWidth + horizontalItemSpacing;
       const scrollX = Math.max(0, index * itemWidth - horizontalPadding);
@@ -391,6 +395,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
     // Scroll to the most recently watched episode if found
     if (mostRecentEpisodeIndex >= 0) {
+      // PERFORMANCE: Reduced from 500ms to 100ms - layout should be ready quickly
       setTimeout(() => {
         if (horizontalEpisodeScrollViewRef.current) {
           // Use scrollToIndex which automatically uses getItemLayout for accurate positioning
@@ -400,7 +405,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             viewPosition: 0 // Align to start of card for precise positioning
           });
         }
-      }, 500); // Delay to ensure the season has loaded
+      }, 100);
     }
   };
 
@@ -1114,7 +1119,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       const tmdbUrl = tmdbService.getImageUrl(tmdbOverride.still_path, 'original');
       if (tmdbUrl) episodeImage = tmdbUrl;
     }
-    const progress = episodeProgress[episodeId];
+    // PERFORMANCE: Access via ref to avoid dependency on episodeProgress state
+    const progress = episodeProgressRef.current[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
 
     // Don't show progress bar if episode is complete (>= 85%)
@@ -1368,7 +1374,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     metadata?.id,
     tmdbEpisodeOverrides,
     getIMDbRating,
-    episodeProgress,
+    // REMOVED: episodeProgress - now accessed via ref to prevent callback recreation
     onSelectEpisode,
     handleEpisodeLongPress,
   ]);
@@ -1432,7 +1438,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       });
     };
 
-    const progress = episodeProgress[episodeId];
+    // PERFORMANCE: Access via ref to avoid dependency on episodeProgress state
+    const progress = episodeProgressRef.current[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
 
     // Don't show progress bar if episode is complete (>= 85%)
@@ -1727,7 +1734,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     metadata?.id,
     tmdbEpisodeOverrides,
     getIMDbRating,
-    episodeProgress,
+    // REMOVED: episodeProgress - now accessed via ref to prevent callback recreation
     onSelectEpisode,
     handleEpisodeLongPress,
     handleTVEpisodeFocus,
@@ -1847,7 +1854,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               getItemLayout={getHorizontalEpisodeItemLayout}
               onScrollToIndexFailed={(info) => {
                 // Fallback if scrollToIndex fails - use scrollToOffset with calculated position
-                const wait = new Promise(resolve => setTimeout(resolve, 500));
+                // PERFORMANCE: Reduced from 500ms to 50ms for better responsiveness
+                const wait = new Promise(resolve => setTimeout(resolve, 50));
                 wait.then(() => {
                   if (horizontalEpisodeScrollViewRef.current) {
                     const length = horizontalCardWidth + horizontalItemSpacing;

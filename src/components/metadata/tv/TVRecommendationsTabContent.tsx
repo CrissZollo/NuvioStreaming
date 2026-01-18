@@ -92,7 +92,6 @@ const TVRecommendationsTabContentComponent: React.FC<TVRecommendationsTabContent
           onFocus={() => handleItemFocus(index)}
           style={styles.card}
           borderRadius={12}
-          unfocusedScale={0.95}
           focusScale={1.0}
           animateBackground={false}
           showFocusBorder={true}

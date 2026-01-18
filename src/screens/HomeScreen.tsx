@@ -43,8 +43,6 @@ import ContinueWatchingSection from '../components/home/ContinueWatchingSection'
 import * as Haptics from 'expo-haptics';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
-import { focusLog } from '../utils/focusPerformanceLogger';
-import { navLog } from '../utils/navigationDebugLogger';
 import { storageService } from '../services/storageService';
 import { getCatalogDisplayName, clearCustomNameCache } from '../utils/catalogNameUtils';
 import { useHomeCatalogs } from '../hooks/useHomeCatalogs';
@@ -692,6 +690,32 @@ const HomeScreen = () => {
     return data;
   }, [hasAddons, catalogs, visibleCatalogCount]);
 
+  // PERFORMANCE: Pre-compute catalog indices for O(1) adjacent section lookup
+  // This replaces O(n) linear search in getAdjacentSectionHandles on every render
+  const catalogIndexMap = useMemo(() => {
+    const map = new Map<number, { prevCatalogIndex: number | null; nextCatalogIndex: number | null }>();
+    const catalogIndices: number[] = [];
+
+    listData.forEach((item, idx) => {
+      if (item.type === 'catalog') {
+        catalogIndices.push(idx);
+      }
+    });
+
+    catalogIndices.forEach((idx, i) => {
+      map.set(idx, {
+        prevCatalogIndex: i > 0 ? catalogIndices[i - 1] : null,
+        nextCatalogIndex: i < catalogIndices.length - 1 ? catalogIndices[i + 1] : null,
+      });
+    });
+
+    return map;
+  }, [listData]);
+
+  // Keep ref for getAdjacentSectionHandles to access latest map without dependencies
+  const catalogIndexMapRef = useRef(catalogIndexMap);
+  catalogIndexMapRef.current = catalogIndexMap;
+
   const handleLoadMoreCatalogs = useCallback(() => {
     setVisibleCatalogCount(prev => Math.min(prev + 3, catalogs.length));
   }, [catalogs.length]);
@@ -834,28 +858,20 @@ const HomeScreen = () => {
   }, []);
 
   // Stable getter function for adjacent section handles
+  // PERFORMANCE: Uses pre-computed catalogIndexMapRef for O(1) lookup instead of O(n) linear search
   // This is passed to CatalogSection and called at render time to get latest handles from ref
-  // Using a ref-based function ensures it always returns current values without needing re-renders
   const getAdjacentSectionHandlesRef = useRef((listIndex: number) => {
-    const currentListData = listDataRef.current;
-
-    // Find previous catalog section
-    let prevHandle: number | null = null;
-    for (let i = listIndex - 1; i >= 0; i--) {
-      if (currentListData[i]?.type === 'catalog') {
-        prevHandle = catalogSectionHandlesRef.current.get(i) || null;
-        break;
-      }
+    const indices = catalogIndexMapRef.current.get(listIndex);
+    if (!indices) {
+      return { prevHandle: null, nextHandle: null };
     }
 
-    // Find next catalog section
-    let nextHandle: number | null = null;
-    for (let i = listIndex + 1; i < currentListData.length; i++) {
-      if (currentListData[i]?.type === 'catalog') {
-        nextHandle = catalogSectionHandlesRef.current.get(i) || null;
-        break;
-      }
-    }
+    const prevHandle = indices.prevCatalogIndex !== null
+      ? catalogSectionHandlesRef.current.get(indices.prevCatalogIndex) || null
+      : null;
+    const nextHandle = indices.nextCatalogIndex !== null
+      ? catalogSectionHandlesRef.current.get(indices.nextCatalogIndex) || null
+      : null;
 
     return { prevHandle, nextHandle };
   });

@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, memo } from 'react';
+import React, { useRef, useCallback, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ interface TVMetadataTabBarProps {
   activeTabRef: React.RefObject<View>;
   playButtonRef: React.RefObject<View>;
   firstContentItemRef: React.RefObject<View>;
+  onFirstTabReady?: () => void;
 }
 
 const TVMetadataTabBarComponent: React.FC<TVMetadataTabBarProps> = ({
@@ -33,6 +34,7 @@ const TVMetadataTabBarComponent: React.FC<TVMetadataTabBarProps> = ({
   activeTabRef,
   playButtonRef,
   firstContentItemRef,
+  onFirstTabReady,
 }) => {
   const { currentTheme } = useTheme();
 
@@ -46,17 +48,39 @@ const TVMetadataTabBarComponent: React.FC<TVMetadataTabBarProps> = ({
     return tabRefs.current.get(tabId)!;
   }, []);
 
+  // Sync activeTabRef with the current active tab's ref
+  // This allows content to navigate back to whichever tab is currently active
+  useEffect(() => {
+    if (activeTab) {
+      const activeIndex = tabs.findIndex(t => t.id === activeTab);
+      if (activeIndex === 0) {
+        // First tab uses firstTabRef, so sync activeTabRef to point to same element
+        (activeTabRef as React.MutableRefObject<View | null>).current = firstTabRef.current;
+      } else {
+        const ref = tabRefs.current.get(activeTab);
+        if (ref?.current) {
+          (activeTabRef as React.MutableRefObject<View | null>).current = ref.current;
+        }
+      }
+    }
+  }, [activeTab, tabs, firstTabRef, activeTabRef]);
+
   // Get adjacent tab refs for navigation
+  // Returns the correct ref that the target tab uses as its viewRef
   const getAdjacentTabRef = useCallback((tabId: string, direction: 'left' | 'right') => {
     const currentIndex = tabs.findIndex(t => t.id === tabId);
     if (direction === 'left' && currentIndex > 0) {
-      return getTabRef(tabs[currentIndex - 1].id);
+      const targetIndex = currentIndex - 1;
+      // First tab uses firstTabRef, others use their internal refs
+      return targetIndex === 0 ? firstTabRef : getTabRef(tabs[targetIndex].id);
     }
     if (direction === 'right' && currentIndex < tabs.length - 1) {
-      return getTabRef(tabs[currentIndex + 1].id);
+      const targetIndex = currentIndex + 1;
+      // First tab uses firstTabRef, others use their internal refs
+      return targetIndex === 0 ? firstTabRef : getTabRef(tabs[targetIndex].id);
     }
     return undefined;
-  }, [tabs, getTabRef]);
+  }, [tabs, getTabRef, firstTabRef]);
 
   return (
     <Animated.View
@@ -69,9 +93,12 @@ const TVMetadataTabBarComponent: React.FC<TVMetadataTabBarProps> = ({
         const isActive = tab.id === activeTab;
         const tabRef = getTabRef(tab.id);
 
-        // Use activeTabRef for the active tab so content can navigate back to it
-        // Use firstTabRef for the first tab (for initial focus scenarios)
-        const refToUse = isActive ? activeTabRef : (isFirst ? firstTabRef : tabRef);
+        // IMPORTANT: Each tab must keep a STABLE ref - don't change refs based on active state
+        // Changing refs during focus causes React Native's native focus system to lose track
+        // First tab always uses firstTabRef (for navigation from action buttons)
+        // Other tabs use their internal refs
+        // We update activeTabRef manually when tabs change (see useEffect below)
+        const refToUse = isFirst ? firstTabRef : tabRef;
 
         return (
           <Focusable
@@ -81,9 +108,9 @@ const TVMetadataTabBarComponent: React.FC<TVMetadataTabBarProps> = ({
             onFocus={() => onTabChange(tab.id)}
             style={styles.tab}
             focusScale={1.0}
-            borderRadius={0}
+            borderRadius={8}
             animateBackground={false}
-            showFocusBorder={false}
+            showFocusBorder={true}
             blockLeft={isFirst}
             blockRight={isLast}
             blockDown={false}
@@ -91,6 +118,7 @@ const TVMetadataTabBarComponent: React.FC<TVMetadataTabBarProps> = ({
             nextFocusRight={!isLast ? getAdjacentTabRef(tab.id, 'right') : undefined}
             nextFocusUp={playButtonRef}
             nextFocusDown={firstContentItemRef}
+            onLayout={isFirst ? onFirstTabReady : undefined}
           >
             {(focused) => (
               <View style={[
@@ -101,7 +129,6 @@ const TVMetadataTabBarComponent: React.FC<TVMetadataTabBarProps> = ({
                   style={[
                     styles.tabText,
                     { color: isActive || focused ? currentTheme.colors.highEmphasis : currentTheme.colors.textMuted },
-                    (isActive || focused) && styles.activeTabText,
                   ]}
                 >
                   {tab.label}
@@ -149,11 +176,8 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     letterSpacing: 0.3,
-  },
-  activeTabText: {
-    fontWeight: '700',
   },
   tabIndicator: {
     height: 3,

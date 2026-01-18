@@ -83,7 +83,6 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
           onFocus={() => handleCastFocus(index)}
           style={styles.castCard}
           borderRadius={6}
-          unfocusedScale={0.95}
           focusScale={1.0}
           animateBackground={false}
           showFocusBorder={true}

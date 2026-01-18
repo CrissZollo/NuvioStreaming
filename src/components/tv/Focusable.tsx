@@ -6,21 +6,23 @@ import {
   ViewStyle,
   StyleProp,
   findNodeHandle,
+  Platform,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withTiming,
   useSharedValue,
   interpolate,
-  interpolateColor,
   SharedValue,
 } from 'react-native-reanimated';
 import { useIsTV } from '../../contexts/TVContext';
-import { focusLog } from '../../utils/focusPerformanceLogger';
-import { navLog } from '../../utils/navigationDebugLogger';
 
 // Focus colors - clean white outline style
 const TV_FOCUS_BORDER_COLOR = '#FFFFFF';
+
+// PERFORMANCE: Use longer animation duration for low-end TV devices
+// 80ms = 2-3 frames at 30fps (jerky), 120ms = 4 frames (smooth)
+const TV_ANIMATION_DURATION = Platform.isTV ? 120 : 80;
 
 interface FocusableProps {
   /** Content to render inside the focusable container */
@@ -211,7 +213,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
 
       // 80ms animation - balanced for responsiveness without causing frame drops on low-end TV
       // 50ms was too fast and caused frame skipping, 100ms+ feels sluggish
-      focusProgress.value = withTiming(1, { duration: 80 });
+      focusProgress.value = withTiming(1, { duration: TV_ANIMATION_DURATION });
 
       onFocus?.();
     }, [onFocus, focusProgress, needsFocusState]);
@@ -226,7 +228,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       }
 
       // 80ms animation - balanced for responsiveness without causing frame drops on low-end TV
-      focusProgress.value = withTiming(0, { duration: 80 });
+      focusProgress.value = withTiming(0, { duration: TV_ANIMATION_DURATION });
 
       onBlur?.();
     }, [onBlur, focusProgress, needsFocusState]);
@@ -238,7 +240,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         if (needsFocusState) {
           setIsFocusedState(true);
         }
-        focusProgress.value = withTiming(1, { duration: 80 });
+        focusProgress.value = withTiming(1, { duration: TV_ANIMATION_DURATION });
         if (actualRef.current) {
           (actualRef.current as any).setNativeProps?.({
             hasTVPreferredFocus: true,
@@ -250,7 +252,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         if (needsFocusState) {
           setIsFocusedState(false);
         }
-        focusProgress.value = withTiming(0, { duration: 80 });
+        focusProgress.value = withTiming(0, { duration: TV_ANIMATION_DURATION });
       },
       isFocused: () => isFocusedRef.current,
       getViewRef: () => actualRef,
@@ -268,35 +270,34 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       };
     });
 
-    // Animated border style - avoids re-render on focus change
+    // PERFORMANCE: Use constant border width with animated opacity
+    // This prevents layout shifts when focus changes (border doesn't change element size)
+    // Opacity animation runs entirely on UI thread via native driver
     const animatedBorderStyle = useAnimatedStyle(() => {
       'worklet';
       if (!showFocusBorder) {
         return {};
       }
-      const borderColor = interpolateColor(
-        focusProgress.value,
-        [0, 1],
-        ['transparent', TV_FOCUS_BORDER_COLOR]
-      );
+      // Keep constant border width to prevent layout shifts, animate opacity
+      const borderOpacity = interpolate(focusProgress.value, [0, 1], [0, 1]);
       return {
         borderWidth: 3,
-        borderColor,
+        borderColor: `rgba(255, 255, 255, ${borderOpacity})`,
       };
     });
 
-    // Animated background style when animateBackground is true
+    // PERFORMANCE: Disabled by default (animateBackground=false)
+    // When enabled, use simple background without interpolateColor
     const animatedBackgroundStyle = useAnimatedStyle(() => {
       'worklet';
       if (!animateBackground) {
         return {};
       }
-      const backgroundColor = interpolateColor(
-        focusProgress.value,
-        [0, 1],
-        ['transparent', '#FFFFFF']
-      );
-      return { backgroundColor };
+      // Use opacity interpolation instead of color interpolation
+      const bgOpacity = interpolate(focusProgress.value, [0, 1], [0, 0.15]);
+      return {
+        backgroundColor: `rgba(255, 255, 255, ${bgOpacity})`,
+      };
     });
 
     // Render children - support render prop for focus-aware content

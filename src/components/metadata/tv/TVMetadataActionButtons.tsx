@@ -30,7 +30,7 @@ interface TVMetadataActionButtonsProps {
   onToggleWatchlist?: () => void;
   onToggleCollection?: () => void;
   playButtonRef: React.RefObject<View>;
-  firstTabRef: React.RefObject<View>;
+  firstTabNodeHandle?: number | null;
   groupedEpisodes?: { [season: number]: Episode[] };
   contentId: string;
 }
@@ -49,7 +49,7 @@ const TVMetadataActionButtonsComponent: React.FC<TVMetadataActionButtonsProps> =
   onToggleWatchlist,
   onToggleCollection,
   playButtonRef,
-  firstTabRef,
+  firstTabNodeHandle,
   groupedEpisodes,
   contentId,
 }) => {
@@ -162,7 +162,7 @@ const TVMetadataActionButtonsComponent: React.FC<TVMetadataActionButtonsProps> =
         animateBackground={false}
         autoFocus={true}
         nextFocusRight={addButtonRef}
-        nextFocusDown={firstTabRef}
+        nextFocusDownId={firstTabNodeHandle}
         blockUp={true}
         blockLeft={true}
       >
@@ -199,7 +199,7 @@ const TVMetadataActionButtonsComponent: React.FC<TVMetadataActionButtonsProps> =
         animateBackground={false}
         nextFocusLeft={playButtonRef}
         nextFocusRight={isAuthenticated ? favoriteButtonRef : undefined}
-        nextFocusDown={firstTabRef}
+        nextFocusDownId={firstTabNodeHandle}
         blockUp={true}
         blockRight={!isAuthenticated}
       >
@@ -222,7 +222,7 @@ const TVMetadataActionButtonsComponent: React.FC<TVMetadataActionButtonsProps> =
           focusScale={1.05}
           animateBackground={false}
           nextFocusLeft={addButtonRef}
-          nextFocusDown={firstTabRef}
+          nextFocusDownId={firstTabNodeHandle}
           blockUp={true}
           blockRight={true}
         >
