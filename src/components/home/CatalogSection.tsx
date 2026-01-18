@@ -268,19 +268,15 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
   // Also used for within-section vertical navigation via flat index calculation
   const itemNodeHandles = useRef<Map<number, number>>(new Map());
 
-  // Force re-render when all items have registered their handles (TV only)
-  // This ensures row 0 items can see row 1 handles for downward navigation
-  const [handlesReady, setHandlesReady] = useState(false);
+  // REMOVED: handlesReady state was causing ALL items to re-render when handles registered
+  // Instead, we let native focus engine handle navigation when handles aren't yet available
+  // This eliminates the cascading re-renders that were causing sluggish navigation
   const expectedItemCount = useRef(0);
-  // Ref to track if we've scheduled the handlesReady update
-  const handlesReadyScheduled = useRef(false);
 
   // Reset node handles when catalog items change
   useEffect(() => {
     itemNodeHandles.current.clear();
     firstItemNodeHandleRef.current = null;
-    handlesReadyScheduled.current = false;
-    setHandlesReady(false);
   }, [catalog.items.length]);
 
   // Report first item handle when it's registered
@@ -294,6 +290,8 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
   }, [onFirstItemHandleReady]);
 
   // Callback to register item's node handle when it mounts
+  // OPTIMIZED: Removed handlesReady dependency to prevent re-renders when handles register
+  // Navigation handles are retrieved at render time from the ref, so no state update needed
   const registerItemNodeHandle = useCallback((index: number, view: View | null) => {
     if (view) {
       const handle = findNodeHandle(view);
@@ -304,20 +302,9 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         if (index === 0) {
           reportFirstItemHandle(handle);
         }
-
-        // When all items have registered, trigger re-render so row 0 items
-        // can get row 1 handles for downward navigation (TV only)
-        // Use requestAnimationFrame to batch this update and avoid multiple re-renders
-        if (isTVDevice && !handlesReady && !handlesReadyScheduled.current &&
-            itemNodeHandles.current.size >= expectedItemCount.current) {
-          handlesReadyScheduled.current = true;
-          requestAnimationFrame(() => {
-            setHandlesReady(true);
-          });
-        }
       }
     }
-  }, [reportFirstItemHandle, isTVDevice, handlesReady]);
+  }, [reportFirstItemHandle]);
 
   // When any item in this section gets focus, update the last focused row
   // so pressing right from menu returns to this row's first item
@@ -325,7 +312,6 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
     if (isTVDevice && firstItemRef.current) {
       setLastFocusedRowView(firstItemRef.current);
     }
-
     onSectionFocus?.();
   }, [isTVDevice, setLastFocusedRowView, onSectionFocus]);
 
@@ -477,7 +463,7 @@ const CatalogSection = ({ catalog, onSectionFocus, isFirstSection, isLastSection
         tvPosterWidth={tvGridLayout.posterWidth}
       />
     );
-  }, [tvGridLayout.itemsPerRow, tvGridLayout.posterWidth, tvGridRows.length, dataWithViewAll.length, getMenuFirstItemNodeHandle, handleViewAllPress, handleSectionItemFocus, isLastSection, currentTheme.colors, handleContentPress, registerItemNodeHandle, prevSectionFirstItemHandle, nextSectionFirstItemHandle, handlesReady]);
+  }, [tvGridLayout.itemsPerRow, tvGridLayout.posterWidth, tvGridRows.length, dataWithViewAll.length, getMenuFirstItemNodeHandle, handleViewAllPress, handleSectionItemFocus, isLastSection, currentTheme.colors, handleContentPress, registerItemNodeHandle]);
 
   // Mobile/tablet render function (unchanged behavior)
   const renderContentItem = useCallback(({ item, index }: { item: StreamingContent, index: number }) => {

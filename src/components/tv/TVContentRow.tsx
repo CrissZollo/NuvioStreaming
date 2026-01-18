@@ -136,35 +136,25 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
 
   const handleItemFocus = useCallback(
     (index: number) => {
-      navLog.perfStart(`TVContentRow[${title}].handleItemFocus`);
-
       // Debounce rapid focus events to prevent scroll conflicts
       const now = Date.now();
       if (now - lastFocusTime.current < TV_FOCUS_DEBOUNCE_MS) {
-        navLog.focusBlocked('debounce', `TVContentRow[${title}]`, `${now - lastFocusTime.current}ms < ${TV_FOCUS_DEBOUNCE_MS}ms threshold`);
-        navLog.perfEnd(`TVContentRow[${title}].handleItemFocus`);
         return; // Skip this focus event - too soon after last one
       }
       lastFocusTime.current = now;
-
-      navLog.focus(`TVContentRow[${title}].item[${index}]`, { rowIndex, itemId: items[index]?.id });
 
       focusedIndexRef.current = index;
       saveFocus(rowIndex, index);
       onRowFocus?.(rowIndex);
 
       // Scroll to keep focused item visible
-      navLog.scrollAnimStart(`TVContentRow[${title}].FlatList`, focusedIndexRef.current, index);
       listRef.current?.scrollToIndex({
         index,
         viewPosition: 0.3, // Keep item towards left
         animated: false,
       });
-      navLog.scrollAnimEnd(`TVContentRow[${title}].FlatList`);
-
-      navLog.perfEnd(`TVContentRow[${title}].handleItemFocus`);
     },
-    [rowIndex, onRowFocus, saveFocus, title, items]
+    [rowIndex, onRowFocus, saveFocus]
   );
 
   const getItemRef = useCallback((index: number) => {

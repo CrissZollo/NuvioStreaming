@@ -890,6 +890,7 @@ const LibraryScreen = () => {
           showsVerticalScrollIndicator={false}
           onEndReachedThreshold={0.7}
           onEndReached={() => { }}
+          estimatedItemSize={itemWidth * 1.5 + 20}
         />
       );
     }
@@ -932,6 +933,7 @@ const LibraryScreen = () => {
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.7}
         onEndReached={() => { }}
+        estimatedItemSize={itemWidth * 1.5 + 20}
       />
     );
   };
@@ -1069,6 +1071,7 @@ const LibraryScreen = () => {
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.7}
         onEndReached={() => { }}
+        estimatedItemSize={itemWidth * 1.5 + 20}
       />
     );
   };

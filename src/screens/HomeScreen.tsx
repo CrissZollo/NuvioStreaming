@@ -185,9 +185,6 @@ const HomeScreen = () => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
-    navLog.dataFetchStart('HomeScreen.catalogs');
-    navLog.perfStart('HomeScreen.loadCatalogsProgressively');
-
     setCatalogsLoading(true);
     setCatalogs([]);
     setLoadedCatalogCount(0);
@@ -223,14 +220,29 @@ const HomeScreen = () => {
       let catalogIndex = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
 
-      // Launch all catalog loaders in parallel
-      const launchAllCatalogs = () => {
-        while (catalogQueue.length > 0) {
+      // PERFORMANCE: Limit concurrent catalog loading on TV devices
+      // TV devices have weaker hardware and can freeze if too many requests run at once
+      const MAX_CONCURRENT_LOADS = isTVDevice ? 2 : 4;
+      let activeLoads = 0;
+
+      // Process catalog queue with concurrency limit
+      const processNextInQueue = () => {
+        while (activeLoads < MAX_CONCURRENT_LOADS && catalogQueue.length > 0) {
           const catalogLoader = catalogQueue.shift();
           if (catalogLoader) {
-            catalogLoader();
+            activeLoads++;
+            catalogLoader().finally(() => {
+              activeLoads--;
+              // Process next item when one completes
+              processNextInQueue();
+            });
           }
         }
+      };
+
+      // Start processing the queue (replaces launchAllCatalogs)
+      const launchAllCatalogs = () => {
+        processNextInQueue();
       };
 
       for (const addon of addons) {
@@ -250,6 +262,7 @@ const HomeScreen = () => {
                   if (!manifest) return;
 
                   const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
+
                   if (metas && metas.length > 0) {
                     // Aggressively limit items per catalog to reduce memory usage
                     // TV devices need even fewer items due to weaker hardware
@@ -354,7 +367,7 @@ const HomeScreen = () => {
       launchAllCatalogs();
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
-      navLog.perfWarn('HomeScreen.loadCatalogsProgressively failed');
+      if (__DEV__) console.warn('[HomeScreen] loadCatalogsProgressively failed');
       InteractionManager.runAfterInteractions(() => {
         setCatalogsLoading(false);
       });
@@ -396,7 +409,6 @@ const HomeScreen = () => {
     // Reset TV navigation handles when catalogs reload
     if (isTVDevice) {
       catalogSectionHandlesRef.current.clear();
-      initialHandlesRegisteredRef.current = false;
     }
 
     // Small delay to ensure previous fetch is fully stopped
@@ -806,60 +818,19 @@ const HomeScreen = () => {
   // Key: listData index, Value: node handle of first focusable item in that section
   const catalogSectionHandlesRef = useRef<Map<number, number>>(new Map());
 
-  // Track when section handles are ready to trigger re-render of CatalogSections
-  // This ensures sections get updated navigation props after all handles are registered
-  const [sectionHandlesVersion, setSectionHandlesVersion] = useState(0);
-  const pendingHandleUpdateRef = useRef<NodeJS.Timeout | null>(null);
-  // Track if initial handles have been registered (for immediate update on first sections)
-  const initialHandlesRegisteredRef = useRef(false);
+  // REMOVED: sectionHandlesVersion state was causing cascading re-renders
+  // When a section registered its handle, it triggered re-render of HomeScreen,
+  // which re-rendered ALL CatalogSections and their ContentItems (3-5x re-renders)
+  // Instead, we use ref-based handle storage and let native focus engine handle navigation
+  // when handles aren't yet available. This eliminates the sluggish navigation feel.
 
   // Callback to register a catalog section's first item handle
+  // OPTIMIZED: Just store in ref, no state update needed
+  // Handles are retrieved at render time via getAdjacentSectionHandles
   const handleCatalogFirstItemReady = useCallback((listIndex: number, handle: number | null) => {
     if (handle) {
-      const prevHandle = catalogSectionHandlesRef.current.get(listIndex);
-      const prevSize = catalogSectionHandlesRef.current.size;
       catalogSectionHandlesRef.current.set(listIndex, handle);
-      const newSize = catalogSectionHandlesRef.current.size;
-
-      // Check if this is a new registration or if the handle value changed
-      const isNewKey = newSize > prevSize;
-      const handleChanged = prevHandle !== handle;
-
-      // Trigger re-render when a new handle is registered OR when handle value changes
-      // Handle changes can occur due to FlashList recycling views
-      if ((isNewKey || handleChanged) && newSize >= 2) {
-        // Clear any pending update to batch multiple registrations
-        if (pendingHandleUpdateRef.current) {
-          clearTimeout(pendingHandleUpdateRef.current);
-        }
-
-        // For first few sections, use immediate update (no debounce) for faster initial navigation
-        // After initial sections are set up, use debounce to batch later registrations
-        const isInitialSetup = !initialHandlesRegisteredRef.current;
-
-        if (isInitialSetup && newSize >= 3) {
-          // First 3+ sections are ready - update immediately
-          initialHandlesRegisteredRef.current = true;
-          setSectionHandlesVersion(v => v + 1);
-        } else {
-          // Schedule update after a short delay to batch registrations
-          // Use shorter delay (16ms = 1 frame) for responsiveness
-          pendingHandleUpdateRef.current = setTimeout(() => {
-            setSectionHandlesVersion(v => v + 1);
-            pendingHandleUpdateRef.current = null;
-          }, 16);
-        }
-      }
     }
-  }, []);
-
-  // Cleanup pending timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (pendingHandleUpdateRef.current) {
-        clearTimeout(pendingHandleUpdateRef.current);
-      }
-    };
   }, []);
 
   // Stable getter function for adjacent section handles
@@ -889,17 +860,16 @@ const HomeScreen = () => {
     return { prevHandle, nextHandle };
   });
 
-  // Also keep the useCallback version for cases where we need dependency tracking
+  // Also keep the useCallback version - stable reference since it just wraps the ref
   const getAdjacentSectionHandles = useCallback((listIndex: number) => {
     return getAdjacentSectionHandlesRef.current(listIndex);
-  }, [sectionHandlesVersion]);
+  }, []);
 
   const handleCatalogFocus = useCallback((index: number) => {
-    navLog.perfStart('HomeScreen.handleCatalogFocus');
+    // PERFORMANCE: Removed all logging from this hot path
+    // Even no-op logging calls have overhead on low-end TV devices
 
     if (!isTVDevice || !flashListRef.current) {
-      navLog.log('SCROLL', 'handleCatalogFocus: skipped (not TV or no ref)');
-      navLog.perfEnd('HomeScreen.handleCatalogFocus');
       return;
     }
 
@@ -907,27 +877,20 @@ const HomeScreen = () => {
 
     // Skip if same index to avoid unnecessary scrolls
     if (lastFocusedIndexRef.current === index) {
-      navLog.log('SCROLL', `handleCatalogFocus: skipped (same index ${index})`);
-      navLog.perfEnd('HomeScreen.handleCatalogFocus');
       return;
     }
 
     // Validate index is within bounds
     if (index < 0 || index >= currentListData.length) {
-      navLog.log('SCROLL', `handleCatalogFocus: skipped (index ${index} out of bounds, length=${currentListData.length})`);
-      navLog.perfEnd('HomeScreen.handleCatalogFocus');
       return;
     }
 
     // Skip scrolling for placeholder items (catalogs still loading)
     const item = currentListData[index];
     if (!item || item.type === 'placeholder') {
-      navLog.log('SCROLL', `handleCatalogFocus: skipped (placeholder or null item at ${index})`);
-      navLog.perfEnd('HomeScreen.handleCatalogFocus');
       return;
     }
 
-    const prevIndex = lastFocusedIndexRef.current;
     lastFocusedIndexRef.current = index;
 
     // TV Prefetch: Auto-load more catalogs when approaching the end
@@ -935,44 +898,26 @@ const HomeScreen = () => {
     const catalogItemsFromEnd = lastCatalogIndex - index;
 
     if (catalogItemsFromEnd <= prefetchThreshold && catalogs.length > visibleCatalogCount) {
-      navLog.dataProcess('HomeScreen', `prefetching more catalogs (${catalogItemsFromEnd} from end)`);
       setVisibleCatalogCount(prev => Math.min(prev + 4, catalogs.length));
     }
-
-    // For TV: Always scroll to keep focused item consistently positioned
-    // This prevents the "jumpy" feeling where focus changes but scroll lags behind
-    const { first, last } = visibleRangeRef.current;
-
-    navLog.log('SCROLL', 'handleCatalogFocus: executing scroll', {
-      index,
-      prevIndex,
-      visibleFirst: first,
-      visibleLast: last,
-    });
 
     // Minimal debounce (16ms ~1 frame) to batch very rapid events but still feel responsive
     const now = Date.now();
     const timeSinceLastScroll = now - lastScrollTimeRef.current;
     if (timeSinceLastScroll < 16) {
-      navLog.scrollSkipped('HomeScreen.FlashList', `debounced (${timeSinceLastScroll}ms < 16ms)`);
-      navLog.perfEnd('HomeScreen.handleCatalogFocus');
       return;
     }
     lastScrollTimeRef.current = now;
 
-    navLog.scrollToFocus('HomeScreen.FlashList', index, prevIndex);
     try {
       flashListRef.current.scrollToIndex({
         index,
         animated: false,
         viewPosition: 0.3,
       });
-      navLog.log('SCROLL', 'scrollToIndex completed');
     } catch (e) {
-      navLog.perfWarn('HomeScreen.scrollToIndex failed');
+      // Silent failure - scroll is best-effort
     }
-
-    navLog.perfEnd('HomeScreen.handleCatalogFocus');
   }, [isTVDevice, prefetchThreshold, catalogs.length, visibleCatalogCount]);
 
   // Track visible items to optimize scroll decisions
@@ -1001,10 +946,7 @@ const HomeScreen = () => {
         const isLastCatalog = isTVDevice && !hasLoadMore && index === lastCatalogIndex;
         // Get adjacent section handles for explicit vertical navigation
         const { prevHandle, nextHandle } = isTVDevice ? getAdjacentSectionHandles(index) : { prevHandle: null, nextHandle: null };
-        // Log when FlashList renders a catalog section (helps debug render timing)
-        if (isTVDevice) {
-          navLog.log('RENDER', `FlashList rendering catalog[${index}]: ${item.catalog.name}`);
-        }
+        // PERFORMANCE: Removed logging from render path - causes overhead on every item render
         return (
           <CatalogSection
             catalog={item.catalog}
@@ -1059,7 +1001,7 @@ const HomeScreen = () => {
       default:
         return null;
     }
-  }, [memoizedThisWeekSection, currentTheme.colors.elevation1, currentTheme.colors.primary, currentTheme.colors.white, handleLoadMoreCatalogs, isTVDevice, handleCatalogFocus, getAdjacentSectionHandles, handleCatalogFirstItemReady, sectionHandlesVersion]); // Removed listData - using ref
+  }, [memoizedThisWeekSection, currentTheme.colors.elevation1, currentTheme.colors.primary, currentTheme.colors.white, handleLoadMoreCatalogs, isTVDevice, handleCatalogFocus, getAdjacentSectionHandles, handleCatalogFirstItemReady]); // Removed listData and sectionHandlesVersion - using refs
 
   // FlashList: using minimal props per installed version
 
@@ -1166,7 +1108,8 @@ const HomeScreen = () => {
           onScroll={handleScroll}
           onViewableItemsChanged={isTVDevice ? handleViewableItemsChanged : undefined}
           viewabilityConfig={isTVDevice ? { itemVisiblePercentThreshold: 50 } : undefined}
-          extraData={isTVDevice ? sectionHandlesVersion : undefined}
+          // REMOVED: extraData={sectionHandlesVersion} was causing full list re-renders
+          // Native focus engine handles navigation when handles aren't yet available
         />
         {/* Toasts are rendered globally at root */}
       </View>
@@ -1183,8 +1126,7 @@ const HomeScreen = () => {
     handleLoadMoreCatalogs,
     handleScroll,
     isTVDevice,
-    handleViewableItemsChanged,
-    sectionHandlesVersion
+    handleViewableItemsChanged
   ]);
 
   return isLoading ? renderLoadingScreen : renderMainContent;

@@ -618,17 +618,19 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(ContentItem, (prev, next) => {
-  // Re-render when identity, poster, or TV navigation props change
+  // Re-render when identity or poster change
   if (prev.item.id !== next.item.id) return false;
   if (prev.item.poster !== next.item.poster) return false;
-  // TV navigation props - must match for proper D-pad behavior
+  // TV navigation props - only re-render for structural changes (row position)
   if (prev.isFirstInRow !== next.isFirstInRow) return false;
   if (prev.isLastInRow !== next.isLastInRow) return false;
   if (prev.isLastRow !== next.isLastRow) return false;
+  // Only re-render for LEFT navigation changes (menu linkage)
+  // UP/DOWN handles are optional hints - native focus engine works without them
   if (prev.nextFocusLeftId !== next.nextFocusLeftId) return false;
-  if (prev.nextFocusUpId !== next.nextFocusUpId) return false;
-  if (prev.nextFocusDownId !== next.nextFocusDownId) return false;
   if (prev.tvPosterWidth !== next.tvPosterWidth) return false;
-  // Note: onRegisterNodeHandle callback identity should remain stable
+  // OPTIMIZED: Removed nextFocusUpId and nextFocusDownId from comparison
+  // These change as sibling items mount, causing cascading re-renders
+  // Native focus engine provides reasonable fallback behavior
   return true;
 });

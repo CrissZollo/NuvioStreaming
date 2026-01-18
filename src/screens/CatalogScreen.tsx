@@ -1208,6 +1208,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : null}
+          estimatedItemSize={cellWidth * 1.5 + 20}
         />
       ) : renderEmptyState()}
     </SafeAreaView>

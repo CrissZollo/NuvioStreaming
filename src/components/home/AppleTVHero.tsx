@@ -115,11 +115,11 @@ const PaginationDot: React.FC<{
 
       return {
         width: withTiming(targetWidth, {
-          duration: 300,
+          duration: 200,
           easing: Easing.out(Easing.cubic),
         }),
         opacity: withTiming(targetOpacity, {
-          duration: 300,
+          duration: 200,
           easing: Easing.out(Easing.cubic),
         }),
       };
@@ -226,11 +226,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
   // Handler for trailer end
   const handleTrailerEnd = useCallback(() => {
-    logger.info('[AppleTVHero] Trailer ended');
+    if (__DEV__) logger.info('[AppleTVHero] Trailer ended');
     setTrailerPlaying(false);
     // Fade back to thumbnail
-    trailerOpacity.value = withTiming(0, { duration: 300 });
-    thumbnailOpacity.value = withTiming(1, { duration: 300 });
+    trailerOpacity.value = withTiming(0, { duration: 200 });
+    thumbnailOpacity.value = withTiming(1, { duration: 200 });
   }, [setTrailerPlaying, trailerOpacity, thumbnailOpacity]);
 
   // Animated style for trailer container - 60% height with zoom
@@ -361,12 +361,19 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       heroOpacity.value = withDelay(
         100,
         withTiming(1, {
-          duration: 500,
+          duration: 300,
           easing: Easing.out(Easing.cubic),
         })
       );
     }
   }, [currentItem, loading, heroOpacity]);
+
+  // PERFORMANCE: Consolidated focus/blur handling - removed animated values from dependencies
+  // to prevent effect re-registration on every animation frame
+  const trailerOpacityRef = useRef(trailerOpacity);
+  const thumbnailOpacityRef = useRef(thumbnailOpacity);
+  trailerOpacityRef.current = trailerOpacity;
+  thumbnailOpacityRef.current = thumbnailOpacity;
 
   // Stop trailer when screen loses focus
   useEffect(() => {
@@ -375,42 +382,43 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       setTrailerShouldBePaused(true);
       setTrailerPlaying(false);
 
-      // Fade out trailer
-      trailerOpacity.value = withTiming(0, { duration: 300 });
-      thumbnailOpacity.value = withTiming(1, { duration: 300 });
+      // Fade out trailer using refs to avoid dependency
+      trailerOpacityRef.current.value = withTiming(0, { duration: 200 });
+      thumbnailOpacityRef.current.value = withTiming(1, { duration: 200 });
 
-      logger.info('[AppleTVHero] Screen lost focus - pausing trailer');
+      if (__DEV__) logger.info('[AppleTVHero] Screen lost focus - pausing trailer');
     } else {
       // Screen gained focus - allow trailer to resume if it was ready
       setTrailerShouldBePaused(false);
 
       // If trailer was ready and loaded, restore the video opacity
       if (trailerReady && trailerUrl) {
-        logger.info('[AppleTVHero] Screen gained focus - restoring trailer');
-        thumbnailOpacity.value = withTiming(0, { duration: 800 });
-        trailerOpacity.value = withTiming(1, { duration: 800 });
+        if (__DEV__) logger.info('[AppleTVHero] Screen gained focus - restoring trailer');
+        thumbnailOpacityRef.current.value = withTiming(0, { duration: 800 });
+        trailerOpacityRef.current.value = withTiming(1, { duration: 800 });
         setTrailerPlaying(true);
       }
     }
-  }, [isFocused, setTrailerPlaying, trailerOpacity, thumbnailOpacity, trailerReady, trailerUrl]);
+  }, [isFocused, setTrailerPlaying, trailerReady, trailerUrl]);
 
   // Listen to navigation events to stop trailer when navigating to other screens
+  // PERFORMANCE: Removed animated values from dependencies - use refs instead
   useEffect(() => {
     const unsubscribe = navigation.addListener('blur', () => {
       // Screen is blurred (navigated away)
       setTrailerPlaying(false);
-      trailerOpacity.value = withTiming(0, { duration: 300 });
-      thumbnailOpacity.value = withTiming(1, { duration: 300 });
-      logger.info('[AppleTVHero] Navigation blur event - stopping trailer');
+      trailerOpacityRef.current.value = withTiming(0, { duration: 200 });
+      thumbnailOpacityRef.current.value = withTiming(1, { duration: 200 });
+      if (__DEV__) logger.info('[AppleTVHero] Navigation blur event - stopping trailer');
     });
 
     return () => {
       unsubscribe();
       // Stop trailer when component unmounts
       setTrailerPlaying(false);
-      logger.info('[AppleTVHero] Component unmounting - stopping trailer');
+      if (__DEV__) logger.info('[AppleTVHero] Component unmounting - stopping trailer');
     };
-  }, [navigation, setTrailerPlaying, trailerOpacity, thumbnailOpacity]);
+  }, [navigation, setTrailerPlaying]);
 
   // Fetch trailer URL when current item changes
   useEffect(() => {
@@ -430,8 +438,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       setTrailerPlaying(false);
 
       // Fade out any existing trailer
-      trailerOpacity.value = withTiming(0, { duration: 300 });
-      thumbnailOpacity.value = withTiming(1, { duration: 300 });
+      trailerOpacity.value = withTiming(0, { duration: 200 });
+      thumbnailOpacity.value = withTiming(1, { duration: 200 });
 
       try {
         // Extract year from metadata
@@ -446,7 +454,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
         const contentType = currentItem.type === 'series' ? 'tv' : 'movie';
 
-        logger.info('[AppleTVHero] Fetching trailer for:', currentItem.name, year, tmdbId);
+        if (__DEV__) logger.info('[AppleTVHero] Fetching trailer for:', currentItem.name, year, tmdbId);
 
         const url = await TrailerService.getTrailerUrl(
           currentItem.name,
@@ -460,14 +468,14 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         if (url) {
           const bestUrl = TrailerService.getBestFormatUrl(url);
           setTrailerUrl(bestUrl);
-          logger.info('[AppleTVHero] Trailer URL loaded:', bestUrl);
+          if (__DEV__) logger.info('[AppleTVHero] Trailer URL loaded:', bestUrl);
         } else {
-          logger.info('[AppleTVHero] No trailer found for:', currentItem.name);
+          if (__DEV__) logger.info('[AppleTVHero] No trailer found for:', currentItem.name);
           setTrailerUrl(null);
         }
       } catch (error) {
         if (!alive) return;
-        logger.error('[AppleTVHero] Error fetching trailer:', error);
+        if (__DEV__) logger.error('[AppleTVHero] Error fetching trailer:', error);
         setTrailerError(true);
         setTrailerUrl(null);
       } finally {
@@ -487,7 +495,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   // Handle trailer preloaded
   const handleTrailerPreloaded = useCallback(() => {
     setTrailerPreloaded(true);
-    logger.info('[AppleTVHero] Trailer preloaded successfully');
+    if (__DEV__) logger.info('[AppleTVHero] Trailer preloaded successfully');
   }, []);
 
   // Handle trailer ready to play
@@ -498,7 +506,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     thumbnailOpacity.value = withTiming(0, { duration: 800 });
     trailerOpacity.value = withTiming(1, { duration: 800 });
 
-    logger.info('[AppleTVHero] Trailer ready - starting playback');
+    if (__DEV__) logger.info('[AppleTVHero] Trailer ready - starting playback');
 
     // Auto-start trailer
     setTrailerPlaying(true);
@@ -511,10 +519,10 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     setTrailerPlaying(false);
 
     // Fade back to thumbnail
-    trailerOpacity.value = withTiming(0, { duration: 300 });
-    thumbnailOpacity.value = withTiming(1, { duration: 300 });
+    trailerOpacity.value = withTiming(0, { duration: 200 });
+    thumbnailOpacity.value = withTiming(1, { duration: 200 });
 
-    logger.error('[AppleTVHero] Trailer playback error');
+    if (__DEV__) logger.error('[AppleTVHero] Trailer playback error');
   }, [trailerOpacity, thumbnailOpacity, setTrailerPlaying]);
 
   // Update state when current item changes and load watch progress
@@ -555,7 +563,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         setIsInWatchlist(Math.random() > 0.5); // Replace with actual Trakt call
       }
     } catch (error) {
-      logger.error('[AppleTVHero] Error checking item status:', error);
+      if (__DEV__) logger.error('[AppleTVHero] Error checking item status:', error);
     }
   }, [checkIsInLibrary, isTraktAuthenticated]);
 
@@ -579,9 +587,9 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       const success = await toggleLibrary(currentItem);
 
       if (success) {
-        logger.info('[AppleTVHero] Successfully toggled library:', currentItem.name);
+        if (__DEV__) logger.info('[AppleTVHero] Successfully toggled library:', currentItem.name);
       } else {
-        logger.warn('[AppleTVHero] Library toggle returned false');
+        if (__DEV__) logger.warn('[AppleTVHero] Library toggle returned false');
       }
 
       // If authenticated with Trakt, also toggle Trakt watchlist
@@ -590,11 +598,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
         // TODO: Replace with your actual Trakt service call
         // await traktService.toggleWatchlist(currentItem.id, !wasInWatchlist);
-        logger.info('[AppleTVHero] Toggled Trakt watchlist');
+        if (__DEV__) logger.info('[AppleTVHero] Toggled Trakt watchlist');
       }
 
     } catch (error) {
-      logger.error('[AppleTVHero] Error toggling library:', error);
+      if (__DEV__) logger.error('[AppleTVHero] Error toggling library:', error);
       // Revert state on error
       setInLibrary(wasInLibrary);
       if (isTraktAuthenticated) {
@@ -605,7 +613,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
   // Play button handler - navigates to Streams screen with progress data if available
   const handlePlayAction = useCallback(async () => {
-    logger.info('[AppleTVHero] Play button pressed for:', currentItem?.name);
+    if (__DEV__) logger.info('[AppleTVHero] Play button pressed for:', currentItem?.name);
     if (!currentItem) return;
 
     // Stop any playing trailer
@@ -618,7 +626,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       watchProgress.currentTime > 0 &&
       (watchProgress.currentTime / watchProgress.duration) < 0.85;
 
-    logger.info('[AppleTVHero] Should resume:', shouldResume, watchProgress);
+    if (__DEV__) logger.info('[AppleTVHero] Should resume:', shouldResume, watchProgress);
 
     try {
       // Check if we have a cached stream for this content
@@ -626,13 +634,13 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         ? watchProgress.episodeId
         : undefined;
 
-      logger.info('[AppleTVHero] Looking for cached stream with episodeId:', episodeId);
+      if (__DEV__) logger.info('[AppleTVHero] Looking for cached stream with episodeId:', episodeId);
 
       const cachedStream = await streamCacheService.getCachedStream(currentItem.id, currentItem.type, episodeId);
 
       if (cachedStream && cachedStream.stream?.url) {
         // We have a valid cached stream, navigate directly to player
-        logger.info('[AppleTVHero] Using cached stream for:', currentItem.name);
+        if (__DEV__) logger.info('[AppleTVHero] Using cached stream for:', currentItem.name);
 
         // Determine the player route based on platform
         const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
@@ -666,7 +674,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       }
 
       // No cached stream, navigate to Streams screen with resume data
-      logger.info('[AppleTVHero] No cached stream, navigating to StreamsScreen for:', currentItem.name);
+      if (__DEV__) logger.info('[AppleTVHero] No cached stream, navigating to StreamsScreen for:', currentItem.name);
 
       const navigationParams: any = {
         id: currentItem.id,
@@ -685,13 +693,13 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         navigationParams.resumeTime = watchProgress.currentTime;
         navigationParams.duration = watchProgress.duration;
         navigationParams.episodeId = watchProgress.episodeId;
-        logger.info('[AppleTVHero] Passing resume data to Streams:', watchProgress.currentTime, watchProgress.duration);
+        if (__DEV__) logger.info('[AppleTVHero] Passing resume data to Streams:', watchProgress.currentTime, watchProgress.duration);
       }
 
       navigation.navigate('Streams', navigationParams);
 
     } catch (error) {
-      logger.error('[AppleTVHero] Error handling play action:', error);
+      if (__DEV__) logger.error('[AppleTVHero] Error handling play action:', error);
       // Fallback to StreamsScreen on any error
       navigation.navigate('Streams', {
         id: currentItem.id,
@@ -717,7 +725,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
     // Don't auto-advance if trailer is playing
     if (globalTrailerPlaying && trailerReady) {
-      logger.info('[AppleTVHero] Auto-rotation paused - trailer is playing');
+      if (__DEV__) logger.info('[AppleTVHero] Auto-rotation paused - trailer is playing');
       return;
     }
 
@@ -736,7 +744,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         dragProgress.value = withTiming(
           1,
           {
-            duration: 500,
+            duration: 300,
             easing: Easing.out(Easing.cubic),
           },
           (finished) => {
@@ -761,27 +769,34 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     };
   }, [startAutoPlay, currentIndex, globalTrailerPlaying, trailerReady]);
 
+  // PERFORMANCE: Store animated values in refs to avoid dependency array issues
+  const dragProgressRef = useRef(dragProgress);
+  const logoOpacityRef = useRef(logoOpacity);
+  dragProgressRef.current = dragProgress;
+  logoOpacityRef.current = logoOpacity;
+
   // Reset drag progress and animate logo when index changes
+  // PERFORMANCE: Removed animated values from dependencies - use refs instead
   useEffect(() => {
     // Instant reset - no extra fade animation
-    dragProgress.value = 0;
+    dragProgressRef.current.value = 0;
     setNextIndex(currentIndex);
 
     // Immediately hide trailer and show thumbnail when index changes
-    trailerOpacity.value = 0;
-    thumbnailOpacity.value = 1;
+    trailerOpacityRef.current.value = 0;
+    thumbnailOpacityRef.current.value = 1;
     setTrailerPlaying(false);
 
     // Faster logo fade
-    logoOpacity.value = 0;
-    logoOpacity.value = withDelay(
+    logoOpacityRef.current.value = 0;
+    logoOpacityRef.current.value = withDelay(
       80,
       withTiming(1, {
         duration: 250,
         easing: Easing.out(Easing.cubic),
       })
     );
-  }, [currentIndex, setTrailerPlaying, trailerOpacity, thumbnailOpacity]);
+  }, [currentIndex, setTrailerPlaying]);
 
   // Callback for updating interaction time
   const updateInteractionTime = useCallback(() => {
@@ -859,7 +874,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             dragProgress.value = withTiming(
               1,
               {
-                duration: 300,
+                duration: 200,
                 easing: Easing.out(Easing.cubic),
               },
               (finished) => {
@@ -1132,7 +1147,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
                     onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
                     onError={() => {
                       setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
-                      logger.warn('[AppleTVHero] Logo load failed:', currentItem.logo);
+                      if (__DEV__) logger.warn('[AppleTVHero] Logo load failed:', currentItem.logo);
                     }}
                   />
                 </View>

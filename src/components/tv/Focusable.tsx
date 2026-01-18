@@ -209,8 +209,9 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         setIsFocusedState(true);
       }
 
-      // Very fast animation for responsive feel on low-end TV devices
-      focusProgress.value = withTiming(1, { duration: 50 });
+      // 80ms animation - balanced for responsiveness without causing frame drops on low-end TV
+      // 50ms was too fast and caused frame skipping, 100ms+ feels sluggish
+      focusProgress.value = withTiming(1, { duration: 80 });
 
       onFocus?.();
     }, [onFocus, focusProgress, needsFocusState]);
@@ -224,8 +225,8 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         setIsFocusedState(false);
       }
 
-      // Very fast animation for responsive feel on low-end TV devices
-      focusProgress.value = withTiming(0, { duration: 50 });
+      // 80ms animation - balanced for responsiveness without causing frame drops on low-end TV
+      focusProgress.value = withTiming(0, { duration: 80 });
 
       onBlur?.();
     }, [onBlur, focusProgress, needsFocusState]);
@@ -237,7 +238,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         if (needsFocusState) {
           setIsFocusedState(true);
         }
-        focusProgress.value = withTiming(1, { duration: 50 });
+        focusProgress.value = withTiming(1, { duration: 80 });
         if (actualRef.current) {
           (actualRef.current as any).setNativeProps?.({
             hasTVPreferredFocus: true,
@@ -249,7 +250,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         if (needsFocusState) {
           setIsFocusedState(false);
         }
-        focusProgress.value = withTiming(0, { duration: 50 });
+        focusProgress.value = withTiming(0, { duration: 80 });
       },
       isFocused: () => isFocusedRef.current,
       getViewRef: () => actualRef,

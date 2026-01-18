@@ -996,6 +996,10 @@ const SearchScreen = () => {
               showsHorizontalScrollIndicator={false}
               scrollEnabled={!isTVDevice}
               contentContainerStyle={styles.horizontalListContent}
+              initialNumToRender={5}
+              maxToRenderPerBatch={4}
+              windowSize={3}
+              removeClippedSubviews
             />
           </View>
         )}
@@ -1040,6 +1044,10 @@ const SearchScreen = () => {
               showsHorizontalScrollIndicator={false}
               scrollEnabled={!isTVDevice}
               contentContainerStyle={styles.horizontalListContent}
+              initialNumToRender={5}
+              maxToRenderPerBatch={4}
+              windowSize={3}
+              removeClippedSubviews
             />
           </View>
         )}
@@ -1084,6 +1092,10 @@ const SearchScreen = () => {
               showsHorizontalScrollIndicator={false}
               scrollEnabled={!isTVDevice}
               contentContainerStyle={styles.horizontalListContent}
+              initialNumToRender={5}
+              maxToRenderPerBatch={4}
+              windowSize={3}
+              removeClippedSubviews
             />
           </View>
         )}

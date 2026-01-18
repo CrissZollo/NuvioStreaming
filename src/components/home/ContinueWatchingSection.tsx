@@ -98,13 +98,14 @@ const isSupportedId = (id: string): boolean => {
 };
 
 // Function to check if an episode has been released
-const isEpisodeReleased = (video: any): boolean => {
+// PERFORMANCE: Accept a pre-computed timestamp to avoid repeated Date.now() calls in loops
+const isEpisodeReleased = (video: any, nowTimestamp?: number): boolean => {
   if (!video.released) return false;
 
   try {
-    const releaseDate = new Date(video.released);
-    const now = new Date();
-    return releaseDate <= now;
+    const releaseTimestamp = new Date(video.released).getTime();
+    const now = nowTimestamp ?? Date.now();
+    return releaseTimestamp <= now;
   } catch (error) {
     // If we can't parse the date, assume it's not released
     return false;
@@ -217,6 +218,31 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
         return 16; // phone
     }
   }, [deviceType]);
+
+  // PERFORMANCE: Memoize dynamic styles to prevent object recreation on every render
+  const memoizedItemStyle = useMemo(() => ({
+    backgroundColor: currentTheme.colors.elevation1,
+    borderColor: currentTheme.colors.border,
+    shadowColor: currentTheme.colors.black,
+    width: computedItemWidth,
+    height: computedItemHeight,
+  }), [currentTheme.colors.elevation1, currentTheme.colors.border, currentTheme.colors.black, computedItemWidth, computedItemHeight]);
+
+  const memoizedPosterContainerStyle = useMemo(() => ({
+    width: isTV ? 100 : isLargeTablet ? 90 : isTablet ? 85 : 80
+  }), [isTV, isLargeTablet, isTablet]);
+
+  const memoizedContentDetailsStyle = useMemo(() => ({
+    padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+  }), [isTV, isLargeTablet, isTablet]);
+
+  const memoizedTitleFontSize = useMemo(() =>
+    isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
+  , [isTV, isLargeTablet, isTablet]);
+
+  const memoizedEpisodeFontSize = useMemo(() =>
+    isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
+  , [isTV, isLargeTablet, isTablet]);
 
   // TV grid layout - fixed to 3 items per row, 2 rows max (6 total on screen)
   const tvGridLayout = useMemo(() => {
@@ -339,15 +365,32 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     }
   }, []);
 
+  // Cache for sorted videos to avoid repeated sorting - keyed by content ID
+  const sortedVideosCache = useRef<Map<string, any[]>>(new Map());
+
   // Helper function to find the next episode
-  const findNextEpisode = useCallback((currentSeason: number, currentEpisode: number, videos: any[]) => {
+  // PERFORMANCE: Accepts pre-computed nowTimestamp and caches sorted videos
+  const findNextEpisode = useCallback((currentSeason: number, currentEpisode: number, videos: any[], contentId?: string, nowTimestamp?: number) => {
     if (!videos || !Array.isArray(videos)) return null;
 
-    // Sort videos to ensure correct order
-    const sortedVideos = [...videos].sort((a, b) => {
-      if (a.season !== b.season) return a.season - b.season;
-      return a.episode - b.episode;
-    });
+    // Use cached sorted videos if available, otherwise sort and cache
+    let sortedVideos: any[];
+    const cacheKey = contentId || 'default';
+
+    if (sortedVideosCache.current.has(cacheKey)) {
+      sortedVideos = sortedVideosCache.current.get(cacheKey)!;
+    } else {
+      sortedVideos = [...videos].sort((a, b) => {
+        if (a.season !== b.season) return a.season - b.season;
+        return a.episode - b.episode;
+      });
+      // Limit cache size to prevent memory bloat
+      if (sortedVideosCache.current.size > 50) {
+        const firstKey = sortedVideosCache.current.keys().next().value;
+        if (firstKey) sortedVideosCache.current.delete(firstKey);
+      }
+      sortedVideosCache.current.set(cacheKey, sortedVideos);
+    }
 
     // Strategy 1: Look for next episode in the same season
     let nextEp = sortedVideos.find(v => v.season === currentSeason && v.episode === currentEpisode + 1);
@@ -369,8 +412,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
       }
     }
 
-    // Verify the found episode is released
-    if (nextEp && isEpisodeReleased(nextEp)) {
+    // Verify the found episode is released (pass nowTimestamp to avoid repeated Date.now())
+    const now = nowTimestamp ?? Date.now();
+    if (nextEp && isEpisodeReleased(nextEp, now)) {
       return nextEp;
     }
 
@@ -987,10 +1031,19 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     loadContinueWatching();
   }, [loadContinueWatching]);
 
+  // Track last focus refresh to prevent excessive refreshes
+  const lastFocusRefreshRef = useRef<number>(0);
+  const FOCUS_REFRESH_COOLDOWN = 30 * 1000; // 30 seconds between focus-triggered refreshes
+
   // Refresh on screen focus (lightweight, no polling)
+  // PERFORMANCE: Add cooldown to prevent double-refresh with AppState changes
   useFocusEffect(
     useCallback(() => {
-      loadContinueWatching(true);
+      const now = Date.now();
+      if (now - lastFocusRefreshRef.current >= FOCUS_REFRESH_COOLDOWN) {
+        lastFocusRefreshRef.current = now;
+        loadContinueWatching(true);
+      }
       return () => { };
     }, [loadContinueWatching])
   );
@@ -1186,170 +1239,110 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
   }, [currentTheme.colors.error]);
 
   // Memoized render function for continue watching items
-  const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
-    <TouchableOpacity
-      style={[
-        styles.wideContentItem,
-        {
-          backgroundColor: currentTheme.colors.elevation1,
-          borderColor: currentTheme.colors.border,
-          shadowColor: currentTheme.colors.black,
-          width: computedItemWidth,
-          height: computedItemHeight
-        }
-      ]}
-      activeOpacity={0.8}
-      onPress={() => handleContentPress(item)}
-      onLongPress={() => handleLongPress(item)}
-      delayLongPress={800}
-    >
-      {/* Poster Image */}
-      <View style={[
-        styles.posterContainer,
-        {
-          width: isTV ? 100 : isLargeTablet ? 90 : isTablet ? 85 : 80
-        }
-      ]}>
-        <FastImage
-          source={{
-            uri: item.poster || 'https://via.placeholder.com/300x450',
-            priority: FastImage.priority.high,
-            cache: FastImage.cacheControl.immutable
-          }}
-          style={styles.continueWatchingPoster}
-          resizeMode={FastImage.resizeMode.cover}
-        />
+  // PERFORMANCE: Uses pre-memoized styles instead of creating objects on every render
+  const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => {
+    const isUpNext = item.type === 'series' && item.progress === 0;
 
-        {/* Delete Indicator Overlay */}
-        {deletingItemId === item.id && (
-          <View style={styles.deletingOverlay}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+    return (
+      <TouchableOpacity
+        style={[styles.wideContentItem, memoizedItemStyle]}
+        activeOpacity={0.8}
+        onPress={() => handleContentPress(item)}
+        onLongPress={() => handleLongPress(item)}
+        delayLongPress={800}
+      >
+        {/* Poster Image */}
+        <View style={[styles.posterContainer, memoizedPosterContainerStyle]}>
+          <FastImage
+            source={{
+              uri: item.poster || 'https://via.placeholder.com/300x450',
+              priority: FastImage.priority.high,
+              cache: FastImage.cacheControl.immutable
+            }}
+            style={styles.continueWatchingPoster}
+            resizeMode={FastImage.resizeMode.cover}
+          />
+
+          {/* Delete Indicator Overlay */}
+          {deletingItemId === item.id && (
+            <View style={styles.deletingOverlay}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+            </View>
+          )}
+        </View>
+
+        {/* Content Details */}
+        <View style={[styles.contentDetails, memoizedContentDetailsStyle]}>
+          <View style={styles.titleRow}>
+            <Text
+              style={[
+                styles.contentTitle,
+                { color: currentTheme.colors.highEmphasis, fontSize: memoizedTitleFontSize }
+              ]}
+              numberOfLines={1}
+            >
+              {item.name}
+            </Text>
+            {isUpNext && (
+              <View style={[
+                styles.progressBadge,
+                { backgroundColor: currentTheme.colors.primary }
+              ]}>
+                <Text style={styles.progressText}>Up Next</Text>
+              </View>
+            )}
           </View>
-        )}
-      </View>
 
-      {/* Content Details */}
-      <View style={[
-        styles.contentDetails,
-        {
-          padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-        }
-      ]}>
-        <View style={styles.titleRow}>
-          {(() => {
-            const isUpNext = item.type === 'series' && item.progress === 0;
-            return (
-              <View style={styles.titleRow}>
+          {/* Episode Info or Year */}
+          {item.type === 'series' && item.season && item.episode ? (
+            <View style={styles.episodeRow}>
+              <Text style={[
+                styles.episodeText,
+                { color: currentTheme.colors.mediumEmphasis, fontSize: memoizedEpisodeFontSize }
+              ]}>
+                Season {item.season}
+              </Text>
+              {item.episodeTitle && (
                 <Text
                   style={[
-                    styles.contentTitle,
-                    {
-                      color: currentTheme.colors.highEmphasis,
-                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
-                    }
+                    styles.episodeTitle,
+                    { color: currentTheme.colors.mediumEmphasis, fontSize: memoizedEpisodeFontSize - 1 }
                   ]}
                   numberOfLines={1}
                 >
-                  {item.name}
+                  {item.episodeTitle}
                 </Text>
-                {isUpNext && (
-                  <View style={[
-                    styles.progressBadge,
-                    {
-                      backgroundColor: currentTheme.colors.primary,
-                      paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-                      paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
-                    }
-                  ]}>
-                    <Text style={[
-                      styles.progressText,
-                      { fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12 }
-                    ]}>Up Next</Text>
-                  </View>
-                )}
-              </View>
-            );
-          })()}
-        </View>
-
-        {/* Episode Info or Year */}
-        {(() => {
-          if (item.type === 'series' && item.season && item.episode) {
-            return (
-              <View style={styles.episodeRow}>
-                <Text style={[
-                  styles.episodeText,
-                  {
-                    color: currentTheme.colors.mediumEmphasis,
-                    fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
-                  }
-                ]}>
-                  Season {item.season}
-                </Text>
-                {item.episodeTitle && (
-                  <Text
-                    style={[
-                      styles.episodeTitle,
-                      {
-                        color: currentTheme.colors.mediumEmphasis,
-                        fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 13 : 12
-                      }
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.episodeTitle}
-                  </Text>
-                )}
-              </View>
-            );
-          } else {
-            return (
-              <Text style={[
-                styles.yearText,
-                {
-                  color: currentTheme.colors.mediumEmphasis,
-                  fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
-                }
-              ]}>
-                {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
-              </Text>
-            );
-          }
-        })()}
-
-        {/* Progress Bar */}
-        {item.progress > 0 && (
-          <View style={styles.wideProgressContainer}>
-            <View style={[
-              styles.wideProgressTrack,
-              {
-                height: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
-              }
-            ]}>
-              <View
-                style={[
-                  styles.wideProgressBar,
-                  {
-                    width: `${item.progress}%`,
-                    backgroundColor: currentTheme.colors.primary
-                  }
-                ]}
-              />
+              )}
             </View>
+          ) : (
             <Text style={[
-              styles.progressLabel,
-              {
-                color: currentTheme.colors.textMuted,
-                fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 11
-              }
+              styles.yearText,
+              { color: currentTheme.colors.mediumEmphasis, fontSize: memoizedEpisodeFontSize }
             ]}>
-              {Math.round(item.progress)}% watched
+              {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
             </Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, computedItemWidth, computedItemHeight, isTV, isLargeTablet, isTablet]);
+          )}
+
+          {/* Progress Bar */}
+          {item.progress > 0 && (
+            <View style={styles.wideProgressContainer}>
+              <View style={styles.wideProgressTrack}>
+                <View
+                  style={[
+                    styles.wideProgressBar,
+                    { width: `${item.progress}%`, backgroundColor: currentTheme.colors.primary }
+                  ]}
+                />
+              </View>
+              <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
+                {Math.round(item.progress)}% watched
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }, [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, memoizedItemStyle, memoizedPosterContainerStyle, memoizedContentDetailsStyle, memoizedTitleFontSize, memoizedEpisodeFontSize]);
 
   // Handle View All press - navigate to the Continue Watching list screen
   const handleViewAllPress = useCallback(() => {
@@ -1934,7 +1927,10 @@ const styles = StyleSheet.create({
   },
 });
 
+// PERFORMANCE: Proper memo comparison - check actual props that affect rendering
 export default React.memo(ContinueWatchingSection, (prevProps, nextProps) => {
-  // This component has no props that would cause re-renders
+  // Compare refs by identity - if they're the same objects, no re-render needed
+  if (prevProps.heroSectionRef !== nextProps.heroSectionRef) return false;
+  if (prevProps.firstItemRef !== nextProps.firstItemRef) return false;
   return true;
 });
