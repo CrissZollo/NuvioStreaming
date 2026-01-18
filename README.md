@@ -122,9 +122,9 @@ Contributions make the open-source community amazing! Any contributions are grea
 
 ## Support
 
-If you find Nuvio TV helpful, consider supporting the original project:
+If you find Nuvio TV helpful, consider supporting project:
 
-* **Ko-Fi** – `https://ko-fi.com/tapframe`
+* **Ko-Fi** – `https://ko-fi.com/crisszollo`
 * **GitHub Star** – Star both this repo and the [original NuvioStream](https://github.com/tapframe/NuvioStreaming)
 * **Share** – Tell others about the project
 
