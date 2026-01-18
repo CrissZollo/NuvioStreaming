@@ -100,12 +100,12 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
         style={{ width: 51, height: 26, justifyContent: 'center' }}
         borderRadius={13}
         focusScale={1.1}
-        animateBackground={true}
+        animateBackground={false}
         showFocusBorder={true}
       >
         {(focused) => (
-          <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (value ? '#333' : '#666') : (value ? colors.primary : colors.elevation2), position: 'relative' as const }}>
-            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (value ? colors.white : colors.mediumEmphasis), ...(value ? { right: 0 } : { left: 0 }) }} />
+          <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: value ? colors.primary : colors.elevation2, position: 'relative' as const }}>
+            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: value ? colors.white : colors.mediumEmphasis, ...(value ? { right: 0 } : { left: 0 }) }} />
           </View>
         )}
       </Focusable>
@@ -142,21 +142,21 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
         ]}
         borderRadius={8}
         focusScale={1}
-        animateBackground={true}
+        animateBackground={false}
         showFocusBorder={true}
       >
         {(focused) => (
           <>
             <View style={styles.settingContent}>
-              <Text style={[styles.settingTitle, { color: focused ? '#000' : colors.highEmphasis }]}>
+              <Text style={[styles.settingTitle, { color: colors.highEmphasis }]}>
                 {title}
               </Text>
-              <Text style={[styles.settingDescription, { color: focused ? '#333' : colors.mediumEmphasis }]}>
+              <Text style={[styles.settingDescription, { color: colors.mediumEmphasis }]}>
                 {description}
               </Text>
             </View>
-            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (value ? '#333' : '#666') : (value ? colors.primary : colors.elevation2), position: 'relative' as const }}>
-              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (value ? colors.white : colors.mediumEmphasis), ...(value ? { right: 0 } : { left: 0 }) }} />
+            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: value ? colors.primary : colors.elevation2, position: 'relative' as const }}>
+              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: value ? colors.white : colors.mediumEmphasis, ...(value ? { right: 0 } : { left: 0 }) }} />
             </View>
           </>
         )}
@@ -196,19 +196,19 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
         ]}
         borderRadius={8}
         focusScale={1.05}
-        animateBackground={true}
+        animateBackground={false}
         showFocusBorder={true}
       >
         {(focused) => (
           <>
             <Text style={[
               styles.ttlOptionText,
-              { color: focused ? '#000' : (isSelected ? colors.white : colors.highEmphasis) }
+              { color: isSelected ? colors.white : colors.highEmphasis }
             ]}>
               {option.label}
             </Text>
             {isSelected && (
-              <MaterialIcons name="check" size={20} color={focused ? '#000' : colors.white} />
+              <MaterialIcons name="check" size={20} color={colors.white} />
             )}
           </>
         )}
@@ -252,13 +252,13 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
             autoFocus
             borderRadius={8}
             focusScale={1.05}
-            animateBackground={true}
+            animateBackground={false}
             showFocusBorder={true}
           >
             {(focused) => (
               <>
-                <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.white} />
-                <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+                <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+                <Text style={styles.backText}>Settings</Text>
               </>
             )}
           </Focusable>

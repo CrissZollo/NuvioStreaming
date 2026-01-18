@@ -787,11 +787,11 @@ const CollapsibleSection: React.FC<{
       >
         {(focused) => (
           <>
-            <Text style={[styles.collapsibleTitle, focused && { color: '#000' }]}>{title}</Text>
+            <Text style={styles.collapsibleTitle}>{title}</Text>
             <Ionicons
               name={isExpanded ? "chevron-up" : "chevron-down"}
               size={20}
-              color={focused ? '#000' : colors.mediumGray}
+              color={colors.mediumGray}
             />
           </>
         )}
@@ -1403,8 +1403,8 @@ const PluginsScreen: React.FC = () => {
           >
             {(focused) => (
               <>
-                <Ionicons name="arrow-back" size={24} color={focused ? '#000' : colors.primary} />
-                <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+                <Ionicons name="arrow-back" size={24} color={colors.primary} />
+                <Text style={styles.backText}>Settings</Text>
               </>
             )}
           </Focusable>
@@ -1430,7 +1430,7 @@ const PluginsScreen: React.FC = () => {
               showFocusBorder={true}
             >
               {(focused) => (
-                <Ionicons name="help-circle-outline" size={20} color={focused ? '#000' : colors.primary} />
+                <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
               )}
             </Focusable>
           ) : (
@@ -1493,13 +1493,13 @@ const PluginsScreen: React.FC = () => {
               {(focused) => (
                 <>
                   <View style={styles.settingInfo}>
-                    <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Enable Plugins</Text>
-                    <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                    <Text style={styles.settingTitle}>Enable Plugins</Text>
+                    <Text style={styles.settingDescription}>
                       Allow the app to use installed plugins for finding streams
                     </Text>
                   </View>
-                  <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (settings.enableLocalScrapers ? '#333' : '#666') : (settings.enableLocalScrapers ? colors.primary : colors.elevation3), position: 'relative' as const }}>
-                    <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (settings.enableLocalScrapers ? colors.white : '#f4f3f4'), ...(settings.enableLocalScrapers ? { right: 0 } : { left: 0 }) }} />
+                  <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: settings.enableLocalScrapers ? colors.primary : colors.elevation3, position: 'relative' as const }}>
+                    <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: settings.enableLocalScrapers ? colors.white : '#f4f3f4', ...(settings.enableLocalScrapers ? { right: 0 } : { left: 0 }) }} />
                   </View>
                 </>
               )}
@@ -1587,9 +1587,9 @@ const PluginsScreen: React.FC = () => {
                         >
                           {(focused) => (
                             switchingRepository === repo.id ? (
-                              <ActivityIndicator size="small" color={focused ? '#000' : colors.primary} />
+                              <ActivityIndicator size="small" color={colors.primary} />
                             ) : (
-                              <Text style={[styles.repositoryActionButtonText, focused && { color: '#000' }]}>Switch</Text>
+                              <Text style={styles.repositoryActionButtonText}>Switch</Text>
                             )
                           )}
                         </Focusable>
@@ -1618,9 +1618,9 @@ const PluginsScreen: React.FC = () => {
                       >
                         {(focused) => (
                           isRefreshing ? (
-                            <ActivityIndicator size="small" color={focused ? '#000' : colors.mediumGray} />
+                            <ActivityIndicator size="small" color={colors.mediumGray} />
                           ) : (
-                            <Text style={[styles.repositoryActionButtonText, focused && { color: '#000' }]}>Refresh</Text>
+                            <Text style={styles.repositoryActionButtonText}>Refresh</Text>
                           )
                         )}
                       </Focusable>
@@ -1647,7 +1647,7 @@ const PluginsScreen: React.FC = () => {
                         showFocusBorder={true}
                       >
                         {(focused) => (
-                          <Text style={[styles.repositoryActionButtonText, focused && { color: '#000' }]}>Remove</Text>
+                          <Text style={[styles.repositoryActionButtonText]}>Remove</Text>
                         )}
                       </Focusable>
                     ) : (
@@ -1677,7 +1677,7 @@ const PluginsScreen: React.FC = () => {
               showFocusBorder={true}
             >
               {(focused) => (
-                <Text style={[styles.buttonText, focused && { color: '#000' }]}>Add New Repository</Text>
+                <Text style={[styles.buttonText]}>Add New Repository</Text>
               )}
             </Focusable>
           ) : (
@@ -1739,8 +1739,7 @@ const PluginsScreen: React.FC = () => {
                         <Text style={[
                           styles.filterChipText,
                           selectedFilter === filter && styles.filterChipTextSelected,
-                          focused && { color: '#000' }
-                        ]}>
+                                                  ]}>
                           {filter === 'all' ? 'All' : filter === 'movie' ? 'Movies' : 'TV Shows'}
                         </Text>
                       )}
@@ -1778,7 +1777,7 @@ const PluginsScreen: React.FC = () => {
                       showFocusBorder={true}
                     >
                       {(focused) => (
-                        <Text style={[styles.bulkActionButtonText, { color: focused ? '#000' : '#34C759' }]}>Enable All</Text>
+                        <Text style={[styles.bulkActionButtonText, { color: '#34C759' }]}>Enable All</Text>
                       )}
                     </Focusable>
                   ) : (
@@ -1800,7 +1799,7 @@ const PluginsScreen: React.FC = () => {
                       showFocusBorder={true}
                     >
                       {(focused) => (
-                        <Text style={[styles.bulkActionButtonText, { color: focused ? '#000' : colors.mediumGray }]}>Disable All</Text>
+                        <Text style={[styles.bulkActionButtonText, { color: colors.mediumGray }]}>Disable All</Text>
                       )}
                     </Focusable>
                   ) : (
@@ -1845,7 +1844,7 @@ const PluginsScreen: React.FC = () => {
                     showFocusBorder={true}
                   >
                     {(focused) => (
-                      <Text style={[styles.secondaryButtonText, focused && { color: '#000' }]}>Clear Search</Text>
+                      <Text style={[styles.secondaryButtonText]}>Clear Search</Text>
                     )}
                   </Focusable>
                 ) : (
@@ -1903,8 +1902,8 @@ const PluginsScreen: React.FC = () => {
                         {(focused) => {
                           const isOn = scraper.enabled && settings.enableLocalScrapers;
                           return (
-                            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
-                              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: isOn ? colors.primary : colors.elevation3, position: 'relative' as const }}>
+                              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: isOn ? colors.white : '#f4f3f4', ...(isOn ? { right: 0 } : { left: 0 }) }} />
                             </View>
                           );
                         }}
@@ -2035,13 +2034,13 @@ const PluginsScreen: React.FC = () => {
                 return (
                   <>
                     <View style={styles.settingInfo}>
-                      <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Enable URL Validation</Text>
-                      <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                      <Text style={styles.settingTitle}>Enable URL Validation</Text>
+                      <Text style={styles.settingDescription}>
                         Validate streaming URLs before returning them (may slow down results but improves reliability)
                       </Text>
                     </View>
-                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
-                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: isOn ? colors.primary : colors.elevation3, position: 'relative' as const }}>
+                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: isOn ? colors.white : '#f4f3f4', ...(isOn ? { right: 0 } : { left: 0 }) }} />
                     </View>
                   </>
                 );
@@ -2085,13 +2084,13 @@ const PluginsScreen: React.FC = () => {
                 return (
                   <>
                     <View style={styles.settingInfo}>
-                      <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Group Plugin Streams</Text>
-                      <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                      <Text style={styles.settingTitle}>Group Plugin Streams</Text>
+                      <Text style={styles.settingDescription}>
                         When enabled, all plugin streams are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
                       </Text>
                     </View>
-                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
-                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: isOn ? colors.primary : colors.elevation3, position: 'relative' as const }}>
+                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: isOn ? colors.white : '#f4f3f4', ...(isOn ? { right: 0 } : { left: 0 }) }} />
                     </View>
                   </>
                 );
@@ -2140,13 +2139,13 @@ const PluginsScreen: React.FC = () => {
                 return (
                   <>
                     <View style={styles.settingInfo}>
-                      <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Sort by Quality First</Text>
-                      <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                      <Text style={styles.settingTitle}>Sort by Quality First</Text>
+                      <Text style={styles.settingDescription}>
                         When enabled, streams are sorted by quality first, then by scraper. When disabled, streams are sorted by scraper first, then by quality. Only available when grouping is enabled.
                       </Text>
                     </View>
-                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
-                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: isOn ? colors.primary : colors.elevation3, position: 'relative' as const }}>
+                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: isOn ? colors.white : '#f4f3f4', ...(isOn ? { right: 0 } : { left: 0 }) }} />
                     </View>
                   </>
                 );
@@ -2188,13 +2187,13 @@ const PluginsScreen: React.FC = () => {
                 return (
                   <>
                     <View style={styles.settingInfo}>
-                      <Text style={[styles.settingTitle, focused && { color: '#000' }]}>Show Scraper Logos</Text>
-                      <Text style={[styles.settingDescription, focused && { color: '#333' }]}>
+                      <Text style={styles.settingTitle}>Show Scraper Logos</Text>
+                      <Text style={styles.settingDescription}>
                         Display scraper logos next to streaming links on the streams screen.
                       </Text>
                     </View>
-                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (isOn ? '#333' : '#666') : (isOn ? colors.primary : colors.elevation3), position: 'relative' as const }}>
-                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (isOn ? colors.white : '#f4f3f4'), ...(isOn ? { right: 0 } : { left: 0 }) }} />
+                    <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: isOn ? colors.primary : colors.elevation3, position: 'relative' as const }}>
+                      <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: isOn ? colors.white : '#f4f3f4', ...(isOn ? { right: 0 } : { left: 0 }) }} />
                     </View>
                   </>
                 );
@@ -2254,8 +2253,7 @@ const PluginsScreen: React.FC = () => {
                       styles.qualityChipText,
                       isExcluded && styles.qualityChipTextSelected,
                       !settings.enableLocalScrapers && styles.disabledText,
-                      focused && { color: '#000' }
-                    ]}>
+                                          ]}>
                       {isExcluded ? '✕ ' : ''}{quality}
                     </Text>
                   )}
@@ -2329,8 +2327,7 @@ const PluginsScreen: React.FC = () => {
                       styles.qualityChipText,
                       isExcluded && styles.qualityChipTextSelected,
                       !settings.enableLocalScrapers && styles.disabledText,
-                      focused && { color: '#000' }
-                    ]}>
+                                          ]}>
                       {isExcluded ? '✕ ' : ''}{language}
                     </Text>
                   )}
@@ -2413,7 +2410,7 @@ const PluginsScreen: React.FC = () => {
                 showFocusBorder={true}
               >
                 {(focused) => (
-                  <Text style={[styles.modalButtonText, focused && { color: '#000' }]}>Got it!</Text>
+                  <Text style={[styles.modalButtonText]}>Got it!</Text>
                 )}
               </Focusable>
             ) : (
@@ -2478,7 +2475,7 @@ const PluginsScreen: React.FC = () => {
                     showFocusBorder={true}
                   >
                     {(focused) => (
-                      <Text style={[styles.cancelButtonText, focused && { color: '#000' }]}>Cancel</Text>
+                      <Text style={[styles.cancelButtonText]}>Cancel</Text>
                     )}
                   </Focusable>
                 ) : (
@@ -2505,9 +2502,9 @@ const PluginsScreen: React.FC = () => {
                   >
                     {(focused) => (
                       isLoading ? (
-                        <ActivityIndicator size="small" color={focused ? '#000' : colors.white} />
+                        <ActivityIndicator size="small" color={colors.white} />
                       ) : (
-                        <Text style={[styles.addButtonText, focused && { color: '#000' }]}>Add</Text>
+                        <Text style={styles.addButtonText}>Add</Text>
                       )
                     )}
                   </Focusable>

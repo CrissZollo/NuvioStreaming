@@ -183,12 +183,12 @@ const DebugSettingsScreen: React.FC = () => {
         <View style={styles.tvSwitchContainer}>
           <View style={[
             styles.tvSwitchTrack,
-            { backgroundColor: focused ? (value ? '#333' : '#666') : (value ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+            { backgroundColor: value ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)' }
           ]}>
             <View style={[
               styles.tvSwitchThumb,
               value ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-              { backgroundColor: focused ? '#000' : (value ? '#fff' : '#888') }
+              { backgroundColor: value ? '#fff' : '#888' }
             ]} />
           </View>
         </View>
@@ -286,7 +286,7 @@ const DebugSettingsScreen: React.FC = () => {
             autoFocus
             borderRadius={8}
             focusScale={1.05}
-            animateBackground={true}
+            animateBackground={false}
             showFocusBorder={true}
           >
             {(focused) => (
@@ -294,9 +294,9 @@ const DebugSettingsScreen: React.FC = () => {
                 <MaterialIcons
                   name="arrow-back"
                   size={24}
-                  color={focused ? '#000' : currentTheme.colors.text}
+                  color={currentTheme.colors.text}
                 />
-                <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.text }]}>
+                <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
                   Settings
                 </Text>
               </>
@@ -342,34 +342,36 @@ const DebugSettingsScreen: React.FC = () => {
             style={[
               styles.card,
               { backgroundColor: currentTheme.colors.elevation2 },
+              isTV && { overflow: 'visible', backgroundColor: 'transparent', borderWidth: 0 },
             ]}
           >
             {isTV ? (
+              <View style={{ marginBottom: 8 }}>
               <Focusable
                 onPress={() => handleToggleDebug(!settings.enableDebugLogging)}
-                style={styles.settingItem}
-                borderRadius={0}
-                focusScale={1}
-                animateBackground={true}
+                style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                borderRadius={14}
+                focusScale={1.0}
+                animateBackground={false}
                 showFocusBorder={true}
               >
                 {(focused) => (
                   <View style={styles.settingContent}>
                     <View style={[
                       styles.settingIconContainer,
-                      { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+                      { backgroundColor: 'rgba(255,255,255,0.1)' }
                     ]}>
                       <MaterialIcons
                         name="bug-report"
                         size={20}
-                        color={focused ? '#000' : currentTheme.colors.primary}
+                        color={currentTheme.colors.primary}
                       />
                     </View>
                     <View style={styles.settingText}>
                       <Text
                         style={[
                           styles.settingTitle,
-                          { color: focused ? '#000' : currentTheme.colors.text },
+                          { color: currentTheme.colors.text },
                         ]}
                       >
                         Enable Debug Logging
@@ -377,7 +379,7 @@ const DebugSettingsScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                          { color: currentTheme.colors.textMuted },
                         ]}
                       >
                         Collect logs and crash reports for troubleshooting
@@ -387,6 +389,7 @@ const DebugSettingsScreen: React.FC = () => {
                   </View>
                 )}
               </Focusable>
+              </View>
             ) : (
               <View style={styles.settingItem}>
                 <View style={styles.settingContent}>
@@ -498,32 +501,34 @@ const DebugSettingsScreen: React.FC = () => {
             style={[
               styles.card,
               { backgroundColor: currentTheme.colors.elevation2 },
+              isTV && { overflow: 'visible', backgroundColor: 'transparent', borderWidth: 0 },
             ]}
           >
             {isTV ? (
               <>
                 {/* QR Code option - especially useful for TV */}
+                <View style={{ marginBottom: 8 }}>
                 <Focusable
                   onPress={handleShowQRCode}
-                  style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: 'rgba(255,255,255,0.08)' }]}
-                  borderRadius={0}
-                  focusScale={1.02}
-                  animateBackground={true}
+                  style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                  borderRadius={14}
+                  focusScale={1.0}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
                     <View style={styles.settingContent}>
                       <View style={[
                         styles.settingIconContainer,
-                        { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+                        { backgroundColor: 'rgba(255,255,255,0.1)' }
                       ]}>
                         {isStartingServer ? (
-                          <ActivityIndicator size="small" color={focused ? '#000' : currentTheme.colors.primary} />
+                          <ActivityIndicator size="small" color={currentTheme.colors.primary} />
                         ) : (
                           <MaterialIcons
                             name="qr-code"
                             size={20}
-                            color={focused ? '#000' : currentTheme.colors.primary}
+                            color={currentTheme.colors.primary}
                           />
                         )}
                       </View>
@@ -531,7 +536,7 @@ const DebugSettingsScreen: React.FC = () => {
                         <Text
                           style={[
                             styles.settingTitle,
-                            { color: focused ? '#000' : currentTheme.colors.text },
+                            { color: currentTheme.colors.text },
                           ]}
                         >
                           Download via QR Code
@@ -539,7 +544,7 @@ const DebugSettingsScreen: React.FC = () => {
                         <Text
                           style={[
                             styles.settingDescription,
-                            { color: focused ? '#333' : currentTheme.colors.textMuted },
+                            { color: currentTheme.colors.textMuted },
                           ]}
                         >
                           Scan with your phone to download the report
@@ -548,32 +553,34 @@ const DebugSettingsScreen: React.FC = () => {
                       <MaterialIcons
                         name="chevron-right"
                         size={24}
-                        color={focused ? '#000' : currentTheme.colors.textMuted}
+                        color={currentTheme.colors.textMuted}
                       />
                     </View>
                   )}
                 </Focusable>
+                </View>
+                <View style={{ marginBottom: 8 }}>
                 <Focusable
                   onPress={handleExport}
-                  style={styles.settingItem}
-                  borderRadius={0}
-                  focusScale={1.02}
-                  animateBackground={true}
+                  style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                  borderRadius={14}
+                  focusScale={1.0}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
                     <View style={styles.settingContent}>
                       <View style={[
                         styles.settingIconContainer,
-                        { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' }
+                        { backgroundColor: 'rgba(255,255,255,0.1)' }
                       ]}>
                         {isExporting ? (
-                          <ActivityIndicator size="small" color={focused ? '#000' : currentTheme.colors.primary} />
+                          <ActivityIndicator size="small" color={currentTheme.colors.primary} />
                         ) : (
                           <MaterialIcons
                             name="share"
                             size={20}
-                            color={focused ? '#000' : currentTheme.colors.primary}
+                            color={currentTheme.colors.primary}
                           />
                         )}
                       </View>
@@ -581,7 +588,7 @@ const DebugSettingsScreen: React.FC = () => {
                         <Text
                           style={[
                             styles.settingTitle,
-                            { color: focused ? '#000' : currentTheme.colors.text },
+                            { color: currentTheme.colors.text },
                           ]}
                         >
                           Share Debug Report
@@ -589,7 +596,7 @@ const DebugSettingsScreen: React.FC = () => {
                         <Text
                           style={[
                             styles.settingDescription,
-                            { color: focused ? '#333' : currentTheme.colors.textMuted },
+                            { color: currentTheme.colors.textMuted },
                           ]}
                         >
                           Export and share via system share sheet
@@ -598,11 +605,12 @@ const DebugSettingsScreen: React.FC = () => {
                       <MaterialIcons
                         name="chevron-right"
                         size={24}
-                        color={focused ? '#000' : currentTheme.colors.textMuted}
+                        color={currentTheme.colors.textMuted}
                       />
                     </View>
                   )}
                 </Focusable>
+                </View>
               </>
             ) : (
               <>
@@ -719,30 +727,32 @@ const DebugSettingsScreen: React.FC = () => {
             style={[
               styles.card,
               { backgroundColor: currentTheme.colors.elevation2 },
+              isTV && { overflow: 'visible', backgroundColor: 'transparent', borderWidth: 0 },
             ]}
           >
             {isTV ? (
+              <View style={{ marginBottom: 8 }}>
               <Focusable
                 onPress={handleClearLogs}
-                style={styles.settingItem}
-                borderRadius={0}
-                focusScale={1.02}
-                animateBackground={true}
+                style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                borderRadius={14}
+                focusScale={1.0}
+                animateBackground={false}
                 showFocusBorder={true}
               >
                 {(focused) => (
                   <View style={styles.settingContent}>
                     <View style={[
                       styles.settingIconContainer,
-                      { backgroundColor: focused ? 'rgba(0,0,0,0.2)' : 'rgba(255,100,100,0.1)' }
+                      { backgroundColor: 'rgba(255,100,100,0.1)' }
                     ]}>
                       {isClearing ? (
-                        <ActivityIndicator size="small" color={focused ? '#000' : '#ff6b6b'} />
+                        <ActivityIndicator size="small" color="#ff6b6b" />
                       ) : (
                         <MaterialIcons
                           name="delete-outline"
                           size={20}
-                          color={focused ? '#000' : '#ff6b6b'}
+                          color="#ff6b6b"
                         />
                       )}
                     </View>
@@ -750,7 +760,7 @@ const DebugSettingsScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.settingTitle,
-                          { color: focused ? '#000' : currentTheme.colors.text },
+                          { color: currentTheme.colors.text },
                         ]}
                       >
                         Clear All Logs
@@ -758,7 +768,7 @@ const DebugSettingsScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                          { color: currentTheme.colors.textMuted },
                         ]}
                       >
                         Delete all debug logs and crash reports
@@ -767,11 +777,12 @@ const DebugSettingsScreen: React.FC = () => {
                     <MaterialIcons
                       name="chevron-right"
                       size={24}
-                      color={focused ? '#000' : currentTheme.colors.textMuted}
+                      color={currentTheme.colors.textMuted}
                     />
                   </View>
                 )}
               </Focusable>
+              </View>
             ) : (
               <TouchableOpacity
                 onPress={handleClearLogs}

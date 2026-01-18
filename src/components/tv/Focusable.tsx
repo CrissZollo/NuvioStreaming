@@ -17,9 +17,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useIsTV } from '../../contexts/TVContext';
 
-// Focus colors - clean white outline style
-const TV_FOCUS_BORDER_COLOR = '#FFFFFF';
-
 // PERFORMANCE: Use longer animation duration for low-end TV devices
 // 80ms = 2-3 frames at 30fps (jerky), 120ms = 4 frames (smooth)
 const TV_ANIMATION_DURATION = Platform.isTV ? 120 : 80;
@@ -270,21 +267,6 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       };
     });
 
-    // PERFORMANCE: Use constant border width with animated opacity
-    // This prevents layout shifts when focus changes (border doesn't change element size)
-    // Opacity animation runs entirely on UI thread via native driver
-    const animatedBorderStyle = useAnimatedStyle(() => {
-      'worklet';
-      if (!showFocusBorder) {
-        return {};
-      }
-      // Keep constant border width to prevent layout shifts, animate opacity
-      const borderOpacity = interpolate(focusProgress.value, [0, 1], [0, 1]);
-      return {
-        borderWidth: 3,
-        borderColor: `rgba(255, 255, 255, ${borderOpacity})`,
-      };
-    });
 
     // PERFORMANCE: Disabled by default (animateBackground=false)
     // When enabled, use simple background without interpolateColor
@@ -294,9 +276,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         return {};
       }
       // Use opacity interpolation instead of color interpolation
-      const bgOpacity = interpolate(focusProgress.value, [0, 1], [0, 0.15]);
+      // Round to avoid extremely small floating point values that cause Reanimated errors
+      const bgOpacity = Math.round(interpolate(focusProgress.value, [0, 1], [0, 15])) / 100;
       return {
-        backgroundColor: `rgba(255, 255, 255, ${bgOpacity})`,
+        backgroundColor: bgOpacity > 0 ? `rgba(255, 255, 255, ${bgOpacity})` : 'transparent',
       };
     });
 
@@ -346,6 +329,22 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     if (leftHandle) tvProps.nextFocusLeft = leftHandle;
     if (rightHandle) tvProps.nextFocusRight = rightHandle;
 
+    // Border width for focus indicator
+    const BORDER_WIDTH = 3;
+
+    // Focus border animated style - applies directly to the Pressable
+    // Use transparent border when unfocused, white border when focused
+    // This avoids layout shifts since border width is always present
+    const animatedFocusBorderStyle = useAnimatedStyle(() => {
+      'worklet';
+      // Round to avoid extremely small floating point values that cause Reanimated errors
+      const opacity = Math.round(interpolate(focusProgress.value, [0, 1], [0, 100])) / 100;
+      return {
+        borderWidth: BORDER_WIDTH,
+        borderColor: opacity > 0 ? `rgba(255, 255, 255, ${opacity})` : 'transparent',
+      };
+    });
+
     return (
       <AnimatedPressable
         ref={refCallback}
@@ -358,8 +357,9 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
           style,
           animatedContainerStyle,
           { borderRadius },
-          animatedBorderStyle,
           animatedBackgroundStyle,
+          // Apply focus border directly to the element so it scales with content
+          showFocusBorder && animatedFocusBorderStyle,
           // focusStyle is conditionally applied based on render prop state
           // since it may contain non-animatable properties
           needsFocusState && isFocusedState && focusStyle,

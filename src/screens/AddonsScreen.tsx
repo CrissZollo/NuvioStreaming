@@ -1133,7 +1133,7 @@ const AddonsScreen = () => {
                     showFocusBorder={true}
                   >
                     {(focused) => (
-                      <MaterialIcons name="settings" size={20} color={focused ? '#000' : colors.primary} />
+                      <MaterialIcons name="settings" size={20} color={colors.primary} />
                     )}
                   </Focusable>
                 )}
@@ -1155,7 +1155,7 @@ const AddonsScreen = () => {
                     showFocusBorder={true}
                   >
                     {(focused) => (
-                      <MaterialIcons name="delete" size={20} color={focused ? '#000' : colors.error} />
+                      <MaterialIcons name="delete" size={20} color={colors.error} />
                     )}
                   </Focusable>
                 )}
@@ -1178,7 +1178,7 @@ const AddonsScreen = () => {
                             <MaterialIcons
                               name="arrow-upward"
                               size={20}
-                              color={focused ? '#000' : (isFirstItem ? colors.mediumGray : colors.white)}
+                              color={isFirstItem ? colors.mediumGray : colors.white}
                             />
                           )}
                         </Focusable>
@@ -1194,7 +1194,7 @@ const AddonsScreen = () => {
                             <MaterialIcons
                               name="arrow-downward"
                               size={20}
-                              color={focused ? '#000' : (isLastItem ? colors.mediumGray : colors.white)}
+                              color={isLastItem ? colors.mediumGray : colors.white}
                             />
                           )}
                         </Focusable>
@@ -1210,7 +1210,7 @@ const AddonsScreen = () => {
                             <MaterialIcons
                               name="check"
                               size={20}
-                              color={focused ? '#000' : colors.white}
+                              color={colors.white}
                             />
                           )}
                         </Focusable>
@@ -1229,9 +1229,9 @@ const AddonsScreen = () => {
                             <MaterialIcons
                               name="drag-indicator"
                               size={20}
-                              color={focused ? '#000' : colors.mediumGray}
+                              color={colors.mediumGray}
                             />
-                            <Text style={[styles.grabButtonText, focused && { color: '#000' }]}>
+                            <Text style={styles.grabButtonText}>
                               {grabbedAddonId ? 'Move' : 'Grab'}
                             </Text>
                           </View>
@@ -1345,8 +1345,8 @@ const AddonsScreen = () => {
           >
             {(focused) => (
               <>
-                <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.white} />
-                <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+                <MaterialIcons name="chevron-left" size={28} color={colors.white} />
+                <Text style={styles.backText}>Settings</Text>
               </>
             )}
           </Focusable>
@@ -1376,7 +1376,7 @@ const AddonsScreen = () => {
                 <MaterialIcons
                   name="swap-vert"
                   size={24}
-                  color={focused ? '#000' : (reorderMode ? colors.primary : colors.white)}
+                  color={reorderMode ? colors.primary : colors.white}
                 />
               )}
             </Focusable>
@@ -1408,7 +1408,7 @@ const AddonsScreen = () => {
                 <MaterialIcons
                   name="refresh"
                   size={24}
-                  color={focused ? '#000' : (loading ? colors.mediumGray : colors.white)}
+                  color={loading ? colors.mediumGray : colors.white}
                 />
               )}
             </Focusable>
@@ -1487,16 +1487,16 @@ const AddonsScreen = () => {
                 >
                   {(focused) => (
                     <View style={styles.qrInstallContent}>
-                      <MaterialIcons name="qr-code-scanner" size={32} color={focused ? '#000' : colors.primary} />
+                      <MaterialIcons name="qr-code-scanner" size={32} color={colors.primary} />
                       <View style={styles.qrInstallTextContainer}>
-                        <Text style={[styles.qrInstallTitle, focused && { color: '#000' }]}>
+                        <Text style={styles.qrInstallTitle}>
                           Install Addons via QR Code
                         </Text>
-                        <Text style={[styles.qrInstallSubtitle, focused && { color: '#333' }]}>
+                        <Text style={styles.qrInstallSubtitle}>
                           Scan with your phone to browse and install addons
                         </Text>
                       </View>
-                      <MaterialIcons name="chevron-right" size={24} color={focused ? '#000' : colors.mediumGray} />
+                      <MaterialIcons name="chevron-right" size={24} color={colors.mediumGray} />
                     </View>
                   )}
                 </Focusable>
@@ -1521,9 +1521,9 @@ const AddonsScreen = () => {
                     {(focused) => (
                       <TextInput
                         ref={textInputRef}
-                        style={[styles.addonInput, { marginBottom: 0, backgroundColor: 'transparent', color: focused ? '#000' : colors.white }]}
+                        style={[styles.addonInput, { marginBottom: 0, backgroundColor: 'transparent', color: colors.white }]}
                         placeholder="Addon URL"
-                        placeholderTextColor={focused ? '#666' : colors.mediumGray}
+                        placeholderTextColor={colors.mediumGray}
                         value={addonUrl}
                         onChangeText={setAddonUrl}
                         autoCapitalize="none"
@@ -1553,7 +1553,7 @@ const AddonsScreen = () => {
                     showFocusBorder={true}
                   >
                     {(focused) => (
-                      <Text style={[styles.addButtonText, focused && { color: '#000' }]}>
+                      <Text style={styles.addButtonText}>
                         {installing ? 'Loading...' : 'Add Addon'}
                       </Text>
                     )}
@@ -1641,11 +1641,11 @@ const AddonsScreen = () => {
                           style={styles.configButton}
                           borderRadius={6}
                           focusScale={1.1}
-                          animateBackground={true}
+                          animateBackground={false}
                           showFocusBorder={true}
                         >
                           {(focused) => (
-                            <MaterialIcons name="settings" size={20} color={focused ? '#000' : colors.primary} />
+                            <MaterialIcons name="settings" size={20} color={colors.primary} />
                           )}
                         </Focusable>
                       )}
@@ -1655,14 +1655,14 @@ const AddonsScreen = () => {
                           style={styles.installButton}
                           borderRadius={6}
                           focusScale={1.1}
-                          animateBackground={true}
+                          animateBackground={false}
                           showFocusBorder={true}
                         >
                           {(focused) => (
                             installing ? (
-                              <ActivityIndicator size="small" color={focused ? '#000' : colors.white} />
+                              <ActivityIndicator size="small" color={colors.white} />
                             ) : (
-                              <MaterialIcons name="add" size={20} color={focused ? '#000' : colors.white} />
+                              <MaterialIcons name="add" size={20} color={colors.white} />
                             )
                           )}
                         </Focusable>
@@ -1756,11 +1756,11 @@ const AddonsScreen = () => {
                               style={styles.configButton}
                               borderRadius={6}
                               focusScale={1.1}
-                              animateBackground={true}
+                              animateBackground={false}
                               showFocusBorder={true}
                             >
                               {(focused) => (
-                                <MaterialIcons name="settings" size={20} color={focused ? '#000' : colors.primary} />
+                                <MaterialIcons name="settings" size={20} color={colors.primary} />
                               )}
                             </Focusable>
                           )}
@@ -1770,14 +1770,14 @@ const AddonsScreen = () => {
                               style={[styles.installButton, installing && { opacity: 0.6 }]}
                               borderRadius={6}
                               focusScale={1.1}
-                              animateBackground={true}
+                              animateBackground={false}
                               showFocusBorder={true}
                             >
                               {(focused) => (
                                 installing ? (
-                                  <ActivityIndicator size="small" color={focused ? '#000' : colors.white} />
+                                  <ActivityIndicator size="small" color={colors.white} />
                                 ) : (
-                                  <MaterialIcons name="add" size={20} color={focused ? '#000' : colors.white} />
+                                  <MaterialIcons name="add" size={20} color={colors.white} />
                                 )
                               )}
                             </Focusable>
@@ -1853,7 +1853,7 @@ const AddonsScreen = () => {
                       showFocusBorder={true}
                     >
                       {(focused) => (
-                        <MaterialIcons name="close" size={24} color={focused ? '#000' : colors.white} />
+                        <MaterialIcons name="close" size={24} color={colors.white} />
                       )}
                     </Focusable>
                   ) : (
@@ -1940,7 +1940,7 @@ const AddonsScreen = () => {
                       showFocusBorder={true}
                     >
                       {(focused) => (
-                        <Text style={[styles.modalButtonText, focused && { color: '#000' }]}>Cancel</Text>
+                        <Text style={styles.modalButtonText}>Cancel</Text>
                       )}
                     </Focusable>
                   ) : (
@@ -1966,9 +1966,9 @@ const AddonsScreen = () => {
                     >
                       {(focused) => (
                         installing ? (
-                          <ActivityIndicator size="small" color={focused ? '#000' : colors.white} />
+                          <ActivityIndicator size="small" color={colors.white} />
                         ) : (
-                          <Text style={[styles.modalButtonText, focused && { color: '#000' }]}>Install</Text>
+                          <Text style={styles.modalButtonText}>Install</Text>
                         )
                       )}
                     </Focusable>

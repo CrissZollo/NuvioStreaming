@@ -328,7 +328,7 @@ const TraktSettingsScreen: React.FC = () => {
             style={styles.backButton}
             borderRadius={8}
             focusScale={1}
-            animateBackground={true}
+            animateBackground={false}
             showFocusBorder={true}
           >
             {(focused) => (
@@ -336,9 +336,9 @@ const TraktSettingsScreen: React.FC = () => {
                 <MaterialIcons
                   name="arrow-back"
                   size={24}
-                  color={focused ? '#000' : (isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark)}
+                  color={isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark}
                 />
-                <Text style={[styles.backText, { color: focused ? '#000' : (isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark) }]}>
+                <Text style={[styles.backText, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
                   Settings
                 </Text>
               </>
@@ -438,11 +438,11 @@ const TraktSettingsScreen: React.FC = () => {
                   ]}
                   borderRadius={8}
                   focusScale={1}
-                  animateBackground={true}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
-                    <Text style={[styles.buttonText, focused && { color: '#000' }]}>Sign Out</Text>
+                    <Text style={styles.buttonText}>Sign Out</Text>
                   )}
                 </Focusable>
               ) : (
@@ -486,14 +486,14 @@ const TraktSettingsScreen: React.FC = () => {
                   ]}
                   borderRadius={8}
                   focusScale={1}
-                  animateBackground={true}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
                     isPolling ? (
-                      <ActivityIndicator size="small" color={focused ? '#000' : 'white'} />
+                      <ActivityIndicator size="small" color="white" />
                     ) : (
-                      <Text style={[styles.buttonText, focused && { color: '#000' }]}>
+                      <Text style={styles.buttonText}>
                         Sign In with Trakt
                       </Text>
                     )
@@ -545,12 +545,13 @@ const TraktSettingsScreen: React.FC = () => {
                 </Text>
               </View>
               {isTV ? (
+                <View style={{ marginBottom: 8 }}>
                 <Focusable
                   onPress={() => setAutosyncEnabled(!autosyncSettings.enabled)}
-                  style={styles.settingItem}
-                  borderRadius={8}
-                  focusScale={1}
-                  animateBackground={true}
+                  style={[styles.settingItem, { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                  borderRadius={14}
+                  focusScale={1.0}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
@@ -558,25 +559,26 @@ const TraktSettingsScreen: React.FC = () => {
                       <View style={styles.settingTextContainer}>
                         <Text style={[
                           styles.settingLabel,
-                          { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                          { color: currentTheme.colors.highEmphasis }
                         ]}>
                           Auto-sync playback progress
                         </Text>
                         <Text style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                          { color: currentTheme.colors.mediumEmphasis }
                         ]}>
                           Automatically sync watch progress to Trakt
                         </Text>
                       </View>
                       <View style={styles.settingToggleContainer}>
-                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (autosyncSettings.enabled ? '#333' : '#666') : (autosyncSettings.enabled ? currentTheme.colors.primary : currentTheme.colors.border), position: 'relative' as const }}>
-                          <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (autosyncSettings.enabled ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis), ...(autosyncSettings.enabled ? { right: 0 } : { left: 0 }) }} />
+                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: autosyncSettings.enabled ? currentTheme.colors.primary : currentTheme.colors.border, position: 'relative' as const }}>
+                          <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: autosyncSettings.enabled ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis, ...(autosyncSettings.enabled ? { right: 0 } : { left: 0 }) }} />
                         </View>
                       </View>
                     </View>
                   )}
                 </Focusable>
+                </View>
               ) : (
                 <View style={styles.settingItem}>
                   <View style={styles.settingContent}>
@@ -644,19 +646,19 @@ const TraktSettingsScreen: React.FC = () => {
                   ]}
                   borderRadius={8}
                   focusScale={1}
-                  animateBackground={true}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
                     isSyncing ? (
                       <ActivityIndicator
                         size="small"
-                        color={focused ? '#000' : currentTheme.colors.primary}
+                        color={currentTheme.colors.primary}
                       />
                     ) : (
                       <Text style={[
                         styles.buttonText,
-                        { color: focused ? '#000' : currentTheme.colors.primary }
+                        { color: currentTheme.colors.primary }
                       ]}>
                         Sync Now
                       </Text>
@@ -706,12 +708,13 @@ const TraktSettingsScreen: React.FC = () => {
               </Text>
 
               {isTV ? (
+                <View style={{ marginBottom: 8 }}>
                 <Focusable
                   onPress={() => updateSetting('showTraktComments', !settings.showTraktComments)}
-                  style={styles.settingItem}
-                  borderRadius={8}
-                  focusScale={1}
-                  animateBackground={true}
+                  style={[styles.settingItem, { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                  borderRadius={14}
+                  focusScale={1.0}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
@@ -719,25 +722,26 @@ const TraktSettingsScreen: React.FC = () => {
                       <View style={styles.settingTextContainer}>
                         <Text style={[
                           styles.settingLabel,
-                          { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                          { color: currentTheme.colors.highEmphasis }
                         ]}>
                           Show Trakt Comments
                         </Text>
                         <Text style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                          { color: currentTheme.colors.mediumEmphasis }
                         ]}>
                           Display Trakt comments in metadata screens when available
                         </Text>
                       </View>
                       <View style={styles.settingToggleContainer}>
-                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (settings.showTraktComments ? '#333' : '#666') : (settings.showTraktComments ? currentTheme.colors.primary : currentTheme.colors.border), position: 'relative' as const }}>
-                          <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (settings.showTraktComments ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis), ...(settings.showTraktComments ? { right: 0 } : { left: 0 }) }} />
+                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: settings.showTraktComments ? currentTheme.colors.primary : currentTheme.colors.border, position: 'relative' as const }}>
+                          <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: settings.showTraktComments ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis, ...(settings.showTraktComments ? { right: 0 } : { left: 0 }) }} />
                         </View>
                       </View>
                     </View>
                   )}
                 </Focusable>
+                </View>
               ) : (
                 <View style={styles.settingItem}>
                   <View style={styles.settingContent}>
@@ -847,12 +851,12 @@ const TraktSettingsScreen: React.FC = () => {
                 style={[styles.qrModalCancelButton, { backgroundColor: currentTheme.colors.elevation3 }]}
                 borderRadius={8}
                 focusScale={1}
-                animateBackground={true}
+                animateBackground={false}
                 showFocusBorder={true}
                 autoFocus
               >
                 {(focused) => (
-                  <Text style={[styles.qrModalCancelText, { color: focused ? '#000' : currentTheme.colors.highEmphasis }]}>
+                  <Text style={[styles.qrModalCancelText, { color: currentTheme.colors.highEmphasis }]}>
                     Cancel
                   </Text>
                 )}

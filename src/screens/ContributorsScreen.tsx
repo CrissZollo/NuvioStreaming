@@ -124,14 +124,14 @@ const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, currentT
             <View style={styles.contributorInfo}>
               <Text style={[
                 styles.username,
-                { color: focused ? '#000' : currentTheme.colors.highEmphasis },
+                { color: currentTheme.colors.highEmphasis },
                 isTablet && styles.tabletUsername
               ]}>
                 {contributor.login}
               </Text>
               <Text style={[
                 styles.contributions,
-                { color: focused ? '#333' : currentTheme.colors.mediumEmphasis },
+                { color: currentTheme.colors.mediumEmphasis },
                 isTablet && styles.tabletContributions
               ]}>
                 {contributor.contributions} contributions
@@ -276,7 +276,7 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
             <View style={styles.contributorInfo}>
               <Text style={[
                 styles.username,
-                { color: focused ? '#000' : currentTheme.colors.highEmphasis },
+                { color: currentTheme.colors.highEmphasis },
                 isTablet && styles.tabletUsername
               ]}>
                 {mention.isLoading ? 'Loading...' : mention.name}
@@ -284,14 +284,14 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
               {!mention.isLoading && mention.username && (
                 <Text style={[
                   styles.contributions,
-                  { color: focused ? '#333' : currentTheme.colors.mediumEmphasis },
+                  { color: currentTheme.colors.mediumEmphasis },
                   isTablet && styles.tabletContributions
                 ]}>
                   @{mention.username}
                 </Text>
               )}
-              <View style={[styles.roleBadgeSmall, { backgroundColor: focused ? 'rgba(0,0,0,0.15)' : currentTheme.colors.primary + '20' }]}>
-                <Text style={[styles.roleBadgeText, { color: focused ? '#000' : currentTheme.colors.primary }]}>
+              <View style={[styles.roleBadgeSmall, { backgroundColor: currentTheme.colors.primary + '20' }]}>
+                <Text style={[styles.roleBadgeText, { color: currentTheme.colors.primary }]}>
                   {mention.role}
                 </Text>
               </View>
@@ -343,7 +343,7 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
       <View style={styles.contributorInfo}>
         <Text style={[
           styles.username,
-          { color: focused ? '#000' : currentTheme.colors.highEmphasis },
+          { color: currentTheme.colors.highEmphasis },
           isTablet && styles.tabletUsername
         ]}>
           {mention.isLoading ? 'Loading...' : mention.name}
@@ -351,14 +351,14 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
         {!mention.isLoading && mention.username && (
           <Text style={[
             styles.contributions,
-            { color: focused ? '#333' : currentTheme.colors.mediumEmphasis },
+            { color: currentTheme.colors.mediumEmphasis },
             isTablet && styles.tabletContributions
           ]}>
             @{mention.username}
           </Text>
         )}
-        <View style={[styles.roleBadgeSmall, { backgroundColor: focused ? 'rgba(0,0,0,0.15)' : currentTheme.colors.primary + '20' }]}>
-          <Text style={[styles.roleBadgeText, { color: focused ? '#000' : currentTheme.colors.primary }]}>
+        <View style={[styles.roleBadgeSmall, { backgroundColor: currentTheme.colors.primary + '20' }]}>
+          <Text style={[styles.roleBadgeText, { color: currentTheme.colors.primary }]}>
             {mention.role}
           </Text>
         </View>
@@ -368,7 +368,7 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
       <FontAwesome5
         name="discord"
         size={isTablet ? 20 : 16}
-        color={focused ? '#333' : currentTheme.colors.mediumEmphasis}
+        color={currentTheme.colors.mediumEmphasis}
         style={styles.externalIcon}
       />
     </>
@@ -653,8 +653,8 @@ const ContributorsScreen: React.FC = () => {
             >
               {(focused) => (
                 <>
-                  <Feather name="chevron-left" size={24} color={focused ? '#000' : currentTheme.colors.primary} />
-                  <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.primary }]}>Settings</Text>
+                  <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
+                  <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
                 </>
               )}
             </Focusable>
@@ -702,13 +702,8 @@ const ContributorsScreen: React.FC = () => {
               nextFocusRight={specialTabRef.current?.getViewRef()}
             >
               {(focused) => {
-                // Focused: always black text (white bg from animateBackground)
-                // Active + not focused: white text on primary bg
-                // Inactive + not focused: medium text on transparent bg
                 const isActive = activeTab === 'contributors';
-                const textColor = focused
-                  ? '#000'
-                  : (isActive ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis);
+                const textColor = isActive ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis;
                 return (
                   <Text style={[
                     styles.tabText,
@@ -737,9 +732,7 @@ const ContributorsScreen: React.FC = () => {
             >
               {(focused) => {
                 const isActive = activeTab === 'special';
-                const textColor = focused
-                  ? '#000'
-                  : (isActive ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis);
+                const textColor = isActive ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis;
                 return (
                   <Text style={[
                     styles.tabText,
@@ -817,7 +810,7 @@ const ContributorsScreen: React.FC = () => {
                       showFocusBorder={true}
                     >
                       {(focused) => (
-                        <Text style={[styles.retryText, { color: focused ? '#000' : currentTheme.colors.white }]}>
+                        <Text style={[styles.retryText, { color: currentTheme.colors.white }]}>
                           Try Again
                         </Text>
                       )}

@@ -277,7 +277,7 @@ const TVAddonInstallScreen: React.FC = () => {
                 autoFocus
               >
                 {(focused) => (
-                  <Text style={[styles.cancelButtonText, { color: focused ? '#000' : currentTheme.colors.highEmphasis }]}>
+                  <Text style={[styles.cancelButtonText, { color: currentTheme.colors.highEmphasis }]}>
                     Cancel
                   </Text>
                 )}
@@ -362,7 +362,7 @@ const TVAddonInstallScreen: React.FC = () => {
                   showFocusBorder={true}
                 >
                   {(focused) => (
-                    <Text style={[styles.actionButtonText, { color: focused ? '#000' : currentTheme.colors.highEmphasis }]}>
+                    <Text style={[styles.actionButtonText, { color: currentTheme.colors.highEmphasis }]}>
                       Cancel
                     </Text>
                   )}
@@ -379,8 +379,8 @@ const TVAddonInstallScreen: React.FC = () => {
                 >
                   {(focused) => (
                     <View style={styles.buttonContent}>
-                      <MaterialIcons name={hasNewAddons ? "download" : "check"} size={20} color={focused ? '#000' : '#fff'} />
-                      <Text style={[styles.actionButtonText, styles.primaryButtonText, { color: focused ? '#000' : '#fff' }]}>
+                      <MaterialIcons name={hasNewAddons ? "download" : "check"} size={20} color="#fff" />
+                      <Text style={[styles.actionButtonText, styles.primaryButtonText, { color: '#fff' }]}>
                         {hasNewAddons ? 'Install & Apply' : 'Apply Order'}
                       </Text>
                     </View>
@@ -501,7 +501,7 @@ const TVAddonInstallScreen: React.FC = () => {
               autoFocus
             >
               {(focused) => (
-                <Text style={[styles.doneButtonText, { color: focused ? '#000' : '#fff' }]}>
+                <Text style={[styles.doneButtonText, { color: '#fff' }]}>
                   Done
                 </Text>
               )}
@@ -530,7 +530,7 @@ const TVAddonInstallScreen: React.FC = () => {
                 showFocusBorder={true}
               >
                 {(focused) => (
-                  <Text style={[styles.actionButtonText, { color: focused ? '#000' : currentTheme.colors.highEmphasis }]}>
+                  <Text style={[styles.actionButtonText, { color: currentTheme.colors.highEmphasis }]}>
                     Go Back
                   </Text>
                 )}
@@ -546,7 +546,7 @@ const TVAddonInstallScreen: React.FC = () => {
                 autoFocus
               >
                 {(focused) => (
-                  <Text style={[styles.actionButtonText, { color: focused ? '#000' : '#fff' }]}>
+                  <Text style={[styles.actionButtonText, { color: '#fff' }]}>
                     Try Again
                   </Text>
                 )}

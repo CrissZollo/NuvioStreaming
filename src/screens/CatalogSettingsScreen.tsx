@@ -523,13 +523,13 @@ const CatalogSettingsScreen = () => {
               autoFocus
               borderRadius={8}
               focusScale={1.05}
-              animateBackground={true}
+              animateBackground={false}
               showFocusBorder={true}
             >
               {(focused) => (
                 <>
-                  <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.primary} />
-                  <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+                  <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
+                  <Text style={[styles.backText, {}]}>Settings</Text>
                 </>
               )}
             </Focusable>
@@ -563,13 +563,13 @@ const CatalogSettingsScreen = () => {
             autoFocus
             borderRadius={8}
             focusScale={1.05}
-            animateBackground={true}
+            animateBackground={false}
             showFocusBorder={true}
           >
             {(focused) => (
               <>
-                <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.primary} />
-                <Text style={[styles.backText, focused && { color: '#000' }]}>Settings</Text>
+                <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
+                <Text style={[styles.backText, {}]}>Settings</Text>
               </>
             )}
           </Focusable>
@@ -668,32 +668,34 @@ const CatalogSettingsScreen = () => {
               {group.name.toUpperCase()}
             </Text>
 
-            <View style={styles.card}>
+            <View style={[styles.card, isTV && { overflow: 'visible', backgroundColor: 'transparent', borderWidth: 0 }]}>
               {isTV ? (
+                <View style={{ marginBottom: 8 }}>
                 <Focusable
                   onPress={() => toggleExpansion(addonId)}
-                  style={styles.groupHeader}
-                  borderRadius={8}
-                  focusScale={1.02}
-                  animateBackground={true}
+                  style={[styles.groupHeader, { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                  borderRadius={14}
+                  focusScale={1.0}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
                     <>
-                      <Text style={[styles.groupTitle, focused && { color: '#000' }]}>Catalogs</Text>
+                      <Text style={[styles.groupTitle, {}]}>Catalogs</Text>
                       <View style={styles.groupHeaderRight}>
-                        <Text style={[styles.enabledCount, focused && { color: '#000' }]}>
+                        <Text style={[styles.enabledCount, {}]}>
                           {group.enabledCount} of {group.catalogs.length} enabled
                         </Text>
                         <MaterialIcons
                           name={group.expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"}
                           size={24}
-                          color={focused ? '#000' : colors.mediumGray}
+                          color={colors.mediumGray}
                         />
                       </View>
                     </>
                   )}
                 </Focusable>
+                </View>
               ) : (
                 <TouchableOpacity
                   style={styles.groupHeader}
@@ -724,31 +726,32 @@ const CatalogSettingsScreen = () => {
                   )}
                   {group.catalogs.map((setting, index) => (
                     isTV ? (
+                      <View key={`${setting.addonId}:${setting.type}:${setting.catalogId}`} style={{ marginBottom: 8 }}>
                       <Focusable
-                        key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}
                         onPress={() => toggleCatalog(addonId, index)}
-                        style={styles.catalogItem}
-                        borderRadius={8}
-                        focusScale={1}
-                        animateBackground={true}
+                        style={[styles.catalogItem, { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                        borderRadius={14}
+                        focusScale={1.0}
+                        animateBackground={false}
                         showFocusBorder={true}
                       >
                         {(focused) => (
                           <>
                             <View style={styles.catalogInfo}>
-                              <Text style={[styles.catalogName, focused && { color: '#000' }]}>
+                              <Text style={styles.catalogName}>
                                 {setting.customName || setting.name}
                               </Text>
-                              <Text style={[styles.catalogType, focused && { color: '#333' }]}>
+                              <Text style={styles.catalogType}>
                                 {setting.type.charAt(0).toUpperCase() + setting.type.slice(1)}
                               </Text>
                             </View>
-                            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (setting.enabled ? '#333' : '#666') : (setting.enabled ? colors.primary : '#505050'), position: 'relative' as const }}>
-                              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(setting.enabled ? { right: 0 } : { left: 0 }) }} />
+                            <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: setting.enabled ? colors.primary : '#505050', position: 'relative' as const }}>
+                              <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: colors.white, ...(setting.enabled ? { right: 0 } : { left: 0 }) }} />
                             </View>
                           </>
                         )}
                       </Focusable>
+                      </View>
                     ) : (
                       <Pressable
                         key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}

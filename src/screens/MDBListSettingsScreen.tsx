@@ -609,14 +609,14 @@ const MDBListSettingsScreen = () => {
             autoFocus
             borderRadius={8}
             focusScale={1.05}
-            animateBackground={true}
+            animateBackground={false}
             showFocusBorder={true}
             nextFocusDown={enableToggleRef.current?.getViewRef()}
           >
             {(focused) => (
               <>
-                <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : colors.primary} />
-                <Text style={[styles.backText, { color: focused ? '#000' : colors.primary }]}>Settings</Text>
+                <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
+                <Text style={[styles.backText, { color: colors.primary }]}>Settings</Text>
               </>
             )}
           </Focusable>
@@ -670,7 +670,7 @@ const MDBListSettingsScreen = () => {
               style={styles.masterToggleContainer}
               borderRadius={8}
               focusScale={1}
-              animateBackground={true}
+              animateBackground={false}
               showFocusBorder={true}
               nextFocusUp={backButtonRef.current?.getViewRef()}
               nextFocusDown={isMdbListEnabled ? apiKeyInputRef2.current?.getViewRef() : providerRefs.current[0]?.getViewRef()}
@@ -678,20 +678,20 @@ const MDBListSettingsScreen = () => {
               {(focused) => (
                 <>
                   <View style={styles.masterToggleInfo}>
-                    <Text style={[styles.masterToggleTitle, { color: focused ? '#000' : colors.white }]}>Enable MDBList</Text>
-                    <Text style={[styles.masterToggleDescription, { color: focused ? '#333' : colors.mediumGray }]}>
+                    <Text style={[styles.masterToggleTitle, { color: colors.white }]}>Enable MDBList</Text>
+                    <Text style={[styles.masterToggleDescription, { color: colors.mediumGray }]}>
                       Turn on/off all MDBList functionality
                     </Text>
                   </View>
                   <View style={styles.tvSwitchContainer}>
                     <View style={[
                       styles.tvSwitchTrack,
-                      { backgroundColor: focused ? (isMdbListEnabled ? '#333' : '#666') : (isMdbListEnabled ? colors.primary : 'rgba(255,255,255,0.2)') }
+                      { backgroundColor: isMdbListEnabled ? colors.primary : 'rgba(255,255,255,0.2)' }
                     ]}>
                       <View style={[
                         styles.tvSwitchThumb,
                         isMdbListEnabled ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                        { backgroundColor: focused ? '#000' : (isMdbListEnabled ? '#fff' : '#888') }
+                        { backgroundColor: isMdbListEnabled ? '#fff' : '#888' }
                       ]} />
                     </View>
                   </View>
@@ -805,8 +805,8 @@ const MDBListSettingsScreen = () => {
                 >
                   {(focused) => (
                     <>
-                      <MaterialIcons name="save" size={18} color={focused ? '#000' : colors.white} style={styles.buttonIcon} />
-                      <Text style={[styles.saveButtonText, focused && { color: '#000' }]}>Save</Text>
+                      <MaterialIcons name="save" size={18} color={colors.white} style={styles.buttonIcon} />
+                      <Text style={styles.saveButtonText}>Save</Text>
                     </>
                   )}
                 </Focusable>
@@ -830,13 +830,12 @@ const MDBListSettingsScreen = () => {
                         <MaterialIcons
                           name="delete-outline"
                           size={18}
-                          color={!isMdbListEnabled ? colors.darkGray : (focused ? '#000' : colors.error)}
+                          color={!isMdbListEnabled ? colors.darkGray : colors.error}
                           style={styles.buttonIcon}
                         />
                         <Text style={[
                           styles.clearButtonText,
-                          !isMdbListEnabled && styles.clearButtonTextDisabled,
-                          focused && { color: '#000' }
+                          !isMdbListEnabled && styles.clearButtonTextDisabled
                         ]}>
                           Clear Key
                         </Text>
@@ -956,7 +955,7 @@ const MDBListSettingsScreen = () => {
                   style={[styles.providerItem, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   borderRadius={8}
                   focusScale={1}
-                  animateBackground={true}
+                  animateBackground={false}
                   showFocusBorder={true}
                   nextFocusUp={index === 0 ? (isMdbListEnabled && isKeySet ? clearButtonRef.current?.getViewRef() : (isMdbListEnabled ? saveButtonRef.current?.getViewRef() : enableToggleRef.current?.getViewRef())) : providerRefs.current[index - 1]?.getViewRef()}
                   nextFocusDown={index < providerKeys.length - 1 ? providerRefs.current[index + 1]?.getViewRef() : undefined}
@@ -966,7 +965,7 @@ const MDBListSettingsScreen = () => {
                       <View style={styles.providerInfo}>
                         <Text style={[
                           styles.providerName,
-                          { color: !isMdbListEnabled ? colors.darkGray : (focused ? '#000' : colors.white) }
+                          { color: !isMdbListEnabled ? colors.darkGray : colors.white }
                         ]}>
                           {provider.name}
                         </Text>
@@ -976,12 +975,12 @@ const MDBListSettingsScreen = () => {
                           styles.tvSwitchTrack,
                           { backgroundColor: !isMdbListEnabled
                             ? 'rgba(255,255,255,0.1)'
-                            : (focused ? ((enabledProviders[id] ?? true) ? '#333' : '#666') : ((enabledProviders[id] ?? true) ? colors.primary : 'rgba(255,255,255,0.2)')) }
+                            : ((enabledProviders[id] ?? true) ? colors.primary : 'rgba(255,255,255,0.2)') }
                         ]}>
                           <View style={[
                             styles.tvSwitchThumb,
                             (enabledProviders[id] ?? true) ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                            { backgroundColor: !isMdbListEnabled ? '#555' : (focused ? '#000' : ((enabledProviders[id] ?? true) ? '#fff' : '#888')) }
+                            { backgroundColor: !isMdbListEnabled ? '#555' : ((enabledProviders[id] ?? true) ? '#fff' : '#888') }
                           ]} />
                         </View>
                       </View>

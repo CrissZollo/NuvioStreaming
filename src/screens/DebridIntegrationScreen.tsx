@@ -1135,12 +1135,12 @@ const DebridIntegrationScreen = () => {
                                     style={{ width: 51, height: 26, justifyContent: 'center' }}
                                     borderRadius={13}
                                     focusScale={1.1}
-                                    animateBackground={true}
+                                    animateBackground={false}
                                     showFocusBorder={true}
                                 >
                                     {(focused) => (
-                                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (config.isEnabled ? '#333' : '#666') : (config.isEnabled ? colors.primary : colors.elevation2), position: 'relative' as const }}>
-                                            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : (config.isEnabled ? colors.white : colors.mediumEmphasis), ...(config.isEnabled ? { right: 0 } : { left: 0 }) }} />
+                                        <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: config.isEnabled ? colors.primary : colors.elevation2, position: 'relative' as const }}>
+                                            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: config.isEnabled ? colors.white : colors.mediumEmphasis, ...(config.isEnabled ? { right: 0 } : { left: 0 }) }} />
                                         </View>
                                     )}
                                 </Focusable>
@@ -1162,11 +1162,11 @@ const DebridIntegrationScreen = () => {
                             style={[styles.actionButton, styles.dangerButton, loading && styles.disabledButton]}
                             borderRadius={10}
                             focusScale={1.03}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                         >
                             {(focused) => (
-                                <Text style={[styles.buttonText, focused && { color: '#000' }]}>
+                                <Text style={[styles.buttonText]}>
                                     {loading ? 'Disconnecting...' : 'Disconnect & Remove'}
                                 </Text>
                             )}
@@ -1260,11 +1260,11 @@ const DebridIntegrationScreen = () => {
                                 style={styles.subscribeButton}
                                 borderRadius={8}
                                 focusScale={1.05}
-                                animateBackground={true}
+                                animateBackground={false}
                                 showFocusBorder={true}
                             >
                                 {(focused) => (
-                                    <Text style={[styles.subscribeButtonText, focused && { color: '#000' }]}>Open Settings</Text>
+                                    <Text style={[styles.subscribeButtonText]}>Open Settings</Text>
                                 )}
                             </Focusable>
                         ) : (
@@ -1289,11 +1289,11 @@ const DebridIntegrationScreen = () => {
                             style={styles.guideLink}
                             borderRadius={4}
                             focusScale={1.02}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                         >
                             {(focused) => (
-                                <Text style={[styles.guideLinkText, focused && { color: '#000' }]}>What is a Debrid Service?</Text>
+                                <Text style={[styles.guideLinkText]}>What is a Debrid Service?</Text>
                             )}
                         </Focusable>
                     ) : (
@@ -1310,14 +1310,14 @@ const DebridIntegrationScreen = () => {
                                 style={styles.input}
                                 borderRadius={10}
                                 focusScale={1.02}
-                                animateBackground={true}
+                                animateBackground={false}
                                 showFocusBorder={true}
                             >
                                 {(focused) => (
                                     <TextInput
-                                        style={[styles.input, { marginBottom: 0, backgroundColor: 'transparent', color: focused ? '#000' : colors.white }]}
+                                        style={[styles.input, { marginBottom: 0, backgroundColor: 'transparent', color: colors.white }]}
                                         placeholder="Enter your API Key"
-                                        placeholderTextColor={focused ? '#666' : colors.mediumGray}
+                                        placeholderTextColor={colors.mediumGray}
                                         value={apiKey}
                                         onChangeText={setApiKey}
                                         autoCapitalize="none"
@@ -1346,11 +1346,11 @@ const DebridIntegrationScreen = () => {
                             style={[styles.connectButton, loading && styles.disabledButton]}
                             borderRadius={10}
                             focusScale={1.03}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                         >
                             {(focused) => (
-                                <Text style={[styles.connectButtonText, focused && { color: '#000' }]}>
+                                <Text style={[styles.connectButtonText]}>
                                     {loading ? 'Connecting...' : 'Connect & Install'}
                                 </Text>
                             )}
@@ -1378,11 +1378,11 @@ const DebridIntegrationScreen = () => {
                                 style={styles.subscribeButton}
                                 borderRadius={8}
                                 focusScale={1.05}
-                                animateBackground={true}
+                                animateBackground={false}
                                 showFocusBorder={true}
                             >
                                 {(focused) => (
-                                    <Text style={[styles.subscribeButtonText, focused && { color: '#000' }]}>Get Subscription</Text>
+                                    <Text style={[styles.subscribeButtonText]}>Get Subscription</Text>
                                 )}
                             </Focusable>
                         ) : (
@@ -1439,11 +1439,11 @@ const DebridIntegrationScreen = () => {
                             style={styles.promoButton}
                             borderRadius={8}
                             focusScale={1.03}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                         >
                             {(focused) => (
-                                <Text style={[styles.promoButtonText, focused && { color: '#000' }]}>Get TorBox Subscription</Text>
+                                <Text style={[styles.promoButtonText]}>Get TorBox Subscription</Text>
                             )}
                         </Focusable>
                     ) : (
@@ -1472,15 +1472,14 @@ const DebridIntegrationScreen = () => {
                                 ]}
                                 borderRadius={8}
                                 focusScale={1.03}
-                                animateBackground={true}
+                                animateBackground={false}
                                 showFocusBorder={true}
                             >
                                 {(focused) => (
                                     <Text style={[
                                         styles.pickerItemText,
                                         torrentioConfig.debridService === service.id && styles.pickerItemTextSelected,
-                                        focused && { color: '#000' }
-                                    ]}>
+                                                                            ]}>
                                         {service.name}
                                     </Text>
                                 )}
@@ -1515,15 +1514,15 @@ const DebridIntegrationScreen = () => {
                         style={styles.input}
                         borderRadius={10}
                         focusScale={1.02}
-                        animateBackground={true}
+                        animateBackground={false}
                         showFocusBorder={true}
                     >
                         {(focused) => (
                             <TextInput
                                 ref={torrentioApiKeyRef}
-                                style={[{ flex: 1, color: focused ? '#000' : colors.white }]}
+                                style={[{ flex: 1, color: colors.white }]}
                                 placeholder={`Enter your ${TORRENTIO_DEBRID_SERVICES.find((d: any) => d.id === torrentioConfig.debridService)?.name || 'Debrid'} API Key`}
-                                placeholderTextColor={focused ? '#666' : colors.mediumGray}
+                                placeholderTextColor={colors.mediumGray}
                                 value={torrentioConfig.debridApiKey}
                                 onChangeText={(text) => setTorrentioConfig(prev => ({ ...prev, debridApiKey: text }))}
                                 autoCapitalize="none"
@@ -1553,18 +1552,18 @@ const DebridIntegrationScreen = () => {
                     style={[styles.accordionHeader, expandedSections.sorting && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
                     borderRadius={10}
                     focusScale={1.02}
-                    animateBackground={true}
+                    animateBackground={false}
                     showFocusBorder={true}
                 >
                     {(focused) => (
                         <>
                             <View>
-                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Sorting</Text>
-                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>
+                                <Text style={styles.accordionHeaderText}>Sorting</Text>
+                                <Text style={styles.accordionSubtext}>
                                     {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || 'By quality'}
                                 </Text>
                             </View>
-                            <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                            <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
                         </>
                     )}
                 </Focusable>
@@ -1593,11 +1592,11 @@ const DebridIntegrationScreen = () => {
                                     style={[styles.pickerItem, torrentioConfig.sort === option.id && styles.pickerItemSelected]}
                                     borderRadius={8}
                                     focusScale={1.03}
-                                    animateBackground={true}
+                                    animateBackground={false}
                                     showFocusBorder={true}
                                 >
                                     {(focused) => (
-                                        <Text style={[styles.pickerItemText, torrentioConfig.sort === option.id && styles.pickerItemTextSelected, focused && { color: '#000' }]}>
+                                        <Text style={[styles.pickerItemText, torrentioConfig.sort === option.id && styles.pickerItemTextSelected]}>
                                             {option.name}
                                         </Text>
                                     )}
@@ -1625,18 +1624,18 @@ const DebridIntegrationScreen = () => {
                     style={[styles.accordionHeader, expandedSections.qualityFilter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
                     borderRadius={10}
                     focusScale={1.02}
-                    animateBackground={true}
+                    animateBackground={false}
                     showFocusBorder={true}
                 >
                     {(focused) => (
                         <>
                             <View>
-                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Exclude Qualities</Text>
-                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>
+                                <Text style={styles.accordionHeaderText}>Exclude Qualities</Text>
+                                <Text style={styles.accordionSubtext}>
                                     {torrentioConfig.qualityFilter.length > 0 ? `${torrentioConfig.qualityFilter.length} excluded` : 'None excluded'}
                                 </Text>
                             </View>
-                            <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                            <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
                         </>
                     )}
                 </Focusable>
@@ -1665,11 +1664,11 @@ const DebridIntegrationScreen = () => {
                                     style={[styles.chip, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipSelected]}
                                     borderRadius={16}
                                     focusScale={1.05}
-                                    animateBackground={true}
+                                    animateBackground={false}
                                     showFocusBorder={true}
                                 >
                                     {(focused) => (
-                                        <Text style={[styles.chipText, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipTextSelected, focused && { color: '#000' }]}>
+                                        <Text style={[styles.chipText, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipTextSelected]}>
                                             {quality.name}
                                         </Text>
                                     )}
@@ -1697,18 +1696,18 @@ const DebridIntegrationScreen = () => {
                     style={[styles.accordionHeader, expandedSections.languages && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
                     borderRadius={10}
                     focusScale={1.02}
-                    animateBackground={true}
+                    animateBackground={false}
                     showFocusBorder={true}
                 >
                     {(focused) => (
                         <>
                             <View>
-                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Priority Languages</Text>
-                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>
+                                <Text style={styles.accordionHeaderText}>Priority Languages</Text>
+                                <Text style={styles.accordionSubtext}>
                                     {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} selected` : 'No preference'}
                                 </Text>
                             </View>
-                            <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                            <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
                         </>
                     )}
                 </Focusable>
@@ -1737,11 +1736,11 @@ const DebridIntegrationScreen = () => {
                                     style={[styles.chip, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipSelected]}
                                     borderRadius={16}
                                     focusScale={1.05}
-                                    animateBackground={true}
+                                    animateBackground={false}
                                     showFocusBorder={true}
                                 >
                                     {(focused) => (
-                                        <Text style={[styles.chipText, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipTextSelected, focused && { color: '#000' }]}>
+                                        <Text style={[styles.chipText, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipTextSelected]}>
                                             {lang.name}
                                         </Text>
                                     )}
@@ -1769,18 +1768,18 @@ const DebridIntegrationScreen = () => {
                     style={[styles.accordionHeader, expandedSections.maxResults && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
                     borderRadius={10}
                     focusScale={1.02}
-                    animateBackground={true}
+                    animateBackground={false}
                     showFocusBorder={true}
                 >
                     {(focused) => (
                         <>
                             <View>
-                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Max Results</Text>
-                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>
+                                <Text style={styles.accordionHeaderText}>Max Results</Text>
+                                <Text style={styles.accordionSubtext}>
                                     {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || 'All results'}
                                 </Text>
                             </View>
-                            <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                            <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
                         </>
                     )}
                 </Focusable>
@@ -1809,11 +1808,11 @@ const DebridIntegrationScreen = () => {
                                     style={[styles.pickerItem, torrentioConfig.maxResults === option.id && styles.pickerItemSelected]}
                                     borderRadius={8}
                                     focusScale={1.03}
-                                    animateBackground={true}
+                                    animateBackground={false}
                                     showFocusBorder={true}
                                 >
                                     {(focused) => (
-                                        <Text style={[styles.pickerItemText, torrentioConfig.maxResults === option.id && styles.pickerItemTextSelected, focused && { color: '#000' }]}>
+                                        <Text style={[styles.pickerItemText, torrentioConfig.maxResults === option.id && styles.pickerItemTextSelected]}>
                                             {option.name}
                                         </Text>
                                     )}
@@ -1841,16 +1840,16 @@ const DebridIntegrationScreen = () => {
                     style={[styles.accordionHeader, expandedSections.options && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
                     borderRadius={10}
                     focusScale={1.02}
-                    animateBackground={true}
+                    animateBackground={false}
                     showFocusBorder={true}
                 >
                     {(focused) => (
                         <>
                             <View>
-                                <Text style={[styles.accordionHeaderText, focused && { color: '#000' }]}>Additional Options</Text>
-                                <Text style={[styles.accordionSubtext, focused && { color: '#333' }]}>Catalog & download settings</Text>
+                                <Text style={styles.accordionHeaderText}>Additional Options</Text>
+                                <Text style={styles.accordionSubtext}>Catalog & download settings</Text>
                             </View>
-                            <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={focused ? '#000' : colors.mediumEmphasis} />
+                            <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
                         </>
                     )}
                 </Focusable>
@@ -1874,26 +1873,26 @@ const DebridIntegrationScreen = () => {
                             style={styles.switchRow}
                             borderRadius={8}
                             focusScale={1.02}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                         >
                             {(focused) => (
                                 <>
-                                    <Text style={[styles.switchLabel, focused && { color: '#000' }]}>Don't show download links</Text>
+                                    <Text style={styles.switchLabel}>Don't show download links</Text>
                                     <View style={[{
                                         width: 44,
                                         height: 14,
                                         borderRadius: 7,
                                         backgroundColor: torrentioConfig.noDownloadLinks
-                                            ? (focused ? '#333' : colors.primary)
-                                            : (focused ? '#666' : colors.elevation3),
+                                            ? colors.primary
+                                            : colors.elevation3,
                                         justifyContent: 'center',
                                     }]}>
                                         <View style={{
                                             width: 26,
                                             height: 26,
                                             borderRadius: 13,
-                                            backgroundColor: focused ? '#000' : colors.white,
+                                            backgroundColor: colors.white,
                                             position: 'absolute',
                                             top: -6,
                                             left: torrentioConfig.noDownloadLinks ? 20 : -2,
@@ -1924,26 +1923,26 @@ const DebridIntegrationScreen = () => {
                             style={styles.switchRow}
                             borderRadius={8}
                             focusScale={1.02}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                         >
                             {(focused) => (
                                 <>
-                                    <Text style={[styles.switchLabel, focused && { color: '#000' }]}>Don't show debrid catalog</Text>
+                                    <Text style={styles.switchLabel}>Don't show debrid catalog</Text>
                                     <View style={[{
                                         width: 44,
                                         height: 14,
                                         borderRadius: 7,
                                         backgroundColor: torrentioConfig.noCatalog
-                                            ? (focused ? '#333' : colors.primary)
-                                            : (focused ? '#666' : colors.elevation3),
+                                            ? colors.primary
+                                            : colors.elevation3,
                                         justifyContent: 'center',
                                     }]}>
                                         <View style={{
                                             width: 26,
                                             height: 26,
                                             borderRadius: 13,
-                                            backgroundColor: focused ? '#000' : colors.white,
+                                            backgroundColor: colors.white,
                                             position: 'absolute',
                                             top: -6,
                                             left: torrentioConfig.noCatalog ? 20 : -2,
@@ -1991,11 +1990,11 @@ const DebridIntegrationScreen = () => {
                                 style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
                                 borderRadius={10}
                                 focusScale={1.03}
-                                animateBackground={true}
+                                animateBackground={false}
                                 showFocusBorder={true}
                             >
                                 {(focused) => (
-                                    <Text style={[styles.connectButtonText, focused && { color: '#000' }]}>
+                                    <Text style={[styles.connectButtonText]}>
                                         {torrentioLoading ? 'Updating...' : 'Update Configuration'}
                                     </Text>
                                 )}
@@ -2017,11 +2016,11 @@ const DebridIntegrationScreen = () => {
                                 style={[styles.actionButton, styles.dangerButton, torrentioLoading && styles.disabledButton]}
                                 borderRadius={10}
                                 focusScale={1.03}
-                                animateBackground={true}
+                                animateBackground={false}
                                 showFocusBorder={true}
                             >
                                 {(focused) => (
-                                    <Text style={[styles.buttonText, focused && { color: '#000' }]}>Remove Torrentio</Text>
+                                    <Text style={[styles.buttonText]}>Remove Torrentio</Text>
                                 )}
                             </Focusable>
                         ) : (
@@ -2041,11 +2040,11 @@ const DebridIntegrationScreen = () => {
                             style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
                             borderRadius={10}
                             focusScale={1.03}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                         >
                             {(focused) => (
-                                <Text style={[styles.connectButtonText, focused && { color: '#000' }]}>
+                                <Text style={[styles.connectButtonText]}>
                                     {torrentioLoading ? 'Installing...' : 'Install Torrentio'}
                                 </Text>
                             )}
@@ -2094,11 +2093,11 @@ const DebridIntegrationScreen = () => {
                         autoFocus
                         borderRadius={8}
                         focusScale={1.05}
-                        animateBackground={true}
+                        animateBackground={false}
                         showFocusBorder={true}
                     >
                         {(focused) => (
-                            <Feather name="arrow-left" size={24} color={focused ? '#000' : colors.white} />
+                            <Feather name="arrow-left" size={24} color={colors.white} />
                         )}
                     </Focusable>
                 ) : (
@@ -2120,11 +2119,11 @@ const DebridIntegrationScreen = () => {
                         style={[styles.tab, activeTab === 'torbox' && styles.activeTab]}
                         borderRadius={10}
                         focusScale={1.02}
-                        animateBackground={true}
+                        animateBackground={false}
                         showFocusBorder={true}
                     >
                         {(focused) => (
-                            <Text style={[styles.tabText, activeTab === 'torbox' && styles.activeTabText, focused && { color: '#000' }]}>
+                            <Text style={[styles.tabText, activeTab === 'torbox' && styles.activeTabText]}>
                                 TorBox
                             </Text>
                         )}
@@ -2145,11 +2144,11 @@ const DebridIntegrationScreen = () => {
                         style={[styles.tab, activeTab === 'torrentio' && styles.activeTab]}
                         borderRadius={10}
                         focusScale={1.02}
-                        animateBackground={true}
+                        animateBackground={false}
                         showFocusBorder={true}
                     >
                         {(focused) => (
-                            <Text style={[styles.tabText, activeTab === 'torrentio' && styles.activeTabText, focused && { color: '#000' }]}>
+                            <Text style={[styles.tabText, activeTab === 'torrentio' && styles.activeTabText]}>
                                 Torrentio
                             </Text>
                         )}

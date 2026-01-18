@@ -61,11 +61,11 @@ const ThemeCard: React.FC<ThemeCardProps> = ({
   const cardContent = (focused: boolean = false) => (
     <>
       <View style={styles.themeCardHeader}>
-        <Text style={[styles.themeCardTitle, { color: focused ? '#000' : theme.colors.text }]}>
+        <Text style={[styles.themeCardTitle, { color: theme.colors.text }]}>
           {theme.name}
         </Text>
         {isSelected && (
-          <MaterialIcons name="check-circle" size={18} color={focused ? '#000' : theme.colors.primary} />
+          <MaterialIcons name="check-circle" size={18} color={theme.colors.primary} />
         )}
       </View>
 
@@ -180,7 +180,7 @@ const FilterTab: React.FC<FilterTabProps> = ({
           <Text
             style={[
               styles.filterTabText,
-              { color: focused ? '#000' : (isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.8)') }
+              { color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.8)' }
             ]}
           >
             {category.name}
@@ -626,8 +626,8 @@ const ThemeScreen: React.FC = () => {
           >
             {(focused) => (
               <>
-                <MaterialIcons name="arrow-back" size={24} color={focused ? '#000' : currentTheme.colors.text} />
-                <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.text }]}>
+                <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
+                <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
                   Settings
                 </Text>
               </>
@@ -713,8 +713,8 @@ const ThemeScreen: React.FC = () => {
           >
             {(focused) => (
               <>
-                <MaterialIcons name="add" size={20} color={focused ? '#000' : '#FFFFFF'} />
-                <Text style={[styles.createButtonText, focused && { color: '#000' }]}>Create Custom Theme</Text>
+                <MaterialIcons name="add" size={20} color="#FFFFFF" />
+                <Text style={styles.createButtonText}>Create Custom Theme</Text>
               </>
             )}
           </Focusable>
@@ -748,18 +748,18 @@ const ThemeScreen: React.FC = () => {
           >
             {(focused) => (
               <>
-                <Text style={[styles.optionLabel, { color: focused ? '#000' : currentTheme.colors.text }]}>
+                <Text style={[styles.optionLabel, { color: currentTheme.colors.text }]}>
                   Use Dominant Color from Artwork
                 </Text>
                 <View style={styles.tvSwitchContainer}>
                   <View style={[
                     styles.tvSwitchTrack,
-                    { backgroundColor: focused ? (settings.useDominantBackgroundColor ? '#333' : '#666') : (settings.useDominantBackgroundColor ? currentTheme.colors.primary : '#767577') }
+                    { backgroundColor: settings.useDominantBackgroundColor ? currentTheme.colors.primary : '#767577' }
                   ]}>
                     <View style={[
                       styles.tvSwitchThumb,
                       settings.useDominantBackgroundColor ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                      { backgroundColor: focused ? '#000' : (settings.useDominantBackgroundColor ? '#fff' : '#f4f3f4') }
+                      { backgroundColor: settings.useDominantBackgroundColor ? '#fff' : '#f4f3f4' }
                     ]} />
                   </View>
                 </View>

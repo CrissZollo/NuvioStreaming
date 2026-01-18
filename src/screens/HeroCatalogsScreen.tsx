@@ -187,7 +187,7 @@ const HeroCatalogsScreen: React.FC = () => {
               <MaterialIcons
                 name="arrow-back"
                 size={24}
-                color={focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark)}
+                color={isDarkMode ? colors.highEmphasis : colors.textDark}
               />
             )}
           </Focusable>
@@ -240,7 +240,7 @@ const HeroCatalogsScreen: React.FC = () => {
                 showFocusBorder={true}
               >
                 {(focused) => (
-                  <Text style={[styles.actionButtonText, { color: focused ? '#000' : colors.primary }]}>Select All</Text>
+                  <Text style={[styles.actionButtonText, { color: colors.primary }]}>Select All</Text>
                 )}
               </Focusable>
             ) : (
@@ -261,7 +261,7 @@ const HeroCatalogsScreen: React.FC = () => {
                 showFocusBorder={true}
               >
                 {(focused) => (
-                  <Text style={[styles.actionButtonText, { color: focused ? '#000' : colors.primary }]}>Clear All</Text>
+                  <Text style={[styles.actionButtonText, { color: colors.primary }]}>Clear All</Text>
                 )}
               </Focusable>
             ) : (
@@ -283,8 +283,8 @@ const HeroCatalogsScreen: React.FC = () => {
               >
                 {(focused) => (
                   <>
-                    <MaterialIcons name="save" size={16} color={focused ? '#000' : colors.white} style={styles.saveIcon} />
-                    <Text style={[styles.saveButtonText, focused && { color: '#000' }]}>Save</Text>
+                    <MaterialIcons name="save" size={16} color={colors.white} style={styles.saveIcon} />
+                    <Text style={styles.saveButtonText}>Save</Text>
                   </>
                 )}
               </Focusable>
@@ -340,17 +340,17 @@ const HeroCatalogsScreen: React.FC = () => {
                         {(focused) => (
                           <>
                             <View style={styles.catalogInfo}>
-                              <Text style={[styles.catalogName, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>
+                              <Text style={[styles.catalogName, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
                                 {displayName}
                               </Text>
-                              <Text style={[styles.catalogType, { color: focused ? '#333' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark) }]}>
+                              <Text style={[styles.catalogType, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
                                 {catalog.type === 'movie' ? 'Movies' : 'TV Shows'}
                               </Text>
                             </View>
                             <MaterialIcons
                               name={isSelected ? "check-box" : "check-box-outline-blank"}
                               size={24}
-                              color={focused ? '#000' : (isSelected ? colors.primary : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark))}
+                              color={isSelected ? colors.primary : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark)}
                             />
                           </>
                         )}

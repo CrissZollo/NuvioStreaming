@@ -74,84 +74,86 @@ const SettingItem: React.FC<SettingItemProps> = ({
   // For TV with toggle, wrap entire row in Focusable
   if (isTV && onToggle !== undefined) {
     return (
+      <View style={{ marginBottom: 8 }}>
       <Focusable
         onPress={onToggle}
         style={[
           styles.settingItem,
-          !isLast && styles.settingItemBorder,
-          { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+          { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }
         ]}
-        borderRadius={8}
-        focusScale={1}
-        animateBackground={true}
+        borderRadius={14}
+        focusScale={1.0}
+        animateBackground={false}
         showFocusBorder={true}
       >
         {(focused) => (
           <>
             <View style={styles.settingIconContainer}>
-              <MaterialIcons name={icon} size={22} color={focused ? '#000' : colors.primary} />
+              <MaterialIcons name={icon} size={22} color={colors.primary} />
             </View>
             <View style={styles.settingContent}>
               <View style={styles.settingTitleRow}>
-                <Text style={[styles.settingTitle, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>
+                <Text style={[styles.settingTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
                   {title}
                 </Text>
                 {description && (
-                  <Text style={[styles.settingDescription, { color: focused ? '#333' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark) }]}>
+                  <Text style={[styles.settingDescription, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
                     {description}
                   </Text>
                 )}
               </View>
             </View>
             <View style={styles.settingControl}>
-              <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (toggleValue ? '#333' : '#666') : (toggleValue ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')), position: 'relative' as const }}>
-                <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(toggleValue ? { right: 0 } : { left: 0 }) }} />
+              <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: toggleValue ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), position: 'relative' as const }}>
+                <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: colors.white, ...(toggleValue ? { right: 0 } : { left: 0 }) }} />
               </View>
             </View>
           </>
         )}
       </Focusable>
+      </View>
     );
   }
 
   // For TV with navigation (onPress), wrap in Focusable
   if (isTV && onPress) {
     return (
+      <View style={{ marginBottom: 8 }}>
       <Focusable
         onPress={onPress}
         style={[
           styles.settingItem,
-          !isLast && styles.settingItemBorder,
-          { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }
+          { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }
         ]}
-        borderRadius={8}
-        focusScale={1}
-        animateBackground={true}
+        borderRadius={14}
+        focusScale={1.0}
+        animateBackground={false}
         showFocusBorder={true}
       >
         {(focused) => (
           <>
             <View style={styles.settingIconContainer}>
-              <MaterialIcons name={icon} size={22} color={focused ? '#000' : colors.primary} />
+              <MaterialIcons name={icon} size={22} color={colors.primary} />
             </View>
             <View style={styles.settingContent}>
               <View style={styles.settingTitleRow}>
-                <Text style={[styles.settingTitle, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>
+                <Text style={[styles.settingTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
                   {title}
                 </Text>
                 {description && (
-                  <Text style={[styles.settingDescription, { color: focused ? '#333' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark) }]}>
+                  <Text style={[styles.settingDescription, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
                     {description}
                   </Text>
                 )}
               </View>
             </View>
             <View style={styles.settingControl}>
-              <MaterialIcons name="chevron-right" size={24} color={focused ? '#000' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark)} />
+              <MaterialIcons name="chevron-right" size={24} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
             </View>
           </>
         )}
       </Focusable>
+      </View>
     );
   }
 
@@ -275,12 +277,12 @@ const HomeScreenSettings: React.FC = () => {
         style={{ width: 51, height: 26, justifyContent: 'center' }}
         borderRadius={13}
         focusScale={1.1}
-        animateBackground={true}
+        animateBackground={false}
         showFocusBorder={true}
       >
         {(focused) => (
-          <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (value ? '#333' : '#666') : (value ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')), position: 'relative' as const }}>
-            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(value ? { right: 0 } : { left: 0 }) }} />
+          <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: value ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), position: 'relative' as const }}>
+            <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: colors.white, ...(value ? { right: 0 } : { left: 0 }) }} />
           </View>
         )}
       </Focusable>
@@ -344,12 +346,12 @@ const HomeScreenSettings: React.FC = () => {
             ]}
             borderRadius={8}
             focusScale={1.05}
-            animateBackground={true}
+            animateBackground={false}
             showFocusBorder={true}
           >
             {(focused) => (
               <Text style={{
-                color: focused ? '#000' : (selected ? colors.white : (isDarkMode ? colors.highEmphasis : colors.textDark)),
+                color: selected ? colors.white : (isDarkMode ? colors.highEmphasis : colors.textDark),
                 fontWeight: '700',
                 fontSize: 13,
               }}>
@@ -414,7 +416,7 @@ const HomeScreenSettings: React.FC = () => {
             autoFocus
             borderRadius={8}
             focusScale={1.05}
-            animateBackground={true}
+            animateBackground={false}
             showFocusBorder={true}
           >
             {(focused) => (
@@ -422,9 +424,9 @@ const HomeScreenSettings: React.FC = () => {
                 <MaterialIcons
                   name="arrow-back"
                   size={24}
-                  color={focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark)}
+                  color={isDarkMode ? colors.highEmphasis : colors.textDark}
                 />
-                <Text style={[styles.backText, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>
+                <Text style={[styles.backText, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
                   Settings
                 </Text>
               </>
@@ -528,21 +530,23 @@ const HomeScreenSettings: React.FC = () => {
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Featured Source</Text>
               <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Using Catalogs</Text>
               {isTV ? (
+                <View style={{ marginBottom: 8 }}>
                 <Focusable
                   onPress={() => navigation.navigate('HeroCatalogs')}
-                  style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
-                  borderRadius={10}
-                  focusScale={1.02}
-                  animateBackground={true}
+                  style={[styles.manageLink, { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                  borderRadius={14}
+                  focusScale={1.0}
+                  animateBackground={false}
                   showFocusBorder={true}
                 >
                   {(focused) => (
                     <>
-                      <Text style={{ color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark), fontWeight: '600' }}>Manage selected catalogs</Text>
-                      <MaterialIcons name="chevron-right" size={20} color={focused ? '#000' : (isDarkMode ? colors.mediumEmphasis : colors.textMutedDark)} />
+                      <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
+                      <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
                     </>
                   )}
                 </Focusable>
+                </View>
               ) : (
                 <TouchableOpacity
                   onPress={() => navigation.navigate('HeroCatalogs')}
@@ -582,23 +586,25 @@ const HomeScreenSettings: React.FC = () => {
         <SettingsCard isDarkMode={isDarkMode} colors={colors}>
           <Text style={[styles.cardHeader, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Posters</Text>
           {isTV ? (
+            <View style={{ marginBottom: 8 }}>
             <Focusable
               onPress={() => handleUpdateSetting('showPosterTitles', !settings.showPosterTitles)}
-              style={styles.settingsRowInline}
-              borderRadius={8}
-              focusScale={1}
-              animateBackground={true}
+              style={[styles.settingsRowInline, { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+              borderRadius={14}
+              focusScale={1.0}
+              animateBackground={false}
               showFocusBorder={true}
             >
               {(focused) => (
                 <>
-                  <Text style={[styles.rowLabel, { color: focused ? '#000' : (isDarkMode ? colors.highEmphasis : colors.textDark) }]}>Show Titles</Text>
-                  <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: focused ? (settings.showPosterTitles ? '#333' : '#666') : (settings.showPosterTitles ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)')), position: 'relative' as const }}>
-                    <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: focused ? '#000' : colors.white, ...(settings.showPosterTitles ? { right: 0 } : { left: 0 }) }} />
+                  <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Show Titles</Text>
+                  <View style={{ width: 51, height: 14, borderRadius: 7, backgroundColor: settings.showPosterTitles ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), position: 'relative' as const }}>
+                    <View style={{ width: 26, height: 26, borderRadius: 13, position: 'absolute' as const, top: -6, backgroundColor: colors.white, ...(settings.showPosterTitles ? { right: 0 } : { left: 0 }) }} />
                   </View>
                 </>
               )}
             </Focusable>
+            </View>
           ) : (
             <View style={styles.settingsRowInline}>
               <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Show Titles</Text>

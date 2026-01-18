@@ -269,7 +269,7 @@ const TVRestoreScreen: React.FC = () => {
                 autoFocus
               >
                 {(focused) => (
-                  <Text style={[styles.cancelButtonText, { color: focused ? '#000' : currentTheme.colors.highEmphasis }]}>
+                  <Text style={[styles.cancelButtonText, { color: currentTheme.colors.highEmphasis }]}>
                     Cancel
                   </Text>
                 )}
@@ -361,7 +361,7 @@ const TVRestoreScreen: React.FC = () => {
                   showFocusBorder={true}
                 >
                   {(focused) => (
-                    <Text style={[styles.actionButtonText, { color: focused ? '#000' : currentTheme.colors.highEmphasis }]}>
+                    <Text style={[styles.actionButtonText, { color: currentTheme.colors.highEmphasis }]}>
                       Cancel
                     </Text>
                   )}
@@ -378,8 +378,8 @@ const TVRestoreScreen: React.FC = () => {
                 >
                   {(focused) => (
                     <View style={styles.buttonContent}>
-                      <MaterialIcons name="restore" size={20} color={focused ? '#000' : '#fff'} />
-                      <Text style={[styles.actionButtonText, styles.primaryButtonText, { color: focused ? '#000' : '#fff' }]}>
+                      <MaterialIcons name="restore" size={20} color="#fff" />
+                      <Text style={[styles.actionButtonText, styles.primaryButtonText, { color: '#fff' }]}>
                         Restore Now
                       </Text>
                     </View>
@@ -424,7 +424,7 @@ const TVRestoreScreen: React.FC = () => {
                 showFocusBorder={true}
               >
                 {(focused) => (
-                  <Text style={[styles.actionButtonText, { color: focused ? '#000' : currentTheme.colors.highEmphasis }]}>
+                  <Text style={[styles.actionButtonText, { color: currentTheme.colors.highEmphasis }]}>
                     Go Back
                   </Text>
                 )}
@@ -440,7 +440,7 @@ const TVRestoreScreen: React.FC = () => {
                 autoFocus
               >
                 {(focused) => (
-                  <Text style={[styles.actionButtonText, { color: focused ? '#000' : '#fff' }]}>
+                  <Text style={[styles.actionButtonText, { color: '#fff' }]}>
                     Try Again
                   </Text>
                 )}

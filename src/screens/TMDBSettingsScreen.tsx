@@ -561,14 +561,14 @@ const TMDBSettingsScreen = () => {
               autoFocus
               borderRadius={8}
               focusScale={1.05}
-              animateBackground={true}
+              animateBackground={false}
               showFocusBorder={true}
               nextFocusDown={enrichToggleRef.current?.getViewRef()}
             >
               {(focused) => (
                 <>
-                  <MaterialIcons name="chevron-left" size={28} color={focused ? '#000' : currentTheme.colors.primary} />
-                  <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.primary }]}>Settings</Text>
+                  <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.primary} />
+                  <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
                 </>
               )}
             </Focusable>
@@ -604,13 +604,14 @@ const TMDBSettingsScreen = () => {
           </Text>
 
           {isTV ? (
+            <View style={{ marginBottom: 8 }}>
             <Focusable
               ref={enrichToggleRef}
               onPress={() => updateSetting('enrichMetadataWithTMDB', !settings.enrichMetadataWithTMDB)}
-              style={styles.settingRow}
-              borderRadius={8}
-              focusScale={1}
-              animateBackground={true}
+              style={[styles.settingRow, { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+              borderRadius={14}
+              focusScale={1.0}
+              animateBackground={false}
               showFocusBorder={true}
               nextFocusUp={backButtonRef.current?.getViewRef()}
               nextFocusDown={settings.enrichMetadataWithTMDB ? localizedToggleRef.current?.getViewRef() : customKeyToggleRef.current?.getViewRef()}
@@ -618,26 +619,27 @@ const TMDBSettingsScreen = () => {
               {(focused) => (
                 <>
                   <View style={styles.settingTextContainer}>
-                    <Text style={[styles.settingTitle, { color: focused ? '#000' : currentTheme.colors.text }]}>Enable Enrichment</Text>
-                    <Text style={[styles.settingDescription, { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }]}>
+                    <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Enable Enrichment</Text>
+                    <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
                       Augments addon metadata with TMDb for cast, certification, logos/posters, and episode fallback.
                     </Text>
                   </View>
                   <View style={styles.tvSwitchContainer}>
                     <View style={[
                       styles.tvSwitchTrack,
-                      { backgroundColor: focused ? (settings.enrichMetadataWithTMDB ? '#333' : '#666') : (settings.enrichMetadataWithTMDB ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                      { backgroundColor: settings.enrichMetadataWithTMDB ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)' }
                     ]}>
                       <View style={[
                         styles.tvSwitchThumb,
                         settings.enrichMetadataWithTMDB ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                        { backgroundColor: focused ? '#000' : (settings.enrichMetadataWithTMDB ? '#fff' : '#888') }
+                        { backgroundColor: settings.enrichMetadataWithTMDB ? '#fff' : '#888' }
                       ]} />
                     </View>
                   </View>
                 </>
               )}
             </Focusable>
+            </View>
           ) : (
             <View style={styles.settingRow}>
               <View style={styles.settingTextContainer}>
@@ -661,13 +663,14 @@ const TMDBSettingsScreen = () => {
               <View style={styles.divider} />
 
               {isTV ? (
+                <View style={{ marginBottom: 8 }}>
                 <Focusable
                   ref={localizedToggleRef}
                   onPress={() => updateSetting('useTmdbLocalizedMetadata', !settings.useTmdbLocalizedMetadata)}
-                  style={styles.settingRow}
-                  borderRadius={8}
-                  focusScale={1}
-                  animateBackground={true}
+                  style={[styles.settingRow, { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                  borderRadius={14}
+                  focusScale={1.0}
+                  animateBackground={false}
                   showFocusBorder={true}
                   nextFocusUp={enrichToggleRef.current?.getViewRef()}
                   nextFocusDown={settings.useTmdbLocalizedMetadata ? languageButtonRef.current?.getViewRef() : customKeyToggleRef.current?.getViewRef()}
@@ -675,26 +678,27 @@ const TMDBSettingsScreen = () => {
                   {(focused) => (
                     <>
                       <View style={styles.settingTextContainer}>
-                        <Text style={[styles.settingTitle, { color: focused ? '#000' : currentTheme.colors.text }]}>Localized Text</Text>
-                        <Text style={[styles.settingDescription, { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }]}>
+                        <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Localized Text</Text>
+                        <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
                           Fetch titles and descriptions in your preferred language from TMDb.
                         </Text>
                       </View>
                       <View style={styles.tvSwitchContainer}>
                         <View style={[
                           styles.tvSwitchTrack,
-                          { backgroundColor: focused ? (settings.useTmdbLocalizedMetadata ? '#333' : '#666') : (settings.useTmdbLocalizedMetadata ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)') }
+                          { backgroundColor: settings.useTmdbLocalizedMetadata ? currentTheme.colors.primary : 'rgba(255,255,255,0.2)' }
                         ]}>
                           <View style={[
                             styles.tvSwitchThumb,
                             settings.useTmdbLocalizedMetadata ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                            { backgroundColor: focused ? '#000' : (settings.useTmdbLocalizedMetadata ? '#fff' : '#888') }
+                            { backgroundColor: settings.useTmdbLocalizedMetadata ? '#fff' : '#888' }
                           ]} />
                         </View>
                       </View>
                     </>
                   )}
                 </Focusable>
+                </View>
               ) : (
                 <View style={styles.settingRow}>
                   <View style={styles.settingTextContainer}>
@@ -725,7 +729,7 @@ const TMDBSettingsScreen = () => {
                         style={styles.settingRow}
                         borderRadius={8}
                         focusScale={1}
-                        animateBackground={true}
+                        animateBackground={false}
                         showFocusBorder={true}
                         nextFocusUp={localizedToggleRef.current?.getViewRef()}
                         nextFocusDown={tvLanguageDropdownOpen
@@ -735,12 +739,12 @@ const TMDBSettingsScreen = () => {
                         {(focused) => (
                           <>
                             <View style={styles.settingTextContainer}>
-                              <Text style={[styles.settingTitle, { color: focused ? '#000' : currentTheme.colors.text }]}>Language</Text>
-                              <Text style={[styles.settingDescription, { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }]}>
+                              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Language</Text>
+                              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
                                 Current: {TV_LANGUAGE_OPTIONS.find(l => l.code === settings.tmdbLanguagePreference)?.label || 'English'}
                               </Text>
                             </View>
-                            <View style={[styles.languageButton, { backgroundColor: focused ? '#333' : currentTheme.colors.primary }]}>
+                            <View style={[styles.languageButton, { backgroundColor: currentTheme.colors.primary }]}>
                               <MaterialIcons
                                 name={tvLanguageDropdownOpen ? 'expand-less' : 'expand-more'}
                                 size={20}
@@ -771,7 +775,7 @@ const TMDBSettingsScreen = () => {
                               ]}
                               borderRadius={8}
                               focusScale={1}
-                              animateBackground={true}
+                              animateBackground={false}
                               showFocusBorder={true}
                               nextFocusUp={index === 0
                                 ? languageButtonRef.current?.getViewRef()
@@ -784,7 +788,7 @@ const TMDBSettingsScreen = () => {
                                 <View style={styles.tvLanguageOptionContent}>
                                   <Text style={[
                                     styles.tvLanguageOptionText,
-                                    { color: focused ? '#000' : currentTheme.colors.text }
+                                    { color: currentTheme.colors.text }
                                   ]}>
                                     {lang.label}
                                   </Text>
@@ -792,7 +796,7 @@ const TMDBSettingsScreen = () => {
                                     <MaterialIcons
                                       name="check"
                                       size={20}
-                                      color={focused ? '#000' : currentTheme.colors.primary}
+                                      color={currentTheme.colors.primary}
                                     />
                                   )}
                                 </View>
@@ -853,7 +857,7 @@ const TMDBSettingsScreen = () => {
                           ]}
                           borderRadius={16}
                           focusScale={1.1}
-                          animateBackground={true}
+                          animateBackground={false}
                           showFocusBorder={true}
                           nextFocusUp={languageButtonRef.current?.getViewRef()}
                           nextFocusDown={customKeyToggleRef.current?.getViewRef()}
@@ -864,7 +868,7 @@ const TMDBSettingsScreen = () => {
                             <Text
                               style={[
                                 styles.showItemText,
-                                { color: focused ? '#000' : currentTheme.colors.mediumEmphasis },
+                                { color: currentTheme.colors.mediumEmphasis },
                                 selectedShow.imdbId === show.imdbId && !focused && [styles.selectedShowItemText, { color: currentTheme.colors.white }]
                               ]}
                             >
@@ -932,7 +936,7 @@ const TMDBSettingsScreen = () => {
               style={styles.settingRow}
               borderRadius={8}
               focusScale={1}
-              animateBackground={true}
+              animateBackground={false}
               showFocusBorder={true}
               nextFocusUp={
                 settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata
@@ -946,8 +950,8 @@ const TMDBSettingsScreen = () => {
               {(focused) => (
                 <>
                   <View style={styles.settingTextContainer}>
-                    <Text style={[styles.settingTitle, { color: focused ? '#000' : currentTheme.colors.text }]}>Custom API Key</Text>
-                    <Text style={[styles.settingDescription, { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }]}>
+                    <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Custom API Key</Text>
+                    <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
                       Use your own TMDb API key for better performance and dedicated rate limits.
                     </Text>
                   </View>
@@ -959,7 +963,7 @@ const TMDBSettingsScreen = () => {
                       <View style={[
                         styles.tvSwitchThumb,
                         useCustomKey ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                        { backgroundColor: focused ? '#000' : (useCustomKey ? '#fff' : '#888') }
+                        { backgroundColor: useCustomKey ? '#fff' : '#888' }
                       ]} />
                     </View>
                   </View>
@@ -1069,7 +1073,7 @@ const TMDBSettingsScreen = () => {
                         nextFocusRight={isKeySet ? clearButtonRef.current?.getViewRef() : undefined}
                       >
                         {(focused) => (
-                          <Text style={[styles.buttonText, { color: focused ? '#000' : currentTheme.colors.white }]}>Save</Text>
+                          <Text style={[styles.buttonText, { color: currentTheme.colors.white }]}>Save</Text>
                         )}
                       </Focusable>
 
@@ -1087,7 +1091,7 @@ const TMDBSettingsScreen = () => {
                           nextFocusLeft={saveButtonRef.current?.getViewRef()}
                         >
                           {(focused) => (
-                            <Text style={[styles.buttonText, { color: focused ? '#000' : currentTheme.colors.error }]}>Clear</Text>
+                            <Text style={[styles.buttonText, { color: currentTheme.colors.error }]}>Clear</Text>
                           )}
                         </Focusable>
                       )}
@@ -1234,8 +1238,8 @@ const TMDBSettingsScreen = () => {
             >
               {(focused) => (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <MaterialIcons name="delete-outline" size={18} color={focused ? '#000' : currentTheme.colors.white} />
-                  <Text style={[styles.buttonText, { color: focused ? '#000' : currentTheme.colors.white, marginLeft: 8 }]}>Clear Cache</Text>
+                  <MaterialIcons name="delete-outline" size={18} color={currentTheme.colors.white} />
+                  <Text style={[styles.buttonText, { color: currentTheme.colors.white, marginLeft: 8 }]}>Clear Cache</Text>
                 </View>
               )}
             </Focusable>

@@ -73,16 +73,18 @@ interface SettingsCardProps {
   children: React.ReactNode;
   title?: string;
   isTablet?: boolean;
+  isTV?: boolean;
 }
 
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet = false }) => {
+const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet = false, isTV = false }) => {
   const { currentTheme } = useTheme();
 
   return (
     <View
       style={[
         styles.cardContainer,
-        isTablet && styles.tabletCardContainer
+        isTablet && styles.tabletCardContainer,
+        isTV && { overflow: 'visible' }
       ]}
     >
       {title && (
@@ -101,7 +103,9 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet =
           borderWidth: 1,
           borderColor: currentTheme.colors.elevation2,
         },
-        isTablet && styles.tabletCard
+        isTablet && styles.tabletCard,
+        // Remove overflow hidden, background, and border on TV - items have their own backgrounds
+        isTV && { overflow: 'visible', padding: 0, backgroundColor: 'transparent', borderWidth: 0 }
       ]}>
         {children}
       </View>
@@ -150,7 +154,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
         {
           backgroundColor: disabled
             ? 'rgba(128, 128, 128, 0.1)'
-            : focused ? 'rgba(0, 0, 0, 0.2)' : currentTheme.colors.primary + '12',
+            : currentTheme.colors.primary + '12',
         },
         isTablet && styles.tabletSettingIconContainer
       ]}>
@@ -160,7 +164,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
           <Feather
             name={icon! as any}
             size={isTablet ? 22 : 18}
-            color={disabled ? '#666666' : (focused ? '#0A0A0A' : currentTheme.colors.primary)}
+            color={disabled ? '#666666' : currentTheme.colors.primary}
           />
         )}
       </View>
@@ -168,7 +172,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
         <View style={styles.settingTextContainer}>
           <Text style={[
             styles.settingTitle,
-            { color: disabled ? '#666666' : (focused ? '#0A0A0A' : currentTheme.colors.highEmphasis) },
+            { color: disabled ? '#666666' : currentTheme.colors.highEmphasis },
             isTablet && styles.tabletSettingTitle
           ]}>
             {title}
@@ -176,7 +180,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
           {displayDescription && (
             <Text style={[
               styles.settingDescription,
-              { color: disabled ? '#555555' : (focused ? '#0A0A0A' : currentTheme.colors.mediumEmphasis) },
+              { color: disabled ? '#555555' : currentTheme.colors.mediumEmphasis },
               isTablet && styles.tabletSettingDescription
             ]} numberOfLines={1}>
               {displayDescription}
@@ -184,8 +188,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
           )}
         </View>
         {badge && (
-          <View style={[styles.badge, { backgroundColor: focused ? 'rgba(0, 0, 0, 0.15)' : `${currentTheme.colors.primary}20` }]}>
-            <Text style={[styles.badgeText, { color: focused ? '#0A0A0A' : currentTheme.colors.primary }]}>{String(badge)}</Text>
+          <View style={[styles.badge, { backgroundColor: `${currentTheme.colors.primary}20` }]}>
+            <Text style={[styles.badgeText, { color: currentTheme.colors.primary }]}>{String(badge)}</Text>
           </View>
         )}
       </View>
@@ -201,34 +205,46 @@ const SettingItem: React.FC<SettingItemProps> = ({
   if (isTV) {
     if (disabled) {
       return (
-        <View
-          style={[
-            styles.settingItem,
-            !isLast ? styles.settingItemBorder : undefined,
-            { borderBottomColor: currentTheme.colors.elevation2, opacity: 0.5 },
-            isTablet ? styles.tabletSettingItem : undefined
-          ]}
-        >
-          {content(false)}
+        <View style={{ marginBottom: 8 }}>
+          <View
+            style={[
+              styles.settingItem,
+              {
+                borderBottomWidth: 0,
+                backgroundColor: currentTheme.colors.elevation1,
+                borderRadius: 14,
+                opacity: 0.5,
+              },
+              isTablet ? styles.tabletSettingItem : undefined
+            ]}
+          >
+            {content(false)}
+          </View>
         </View>
       );
     }
     return (
-      <Focusable
-        onPress={onPress}
-        style={[
-          styles.settingItem,
-          !isLast ? styles.settingItemBorder : undefined,
-          { borderBottomColor: currentTheme.colors.elevation2 },
-          isTablet ? styles.tabletSettingItem : undefined
-        ]}
-        borderRadius={0}
-        focusScale={1.02}
-        animateBackground={true}
-        showFocusBorder={true}
-      >
-        {(focused) => content(focused)}
-      </Focusable>
+      <View style={{ marginBottom: 8 }}>
+        <Focusable
+          onPress={onPress}
+          style={[
+            styles.settingItem,
+            // Each item has its own background and rounded corners on TV
+            {
+              borderBottomWidth: 0,
+              backgroundColor: currentTheme.colors.elevation1,
+              borderRadius: 14,
+            },
+            isTablet ? styles.tabletSettingItem : undefined,
+          ]}
+          borderRadius={14}
+          focusScale={1.0}
+          animateBackground={false}
+          showFocusBorder={true}
+        >
+          {(focused) => content(focused)}
+        </Focusable>
+      </View>
     );
   }
 
@@ -267,33 +283,27 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
         <View style={[
           styles.sidebarItemIconContainer,
           {
-            backgroundColor: focused
-              ? 'rgba(0, 0, 0, 0.2)'
-              : isActive
-                ? currentTheme.colors.primary + '15'
-                : 'transparent',
+            backgroundColor: isActive
+              ? currentTheme.colors.primary + '15'
+              : 'transparent',
           }
         ]}>
           <Feather
             name={category.icon as any}
             size={20}
             color={
-              focused
-                ? '#0A0A0A'
-                : isActive
-                  ? currentTheme.colors.primary
-                  : currentTheme.colors.mediumEmphasis
+              isActive
+                ? currentTheme.colors.primary
+                : currentTheme.colors.mediumEmphasis
             }
           />
         </View>
         <Text style={[
           styles.sidebarItemText,
           {
-            color: focused
-              ? '#0A0A0A'
-              : isActive
-                ? currentTheme.colors.highEmphasis
-                : currentTheme.colors.mediumEmphasis,
+            color: isActive
+              ? currentTheme.colors.highEmphasis
+              : currentTheme.colors.mediumEmphasis,
             fontWeight: isActive ? '600' : '500',
           }
         ]}>
@@ -336,7 +346,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
               ]}
               borderRadius={10}
               focusScale={1.03}
-              animateBackground={true}
+              animateBackground={false}
+              showFocusBorder={true}
               autoFocus={index === 0}
               nextFocusLeftId={menuNodeHandle ?? undefined}
             >
@@ -607,7 +618,7 @@ const SettingsScreen: React.FC = () => {
     <Feather
       name="chevron-right"
       size={isTablet ? 24 : 20}
-      color={focused ? '#0A0A0A' : currentTheme.colors.mediumEmphasis}
+      color={currentTheme.colors.mediumEmphasis}
     />
   );
 
@@ -625,7 +636,7 @@ const SettingsScreen: React.FC = () => {
     switch (categoryId) {
       case 'account':
         return (
-          <SettingsCard title="ACCOUNT" isTablet={isTablet}>
+          <SettingsCard title="ACCOUNT" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="Trakt"
               description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
@@ -641,7 +652,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'content':
         return (
-          <SettingsCard title="CONTENT & DISCOVERY" isTablet={isTablet}>
+          <SettingsCard title="CONTENT & DISCOVERY" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="Addons"
               description={`${addonCount} installed`}
@@ -702,7 +713,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'appearance':
         return (
-          <SettingsCard title="APPEARANCE" isTablet={isTablet}>
+          <SettingsCard title="APPEARANCE" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="Theme"
               description={currentTheme.name}
@@ -750,7 +761,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'integrations':
         return (
-          <SettingsCard title="INTEGRATIONS" isTablet={isTablet}>
+          <SettingsCard title="INTEGRATIONS" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="MDBList"
               description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
@@ -775,7 +786,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'ai':
         return (
-          <SettingsCard title="AI ASSISTANT" isTablet={isTablet}>
+          <SettingsCard title="AI ASSISTANT" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="OpenRouter API"
               description={openRouterKeySet ? "Connected" : "Add your API key to enable AI chat"}
@@ -791,7 +802,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'playback':
         return (
-          <SettingsCard title="PLAYBACK" isTablet={isTablet}>
+          <SettingsCard title="PLAYBACK" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="Video Player"
               description={Platform.OS === 'ios'
@@ -814,12 +825,12 @@ const SettingsScreen: React.FC = () => {
                   <View style={styles.tvSwitchContainer}>
                     <View style={[
                       styles.tvSwitchTrack,
-                      { backgroundColor: focused ? ((settings?.showTrailers ?? true) ? '#333' : '#666') : ((settings?.showTrailers ?? true) ? currentTheme.colors.primary : currentTheme.colors.elevation2) }
+                      { backgroundColor: (settings?.showTrailers ?? true) ? currentTheme.colors.primary : currentTheme.colors.elevation2 }
                     ]}>
                       <View style={[
                         styles.tvSwitchThumb,
                         (settings?.showTrailers ?? true) ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                        { backgroundColor: focused ? '#000' : ((settings?.showTrailers ?? true) ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis) }
+                        { backgroundColor: (settings?.showTrailers ?? true) ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis }
                       ]} />
                     </View>
                   </View>
@@ -869,7 +880,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'about':
         return (
-          <SettingsCard title="ABOUT" isTablet={isTablet}>
+          <SettingsCard title="ABOUT" isTablet={isTablet} isTV={isTVDevice}>
             {isTVDevice ? (
               <View style={styles.tvQrContainer}>
                 <View style={styles.tvQrItem}>
@@ -954,7 +965,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'developer':
         return __DEV__ ? (
-          <SettingsCard title="DEVELOPER" isTablet={isTablet}>
+          <SettingsCard title="DEVELOPER" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="Test Onboarding"
               icon="play-circle"
@@ -1069,7 +1080,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'cache':
         return mdblistKeySet ? (
-          <SettingsCard title="CACHE MANAGEMENT" isTablet={isTablet}>
+          <SettingsCard title="CACHE MANAGEMENT" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="Clear MDBList Cache"
               icon="database"
@@ -1083,7 +1094,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'backup':
         return (
-          <SettingsCard title="BACKUP & RESTORE" isTablet={isTablet}>
+          <SettingsCard title="BACKUP & RESTORE" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title={isTVDevice ? "Restore from Backup" : "Backup & Restore"}
               description={isTVDevice ? "Upload backup file from phone to restore" : "Create and restore app backups"}
@@ -1099,7 +1110,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'updates':
         return (
-          <SettingsCard title="UPDATES" isTablet={isTablet}>
+          <SettingsCard title="UPDATES" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="App Updates"
               description="Check for updates and manage app version"
@@ -1122,7 +1133,7 @@ const SettingsScreen: React.FC = () => {
 
       case 'debug':
         return (
-          <SettingsCard title="DEBUG" isTablet={isTablet}>
+          <SettingsCard title="DEBUG" isTablet={isTablet} isTV={isTVDevice}>
             <SettingItem
               title="Debug Logging"
               description={settings.enableDebugLogging ? "Enabled - collecting logs" : "Disabled"}

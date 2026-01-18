@@ -54,14 +54,14 @@ const SettingItem: React.FC<SettingItemProps> = ({
         <MaterialIcons
           name={icon}
           size={20}
-          color={focused ? '#000' : currentTheme.colors.primary}
+          color={currentTheme.colors.primary}
         />
       </View>
       <View style={styles.settingText}>
         <Text
           style={[
             styles.settingTitle,
-            { color: focused ? '#000' : currentTheme.colors.text },
+            { color: currentTheme.colors.text },
           ]}
         >
           {title}
@@ -70,7 +70,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
           <Text
             style={[
               styles.settingDescription,
-              { color: focused ? '#333' : currentTheme.colors.textMuted },
+              { color: currentTheme.colors.textMuted },
             ]}
           >
             {description}
@@ -81,7 +81,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
         <MaterialIcons
           name="check"
           size={24}
-          color={focused ? '#000' : currentTheme.colors.primary}
+          color={currentTheme.colors.primary}
           style={styles.checkIcon}
         />
       )}
@@ -90,21 +90,26 @@ const SettingItem: React.FC<SettingItemProps> = ({
 
   if (isTV) {
     return (
-      <Focusable
-        onPress={onPress}
-        autoFocus={autoFocus}
-        style={[
-          styles.settingItem,
-          !isLast && styles.settingItemBorder,
-          { borderBottomColor: 'rgba(255,255,255,0.08)' },
-        ]}
-        borderRadius={0}
-        focusScale={1.02}
-        animateBackground={true}
-        showFocusBorder={true}
-      >
-        {(focused) => content(focused)}
-      </Focusable>
+      <View style={{ marginBottom: 8 }}>
+        <Focusable
+          onPress={onPress}
+          autoFocus={autoFocus}
+          style={[
+            styles.settingItem,
+            {
+              borderBottomWidth: 0,
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              borderRadius: 14,
+            },
+          ]}
+          borderRadius={14}
+          focusScale={1.0}
+          animateBackground={false}
+          showFocusBorder={true}
+        >
+          {(focused) => content(focused)}
+        </Focusable>
+      </View>
     );
   }
 
@@ -442,7 +447,7 @@ const PlayerSettingsScreen: React.FC = () => {
             autoFocus
             borderRadius={8}
             focusScale={1.05}
-            animateBackground={true}
+            animateBackground={false}
             showFocusBorder={true}
           >
             {(focused) => (
@@ -450,9 +455,9 @@ const PlayerSettingsScreen: React.FC = () => {
                 <MaterialIcons
                   name="arrow-back"
                   size={24}
-                  color={focused ? '#000' : currentTheme.colors.text}
+                  color={currentTheme.colors.text}
                 />
-                <Text style={[styles.backText, { color: focused ? '#000' : currentTheme.colors.text }]}>
+                <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
                   Settings
                 </Text>
               </>
@@ -503,6 +508,7 @@ const PlayerSettingsScreen: React.FC = () => {
               {
                 backgroundColor: currentTheme.colors.elevation2,
               },
+              isTV && { overflow: 'visible', backgroundColor: 'transparent', borderWidth: 0 },
             ]}
           >
             {playerOptions.map((option, index) => (
@@ -546,15 +552,17 @@ const PlayerSettingsScreen: React.FC = () => {
               {
                 backgroundColor: currentTheme.colors.elevation2,
               },
+              isTV && { overflow: 'visible', backgroundColor: 'transparent', borderWidth: 0 },
             ]}
           >
             {isTV ? (
+              <View style={{ marginBottom: 8 }}>
               <Focusable
                 onPress={() => updateSetting('autoplayBestStream', !settings.autoplayBestStream)}
-                style={styles.settingItem}
-                borderRadius={0}
-                focusScale={1}
-                animateBackground={true}
+                style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                borderRadius={14}
+                focusScale={1.0}
+                animateBackground={false}
                 showFocusBorder={true}
               >
                 {(focused) => (
@@ -566,14 +574,14 @@ const PlayerSettingsScreen: React.FC = () => {
                       <MaterialIcons
                         name="play-arrow"
                         size={20}
-                        color={focused ? '#000' : currentTheme.colors.primary}
+                        color={currentTheme.colors.primary}
                       />
                     </View>
                     <View style={styles.settingText}>
                       <Text
                         style={[
                           styles.settingTitle,
-                          { color: focused ? '#000' : currentTheme.colors.text },
+                          { color: currentTheme.colors.text },
                         ]}
                       >
                         Auto-play Best Stream
@@ -581,7 +589,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                          { color: currentTheme.colors.textMuted },
                         ]}
                       >
                         Automatically start the highest quality stream available.
@@ -595,13 +603,14 @@ const PlayerSettingsScreen: React.FC = () => {
                         <View style={[
                           styles.tvSwitchThumb,
                           settings.autoplayBestStream ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                          { backgroundColor: focused ? '#000' : (settings.autoplayBestStream ? '#fff' : '#888') }
+                          { backgroundColor: settings.autoplayBestStream ? '#fff' : '#888' }
                         ]} />
                       </View>
                     </View>
                   </View>
                 )}
               </Focusable>
+              </View>
             ) : (
               <View style={styles.settingItem}>
                 <View style={styles.settingContent}>
@@ -643,12 +652,13 @@ const PlayerSettingsScreen: React.FC = () => {
             )}
 
             {isTV ? (
+              <View style={{ marginBottom: 8 }}>
               <Focusable
                 onPress={() => updateSetting('alwaysResume', !settings.alwaysResume)}
-                style={styles.settingItem}
-                borderRadius={0}
-                focusScale={1}
-                animateBackground={true}
+                style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                borderRadius={14}
+                focusScale={1.0}
+                animateBackground={false}
                 showFocusBorder={true}
               >
                 {(focused) => (
@@ -660,14 +670,14 @@ const PlayerSettingsScreen: React.FC = () => {
                       <MaterialIcons
                         name="restore"
                         size={20}
-                        color={focused ? '#000' : currentTheme.colors.primary}
+                        color={currentTheme.colors.primary}
                       />
                     </View>
                     <View style={styles.settingText}>
                       <Text
                         style={[
                           styles.settingTitle,
-                          { color: focused ? '#000' : currentTheme.colors.text },
+                          { color: currentTheme.colors.text },
                         ]}
                       >
                         Always Resume
@@ -675,7 +685,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                          { color: currentTheme.colors.textMuted },
                         ]}
                       >
                         Skip the resume prompt and automatically continue where you left off (if less than 85% watched).
@@ -689,13 +699,14 @@ const PlayerSettingsScreen: React.FC = () => {
                         <View style={[
                           styles.tvSwitchThumb,
                           settings.alwaysResume ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                          { backgroundColor: focused ? '#000' : (settings.alwaysResume ? '#fff' : '#888') }
+                          { backgroundColor: settings.alwaysResume ? '#fff' : '#888' }
                         ]} />
                       </View>
                     </View>
                   </View>
                 )}
               </Focusable>
+              </View>
             ) : (
               <View style={styles.settingItem}>
                 <View style={styles.settingContent}>
@@ -785,12 +796,13 @@ const PlayerSettingsScreen: React.FC = () => {
 
             {/* Audio Passthrough for Android TV - TV only */}
             {Platform.OS === 'android' && isTV && (
+              <View style={{ marginBottom: 8 }}>
               <Focusable
                 onPress={() => updateSetting('enableAudioPassthrough', !settings.enableAudioPassthrough)}
-                style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}
-                borderRadius={0}
-                focusScale={1}
-                animateBackground={true}
+                style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                borderRadius={14}
+                focusScale={1.0}
+                animateBackground={false}
                 showFocusBorder={true}
               >
                 {(focused) => (
@@ -802,14 +814,14 @@ const PlayerSettingsScreen: React.FC = () => {
                       <MaterialIcons
                         name="surround-sound"
                         size={20}
-                        color={focused ? '#000' : currentTheme.colors.primary}
+                        color={currentTheme.colors.primary}
                       />
                     </View>
                     <View style={styles.settingText}>
                       <Text
                         style={[
                           styles.settingTitle,
-                          { color: focused ? '#000' : currentTheme.colors.text },
+                          { color: currentTheme.colors.text },
                         ]}
                       >
                         Audio Passthrough
@@ -817,7 +829,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                          { color: currentTheme.colors.textMuted },
                         ]}
                       >
                         Send AC3/EAC3/DTS audio directly to your receiver via HDMI. Requires compatible AVR.
@@ -831,13 +843,14 @@ const PlayerSettingsScreen: React.FC = () => {
                         <View style={[
                           styles.tvSwitchThumb,
                           settings.enableAudioPassthrough ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                          { backgroundColor: focused ? '#000' : (settings.enableAudioPassthrough ? '#fff' : '#888') }
+                          { backgroundColor: settings.enableAudioPassthrough ? '#fff' : '#888' }
                         ]} />
                       </View>
                     </View>
                   </View>
                 )}
               </Focusable>
+              </View>
             )}
 
             {/* External Player for Downloads - hide on TV */}
@@ -900,16 +913,18 @@ const PlayerSettingsScreen: React.FC = () => {
               {
                 backgroundColor: currentTheme.colors.elevation2,
               },
+              isTV && { overflow: 'visible', backgroundColor: 'transparent', borderWidth: 0 },
             ]}
           >
             {/* Default Audio Language */}
             {isTV ? (
+              <View style={{ marginBottom: 8 }}>
               <Focusable
                 onPress={() => openLanguagePicker('audio')}
-                style={[styles.settingItem, styles.settingItemBorder, { borderBottomColor: 'rgba(255,255,255,0.08)' }]}
-                borderRadius={0}
-                focusScale={1.02}
-                animateBackground={true}
+                style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                borderRadius={14}
+                focusScale={1.0}
+                animateBackground={false}
                 showFocusBorder={true}
               >
                 {(focused) => (
@@ -921,14 +936,14 @@ const PlayerSettingsScreen: React.FC = () => {
                       <MaterialIcons
                         name="audiotrack"
                         size={20}
-                        color={focused ? '#000' : currentTheme.colors.primary}
+                        color={currentTheme.colors.primary}
                       />
                     </View>
                     <View style={styles.settingText}>
                       <Text
                         style={[
                           styles.settingTitle,
-                          { color: focused ? '#000' : currentTheme.colors.text },
+                          { color: currentTheme.colors.text },
                         ]}
                       >
                         Default Audio Language
@@ -936,7 +951,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                          { color: currentTheme.colors.textMuted },
                         ]}
                       >
                         {getLanguageDisplayName(settings.defaultAudioLanguage, 'audio')}
@@ -945,11 +960,12 @@ const PlayerSettingsScreen: React.FC = () => {
                     <MaterialIcons
                       name="chevron-right"
                       size={24}
-                      color={focused ? '#000' : currentTheme.colors.textMuted}
+                      color={currentTheme.colors.textMuted}
                     />
                   </View>
                 )}
               </Focusable>
+              </View>
             ) : (
               <TouchableOpacity
                 onPress={() => openLanguagePicker('audio')}
@@ -996,12 +1012,13 @@ const PlayerSettingsScreen: React.FC = () => {
 
             {/* Default Subtitle Language */}
             {isTV ? (
+              <View style={{ marginBottom: 8 }}>
               <Focusable
                 onPress={() => openLanguagePicker('subtitle')}
-                style={styles.settingItem}
-                borderRadius={0}
-                focusScale={1.02}
-                animateBackground={true}
+                style={[styles.settingItem, { borderBottomWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14 }]}
+                borderRadius={14}
+                focusScale={1.0}
+                animateBackground={false}
                 showFocusBorder={true}
               >
                 {(focused) => (
@@ -1013,14 +1030,14 @@ const PlayerSettingsScreen: React.FC = () => {
                       <MaterialIcons
                         name="subtitles"
                         size={20}
-                        color={focused ? '#000' : currentTheme.colors.primary}
+                        color={currentTheme.colors.primary}
                       />
                     </View>
                     <View style={styles.settingText}>
                       <Text
                         style={[
                           styles.settingTitle,
-                          { color: focused ? '#000' : currentTheme.colors.text },
+                          { color: currentTheme.colors.text },
                         ]}
                       >
                         Default Subtitle Language
@@ -1028,7 +1045,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       <Text
                         style={[
                           styles.settingDescription,
-                          { color: focused ? '#333' : currentTheme.colors.textMuted },
+                          { color: currentTheme.colors.textMuted },
                         ]}
                       >
                         {getLanguageDisplayName(settings.defaultSubtitleLanguage, 'subtitle')}
@@ -1037,11 +1054,12 @@ const PlayerSettingsScreen: React.FC = () => {
                     <MaterialIcons
                       name="chevron-right"
                       size={24}
-                      color={focused ? '#000' : currentTheme.colors.textMuted}
+                      color={currentTheme.colors.textMuted}
                     />
                   </View>
                 )}
               </Focusable>
+              </View>
             ) : (
               <TouchableOpacity
                 onPress={() => openLanguagePicker('subtitle')}
@@ -1125,14 +1143,14 @@ const PlayerSettingsScreen: React.FC = () => {
                       ]}
                       borderRadius={8}
                       focusScale={1.02}
-                      animateBackground={true}
+                      animateBackground={false}
                       showFocusBorder={true}
                     >
                       {(focused) => (
                         <>
                           <Text style={[
                             styles.languageText,
-                            { color: focused ? '#000' : currentTheme.colors.text }
+                            { color: currentTheme.colors.text }
                           ]}>
                             {item.name}
                           </Text>
@@ -1140,7 +1158,7 @@ const PlayerSettingsScreen: React.FC = () => {
                             <MaterialIcons
                               name="check"
                               size={20}
-                              color={focused ? '#000' : currentTheme.colors.primary}
+                              color={currentTheme.colors.primary}
                             />
                           )}
                         </>

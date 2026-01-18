@@ -512,18 +512,18 @@ const UpdateScreen: React.FC = () => {
               <View style={[
                 styles.backButton,
                 {
-                  backgroundColor: focused ? '#fff' : 'transparent',
+                  backgroundColor: 'transparent',
                   borderRadius: 8,
                 }
               ]}>
                 <MaterialIcons
                   name="arrow-back"
                   size={24}
-                  color={focused ? '#000' : currentTheme.colors.highEmphasis}
+                  color={currentTheme.colors.highEmphasis}
                 />
                 <Text style={[
                   styles.backText,
-                  { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                  { color: currentTheme.colors.highEmphasis }
                 ]}>
                   Settings
                 </Text>
@@ -627,14 +627,11 @@ const UpdateScreen: React.FC = () => {
                     {(focused) => (
                       <>
                         {isChecking ? (
-                          <MaterialIcons name="refresh" size={18} color={focused ? '#000' : 'white'} />
+                          <MaterialIcons name="refresh" size={18} color="white" />
                         ) : (
-                          <MaterialIcons name="system-update" size={18} color={focused ? '#000' : 'white'} />
+                          <MaterialIcons name="system-update" size={18} color="white" />
                         )}
-                        <Text style={[
-                          styles.modernButtonText,
-                          focused && { color: '#000' }
-                        ]}>
+                        <Text style={styles.modernButtonText}>
                           {isChecking ? 'Checking...' : 'Check for Updates'}
                         </Text>
                       </>
@@ -684,14 +681,11 @@ const UpdateScreen: React.FC = () => {
                       {(focused) => (
                         <>
                           {isInstalling ? (
-                            <MaterialIcons name="install-mobile" size={18} color={focused ? '#000' : 'white'} />
+                            <MaterialIcons name="install-mobile" size={18} color="white" />
                           ) : (
-                            <MaterialIcons name="download" size={18} color={focused ? '#000' : 'white'} />
+                            <MaterialIcons name="download" size={18} color="white" />
                           )}
-                          <Text style={[
-                            styles.modernButtonText,
-                            focused && { color: '#000' }
-                          ]}>
+                          <Text style={styles.modernButtonText}>
                             {isInstalling ? 'Installing...' : 'Install Update'}
                           </Text>
                         </>
@@ -1059,37 +1053,28 @@ const UpdateScreen: React.FC = () => {
               <Focusable
                 ref={majorToggleRef}
                 onPress={() => handleMajorAlertsToggle(!majorAlertsEnabled)}
-                style={{ marginHorizontal: 4 }}
+                style={[styles.settingRow, { marginHorizontal: 4, borderBottomWidth: 0 }]}
                 borderRadius={8}
                 focusScale={1}
                 animateBackground={false}
-                showFocusBorder={false}
+                showFocusBorder={true}
                 nextFocusUp={checkUpdatesRef.current?.getViewRef()}
                 nextFocusDown={releaseSourceTapframeRef.current?.getViewRef()}
               >
                 {(focused) => (
-                  <View style={[
-                    styles.settingRow,
-                    {
-                      borderBottomWidth: 0,
-                      borderRadius: 8,
-                      backgroundColor: focused ? '#fff' : 'transparent',
-                      borderWidth: 2,
-                      borderColor: focused ? '#fff' : 'transparent',
-                    }
-                  ]}>
+                  <>
                     <View style={styles.settingInfo}>
                       <Text style={[
                         styles.settingLabel,
                         styles.tvSettingLabel,
-                        { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                        { color: currentTheme.colors.highEmphasis }
                       ]}>
                         Update Notifications
                       </Text>
                       <Text style={[
                         styles.settingDescription,
                         styles.tvSettingDescription,
-                        { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                        { color: currentTheme.colors.mediumEmphasis }
                       ]}>
                         Show popup when a new version is available
                       </Text>
@@ -1097,16 +1082,16 @@ const UpdateScreen: React.FC = () => {
                     <View style={styles.tvSwitchContainer}>
                       <View style={[
                         styles.tvSwitchTrack,
-                        { backgroundColor: focused ? (majorAlertsEnabled ? '#333' : '#666') : (majorAlertsEnabled ? currentTheme.colors.primary : '#505050') }
+                        { backgroundColor: majorAlertsEnabled ? currentTheme.colors.primary : '#505050' }
                       ]}>
                         <View style={[
                           styles.tvSwitchThumb,
                           majorAlertsEnabled ? styles.tvSwitchThumbOn : styles.tvSwitchThumbOff,
-                          { backgroundColor: focused ? '#000' : '#fff' }
+                          { backgroundColor: '#fff' }
                         ]} />
                       </View>
                     </View>
-                  </View>
+                  </>
                 )}
               </Focusable>
             ) : (
@@ -1158,34 +1143,26 @@ const UpdateScreen: React.FC = () => {
               <Focusable
                 ref={releaseSourceTapframeRef}
                 onPress={() => handleReleaseSourceChange('tapframe')}
-                style={{ marginHorizontal: 4 }}
+                style={[styles.settingRow, { marginHorizontal: 4 }]}
                 borderRadius={8}
                 focusScale={1}
                 animateBackground={false}
-                showFocusBorder={false}
+                showFocusBorder={true}
                 nextFocusUp={majorToggleRef.current?.getViewRef()}
                 nextFocusDown={releaseSourceCrisszolloRef.current?.getViewRef()}
               >
                 {(focused) => (
-                  <View style={[
-                    styles.settingRow,
-                    {
-                      borderRadius: 8,
-                      backgroundColor: focused ? '#fff' : 'transparent',
-                      borderWidth: 2,
-                      borderColor: focused ? '#fff' : 'transparent',
-                    }
-                  ]}>
+                  <>
                     <View style={styles.settingInfo}>
                       <Text style={[
                         styles.settingLabel,
-                        { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                        { color: currentTheme.colors.highEmphasis }
                       ]}>
                         {GITHUB_RELEASE_SOURCES.tapframe.label}
                       </Text>
                       <Text style={[
                         styles.settingDescription,
-                        { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                        { color: currentTheme.colors.mediumEmphasis }
                       ]}>
                         Main repository for mobile devices
                       </Text>
@@ -1193,17 +1170,17 @@ const UpdateScreen: React.FC = () => {
                     <View style={styles.radioContainer}>
                       <View style={[
                         styles.radioOuter,
-                        { borderColor: focused ? '#000' : (releaseSource === 'tapframe' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis) }
+                        { borderColor: releaseSource === 'tapframe' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis }
                       ]}>
                         {releaseSource === 'tapframe' && (
                           <View style={[
                             styles.radioInner,
-                            { backgroundColor: focused ? '#000' : currentTheme.colors.primary }
+                            { backgroundColor: currentTheme.colors.primary }
                           ]} />
                         )}
                       </View>
                     </View>
-                  </View>
+                  </>
                 )}
               </Focusable>
             ) : (
@@ -1238,34 +1215,25 @@ const UpdateScreen: React.FC = () => {
               <Focusable
                 ref={releaseSourceCrisszolloRef}
                 onPress={() => handleReleaseSourceChange('crisszollo')}
-                style={{ marginHorizontal: 4 }}
+                style={[styles.settingRow, { marginHorizontal: 4, borderBottomWidth: 0 }]}
                 borderRadius={8}
                 focusScale={1}
                 animateBackground={false}
-                showFocusBorder={false}
+                showFocusBorder={true}
                 nextFocusUp={releaseSourceTapframeRef.current?.getViewRef()}
               >
                 {(focused) => (
-                  <View style={[
-                    styles.settingRow,
-                    {
-                      borderBottomWidth: 0,
-                      borderRadius: 8,
-                      backgroundColor: focused ? '#fff' : 'transparent',
-                      borderWidth: 2,
-                      borderColor: focused ? '#fff' : 'transparent',
-                    }
-                  ]}>
+                  <>
                     <View style={styles.settingInfo}>
                       <Text style={[
                         styles.settingLabel,
-                        { color: focused ? '#000' : currentTheme.colors.highEmphasis }
+                        { color: currentTheme.colors.highEmphasis }
                       ]}>
                         {GITHUB_RELEASE_SOURCES.crisszollo.label}
                       </Text>
                       <Text style={[
                         styles.settingDescription,
-                        { color: focused ? '#333' : currentTheme.colors.mediumEmphasis }
+                        { color: currentTheme.colors.mediumEmphasis }
                       ]}>
                         Optimized for Android TV devices
                       </Text>
@@ -1273,17 +1241,17 @@ const UpdateScreen: React.FC = () => {
                     <View style={styles.radioContainer}>
                       <View style={[
                         styles.radioOuter,
-                        { borderColor: focused ? '#000' : (releaseSource === 'crisszollo' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis) }
+                        { borderColor: releaseSource === 'crisszollo' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis }
                       ]}>
                         {releaseSource === 'crisszollo' && (
                           <View style={[
                             styles.radioInner,
-                            { backgroundColor: focused ? '#000' : currentTheme.colors.primary }
+                            { backgroundColor: currentTheme.colors.primary }
                           ]} />
                         )}
                       </View>
                     </View>
-                  </View>
+                  </>
                 )}
               </Focusable>
             ) : (
