@@ -2,12 +2,34 @@
  * Shared Player Modals Hook
  * Used by both Android (VLC) and iOS (KSPlayer) players
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Episode } from '../../../types/metadata';
 
+// Debug logging for modal state changes
+const DEBUG_MODALS = false; // Disabled after debugging
+
 export const usePlayerModals = () => {
-    const [showAudioModal, setShowAudioModal] = useState(false);
-    const [showSubtitleModal, setShowSubtitleModal] = useState(false);
+    const [showAudioModal, _setShowAudioModal] = useState(false);
+    const [showSubtitleModal, _setShowSubtitleModal] = useState(false);
+
+    // Wrapped setters with logging
+    const setShowAudioModal = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+        if (DEBUG_MODALS) {
+            const newValue = typeof value === 'function' ? 'function' : value;
+            console.log(`[usePlayerModals] setShowAudioModal called with: ${newValue}`);
+            console.log(`[usePlayerModals] Stack trace:`, new Error().stack);
+        }
+        _setShowAudioModal(value);
+    }, []);
+
+    const setShowSubtitleModal = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+        if (DEBUG_MODALS) {
+            const newValue = typeof value === 'function' ? 'function' : value;
+            console.log(`[usePlayerModals] setShowSubtitleModal called with: ${newValue}`);
+            console.log(`[usePlayerModals] Stack trace:`, new Error().stack);
+        }
+        _setShowSubtitleModal(value);
+    }, []);
     const [showSpeedModal, setShowSpeedModal] = useState(false);
     const [showSourcesModal, setShowSourcesModal] = useState(false);
     const [showEpisodesModal, setShowEpisodesModal] = useState(false);

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, memo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Platform, useWindowDimensions, StyleSheet, BackHandler, findNodeHandle } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
@@ -13,6 +13,11 @@ import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
 import { getTrackDisplayName, formatLanguage } from '../utils/playerUtils';
 import { useIsTV } from '../../../contexts/TVContext';
 import { Focusable } from '../../tv/Focusable';
+import { perfMonitor, PERF_MONITOR_ENABLED } from '../../../utils/performanceMonitor';
+
+// Debug logging for performance analysis
+const DEBUG_SUBTITLE_MODAL = false; // Disabled after debugging
+let subtitleModalRenderCount = 0;
 
 interface SubtitleModalsProps {
   showSubtitleModal: boolean;
@@ -127,6 +132,12 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier, subtitleOffsetSec, setSubtitleOffsetSec,
   onModalClosed,
 }) => {
+  const renderStartTime = PERF_MONITOR_ENABLED ? performance.now() : 0;
+  subtitleModalRenderCount++;
+  if (DEBUG_SUBTITLE_MODAL) {
+    console.log(`[SubtitleModal] RENDER START #${subtitleModalRenderCount} showSubtitleModal=${showSubtitleModal}`);
+  }
+
   const { width, height } = useWindowDimensions();
   const isTVDevice = useIsTV();
   const isIos = Platform.OS === 'ios';
@@ -178,7 +189,17 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
     return () => backHandler.remove();
   }, [showSubtitleModal, setShowSubtitleModal, isTVDevice, onModalClosed]);
 
-  if (!showSubtitleModal) return null;
+  if (!showSubtitleModal) {
+    if (PERF_MONITOR_ENABLED) {
+      perfMonitor.recordRender('SubtitleModals(hidden)', performance.now() - renderStartTime);
+    }
+    return null;
+  }
+
+  if (PERF_MONITOR_ENABLED) {
+    const renderTime = performance.now() - renderStartTime;
+    perfMonitor.recordRender('SubtitleModals(visible)', renderTime);
+  }
 
   return (
     <View style={StyleSheet.absoluteFill} zIndex={9999}>
@@ -336,6 +357,9 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       const isSelected = selectedOnlineSubtitleId === sub.id;
                       const isLast = index === availableSubtitles.length - 1;
                       const handleSelect = () => { setSelectedOnlineSubtitleId(sub.id); loadWyzieSubtitle(sub); };
+                      // Detect hearing impaired/SDH from display text
+                      const isHearingImpaired = /\b(hi|hearing.?impaired|sdh|cc)\b/i.test(sub.display) || /\b(hi|hearing.?impaired|sdh|cc)\b/i.test((sub as any).source || '');
+                      const sourceName = (sub as any).source || (sub as any).media || 'External';
 
                       if (isTVDevice) {
                         return (
@@ -352,9 +376,21 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           >
                             {(focused) => (
                               <>
-                                <View>
-                                  <Text style={{ marginLeft: 5, color: (isSelected || focused) ? 'black' : 'white', fontWeight: '600', fontSize: 16 }}>{sub.display}</Text>
-                                  <Text style={{ marginLeft: 5, color: (isSelected || focused) ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 12, paddingBottom: 3 }}>{formatLanguage(sub.language)}</Text>
+                                <View style={{ flex: 1 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Text style={{ marginLeft: 5, color: (isSelected || focused) ? 'black' : 'white', fontWeight: '600', fontSize: 16 }}>
+                                      {formatLanguage(sub.language) || sub.display}
+                                    </Text>
+                                    <View style={{ backgroundColor: (isSelected || focused) ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <Text style={{ color: (isSelected || focused) ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' }}>External</Text>
+                                    </View>
+                                    {isHearingImpaired && (
+                                      <View style={{ backgroundColor: (isSelected || focused) ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                        <Text style={{ color: (isSelected || focused) ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' }}>HI</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                  <Text style={{ marginLeft: 5, color: (isSelected || focused) ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 12, paddingBottom: 3 }}>{sourceName}</Text>
                                 </View>
                                 {isSelected && <MaterialIcons name="check" size={18} color="black" />}
                               </>
@@ -369,9 +405,21 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           onPress={handleSelect}
                           style={{ padding: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                         >
-                          <View>
-                            <Text style={{ marginLeft: 5, color: isSelected ? 'black' : 'white', fontWeight: '600' }}>{sub.display}</Text>
-                            <Text style={{ marginLeft: 5, color: isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 11, paddingBottom: 3 }}>{formatLanguage(sub.language)}</Text>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={{ marginLeft: 5, color: isSelected ? 'black' : 'white', fontWeight: '600' }}>
+                                {formatLanguage(sub.language) || sub.display}
+                              </Text>
+                              <View style={{ backgroundColor: isSelected ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>
+                                <Text style={{ color: isSelected ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: '600' }}>External</Text>
+                              </View>
+                              {isHearingImpaired && (
+                                <View style={{ backgroundColor: isSelected ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>
+                                  <Text style={{ color: isSelected ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: '600' }}>HI</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={{ marginLeft: 5, color: isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 11, paddingBottom: 3 }}>{sourceName}</Text>
                           </View>
                           {isSelected && <MaterialIcons name="check" size={18} color="black" />}
                         </TouchableOpacity>
@@ -1009,4 +1057,20 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   );
 };
 
-export default SubtitleModals;
+// Memoize to prevent re-renders when parent re-renders but props haven't changed
+// This is critical for performance - the modal was re-rendering on every currentTime update
+export default memo(SubtitleModals, (prevProps, nextProps) => {
+  // Only re-render if visibility or key data changes
+  // Don't compare all style-related props when modal is hidden
+  if (!prevProps.showSubtitleModal && !nextProps.showSubtitleModal) {
+    return true; // Skip re-render if modal is hidden in both cases
+  }
+  return (
+    prevProps.showSubtitleModal === nextProps.showSubtitleModal &&
+    prevProps.selectedTextTrack === nextProps.selectedTextTrack &&
+    prevProps.isLoadingSubtitleList === nextProps.isLoadingSubtitleList &&
+    prevProps.isLoadingSubtitles === nextProps.isLoadingSubtitles &&
+    prevProps.ksTextTracks === nextProps.ksTextTracks &&
+    prevProps.availableSubtitles === nextProps.availableSubtitles
+  );
+});

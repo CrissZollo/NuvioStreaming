@@ -54,10 +54,14 @@ import { styles } from './utils/playerStyles';
 import { formatTime, isHlsStream, getHlsHeaders, defaultAndroidHeaders, parseSRT } from './utils/playerUtils';
 import { storageService } from '../../services/storageService';
 import stremioService from '../../services/stremioService';
+import { VideoPlayerService } from '../../services/videoPlayerService';
 import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
+import { perfMonitor, PERF_MONITOR_ENABLED } from '../../utils/performanceMonitor';
 import axios from 'axios';
 
 const DEBUG_MODE = false;
+const DEBUG_PLAYER_STATE = true; // ENABLED for debugging performance issues
+let lastStateLogTime = 0;
 
 const AndroidVideoPlayer: React.FC = () => {
   const navigation = useNavigation();
@@ -237,33 +241,53 @@ const AndroidVideoPlayer: React.FC = () => {
       subtitleTracksCount: subtitleTracks?.length || 0,
     });
 
-    // Apply default audio language - only if there are supported tracks
-    if (settings.defaultAudioLanguage && supportedAudioTracks.length > 0) {
-      const matchingAudioTrackId = findSupportedTrackByLanguage(audioTracks, settings.defaultAudioLanguage);
-      if (matchingAudioTrackId !== null) {
-        console.log('[AndroidVideoPlayer] Auto-selecting supported audio track:', matchingAudioTrackId);
-        tracksHook.setSelectedAudioTrack({ type: 'index', value: matchingAudioTrackId });
-        if (activePlayerRef.current) {
-          activePlayerRef.current.setAudioTrack(matchingAudioTrackId);
-        }
-      } else {
-        // No supported track matches preferred language - try to select first supported track
-        if (supportedAudioTracks.length > 0) {
-          const firstSupportedTrack = supportedAudioTracks[0];
-          console.log('[AndroidVideoPlayer] Preferred language not found/supported, selecting first supported track:', firstSupportedTrack.id);
-          tracksHook.setSelectedAudioTrack({ type: 'index', value: firstSupportedTrack.id });
-          if (activePlayerRef.current) {
-            activePlayerRef.current.setAudioTrack(firstSupportedTrack.id);
-          }
+    // Apply default audio language with fallback chain: preferred → English → first available
+    if (supportedAudioTracks.length > 0) {
+      let selectedTrackId: number | null = null;
+
+      // 1. Try preferred language first
+      if (settings.defaultAudioLanguage) {
+        selectedTrackId = findSupportedTrackByLanguage(audioTracks, settings.defaultAudioLanguage);
+        if (selectedTrackId !== null) {
+          console.log('[AndroidVideoPlayer] Auto-selecting preferred audio track:', selectedTrackId);
         }
       }
-    } else if (supportedAudioTracks.length === 0 && audioTracks && audioTracks.length > 0) {
+
+      // 2. Fallback to English if preferred not found
+      if (selectedTrackId === null) {
+        selectedTrackId = findSupportedTrackByLanguage(audioTracks, 'en');
+        if (selectedTrackId !== null) {
+          console.log('[AndroidVideoPlayer] Fallback to English audio track:', selectedTrackId);
+        }
+      }
+
+      // 3. Fallback to first available supported track
+      if (selectedTrackId === null && supportedAudioTracks.length > 0) {
+        selectedTrackId = supportedAudioTracks[0].id;
+        console.log('[AndroidVideoPlayer] Fallback to first supported audio track:', selectedTrackId);
+      }
+
+      // Apply the selected track
+      if (selectedTrackId !== null) {
+        tracksHook.setSelectedAudioTrack({ type: 'index', value: selectedTrackId });
+        if (activePlayerRef.current) {
+          activePlayerRef.current.setAudioTrack(selectedTrackId);
+        }
+      }
+    } else if (audioTracks && audioTracks.length > 0) {
       // All audio tracks are unsupported - don't try to auto-select, let native handle the error
       console.log('[AndroidVideoPlayer] No supported audio tracks available - skipping auto-selection');
     }
 
-    // Apply default subtitle language
-    if (settings.defaultSubtitleLanguage && settings.defaultSubtitleLanguage !== 'off' && subtitleTracks && subtitleTracks.length > 0) {
+    // Apply default subtitle language - if no match found, disable subtitles (don't default to first)
+    if (settings.defaultSubtitleLanguage === 'off' || !settings.defaultSubtitleEnabled) {
+      // Explicitly disabled - disable subtitles
+      console.log('[AndroidVideoPlayer] Disabling subtitles (user preference)');
+      tracksHook.setSelectedTextTrack(-1);
+      if (activePlayerRef.current) {
+        activePlayerRef.current.setSubtitleTrack(-1);
+      }
+    } else if (settings.defaultSubtitleLanguage && subtitleTracks && subtitleTracks.length > 0) {
       const matchingSubtitleTrackId = findTrackByLanguage(subtitleTracks, settings.defaultSubtitleLanguage);
       if (matchingSubtitleTrackId !== null) {
         console.log('[AndroidVideoPlayer] Auto-selecting subtitle track:', matchingSubtitleTrackId);
@@ -271,10 +295,17 @@ const AndroidVideoPlayer: React.FC = () => {
         if (activePlayerRef.current) {
           activePlayerRef.current.setSubtitleTrack(matchingSubtitleTrackId);
         }
+      } else {
+        // No matching language found - disable subtitles (don't default to first available)
+        console.log('[AndroidVideoPlayer] No matching subtitle language found, disabling subtitles');
+        tracksHook.setSelectedTextTrack(-1);
+        if (activePlayerRef.current) {
+          activePlayerRef.current.setSubtitleTrack(-1);
+        }
       }
-    } else if (settings.defaultSubtitleLanguage === 'off' || !settings.defaultSubtitleEnabled) {
-      // Disable subtitles by default
-      console.log('[AndroidVideoPlayer] Disabling subtitles by default');
+    } else {
+      // No preference set - disable subtitles by default
+      console.log('[AndroidVideoPlayer] No subtitle preference set, disabling subtitles');
       tracksHook.setSelectedTextTrack(-1);
       if (activePlayerRef.current) {
         activePlayerRef.current.setSubtitleTrack(-1);
@@ -292,6 +323,9 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // State to force unmount VideoSurface during stream transitions
   const [isTransitioningStream, setIsTransitioningStream] = useState(false);
+
+  // State for audio track switching with buffering
+  const [isChangingAudioTrack, setIsChangingAudioTrack] = useState(false);
 
   // Subtitle addon state
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -384,6 +418,20 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     openingAnimation.startOpeningAnimation();
   }, []);
+
+  // Start performance monitoring on mount (TV only to diagnose sluggishness)
+  useEffect(() => {
+    if (isTVDevice && PERF_MONITOR_ENABLED) {
+      perfMonitor.reset();
+      perfMonitor.start();
+      console.log('[AndroidVideoPlayer] Performance monitoring started');
+
+      return () => {
+        perfMonitor.stop();
+        console.log('[AndroidVideoPlayer] Performance monitoring stopped');
+      };
+    }
+  }, [isTVDevice]);
 
   // Auto-show controls on TV after video loads
   useEffect(() => {
@@ -488,9 +536,21 @@ const AndroidVideoPlayer: React.FC = () => {
     playerState.setIsVideoLoaded(true);
     openingAnimation.completeOpeningAnimation();
 
-    // Handle Resume - check both initialPosition and initialSeekTargetRef
-    const resumeTarget = watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
-    if (resumeTarget && resumeTarget > 0 && !watchProgress.showResumeOverlay && videoDuration > 0) {
+    // Handle Resume - check resumeFromPosition first (source switch), then watchProgress
+    // Priority: resumeFromPosition > initialPosition > initialSeekTargetRef
+    const resumeFromPosition = (route.params as any).resumeFromPosition;
+    const resumeTarget = resumeFromPosition || watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
+
+    if (resumeFromPosition && resumeFromPosition > 0 && videoDuration > 0) {
+      // Source switch - resume from captured position immediately
+      console.log('[AndroidVideoPlayer] Resuming from source switch position:', resumeFromPosition, 'duration:', videoDuration);
+      setTimeout(() => {
+        if (activePlayerRef.current) {
+          activePlayerRef.current.seek(Math.min(resumeFromPosition, videoDuration - 0.5));
+        }
+      }, 200);
+    } else if (resumeTarget && resumeTarget > 0 && !watchProgress.showResumeOverlay && videoDuration > 0) {
+      // Normal resume from watch progress
       console.log('[AndroidVideoPlayer] Seeking to resume position:', resumeTarget, 'duration:', videoDuration);
       // Use a small delay to ensure the player is ready, then seek directly
       setTimeout(() => {
@@ -500,16 +560,82 @@ const AndroidVideoPlayer: React.FC = () => {
         }
       }, 200);
     }
-  }, [id, type, episodeId, playerState.isMounted, watchProgress.initialPosition, activePlayerRef]);
+  }, [id, type, episodeId, playerState.isMounted, watchProgress.initialPosition, activePlayerRef, route.params]);
+
+  // Track last progress update time to throttle updates on TV
+  const lastProgressUpdateRef = useRef<number>(0);
+  const PROGRESS_UPDATE_INTERVAL_MS = isTVDevice ? 2000 : 500; // 2 seconds on TV, 0.5 on mobile
+
+  // Throttle buffer state updates on TV to prevent excessive re-renders
+  // Buffer events fire rapidly during seeking and can cause UI sluggishness
+  const lastBufferUpdateRef = useRef<number>(0);
+  const lastBufferStateRef = useRef<boolean>(false);
+  const BUFFER_UPDATE_INTERVAL_MS = isTVDevice ? 500 : 100; // 500ms on TV, 100ms on mobile
+
+  const handleBuffer = useCallback((buf: { isBuffering: boolean }) => {
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastBufferUpdateRef.current;
+    const stateChanged = buf.isBuffering !== lastBufferStateRef.current;
+
+    if (DEBUG_PLAYER_STATE) {
+      console.log(`[AndroidVideoPlayer] BUFFER_EVENT isBuffering=${buf.isBuffering} stateChanged=${stateChanged} timeSinceLastUpdate=${timeSinceLastUpdate}ms`);
+    }
+
+    // Only update if state changed AND enough time has passed
+    // This prevents rapid toggling between buffering states from causing re-renders
+    if (stateChanged && timeSinceLastUpdate >= BUFFER_UPDATE_INTERVAL_MS) {
+      if (DEBUG_PLAYER_STATE) {
+        console.log(`[AndroidVideoPlayer] BUFFER_STATE_UPDATE applying state=${buf.isBuffering}`);
+      }
+      lastBufferUpdateRef.current = now;
+      lastBufferStateRef.current = buf.isBuffering;
+      playerState.setIsBuffering(buf.isBuffering);
+    } else if (stateChanged && buf.isBuffering) {
+      // Always show buffering immediately (user needs feedback)
+      // But throttle the "not buffering" state to prevent flicker
+      if (DEBUG_PLAYER_STATE) {
+        console.log(`[AndroidVideoPlayer] BUFFER_STATE_UPDATE immediate buffering=true`);
+      }
+      lastBufferUpdateRef.current = now;
+      lastBufferStateRef.current = buf.isBuffering;
+      playerState.setIsBuffering(buf.isBuffering);
+    } else if (DEBUG_PLAYER_STATE && stateChanged) {
+      console.log(`[AndroidVideoPlayer] BUFFER_STATE_UPDATE throttled (would set ${buf.isBuffering})`);
+    }
+  }, [isTVDevice, playerState]);
+
+  // Store currentTime in ref for handleProgress to avoid recreating callback on every time change
+  const playerCurrentTimeRef = useRef(playerState.currentTime);
+  playerCurrentTimeRef.current = playerState.currentTime;
 
   const handleProgress = useCallback((data: any) => {
-    if (playerState.isDragging.current || playerState.isSeeking.current || !playerState.isMounted.current || setupHook.isAppBackgrounded.current) return;
+    const now = Date.now();
+
+    if (playerState.isDragging.current || playerState.isSeeking.current || !playerState.isMounted.current || setupHook.isAppBackgrounded.current) {
+      if (DEBUG_PLAYER_STATE && now - lastStateLogTime > 1000) {
+        lastStateLogTime = now;
+        console.log(`[AndroidVideoPlayer] PROGRESS_SKIP dragging=${playerState.isDragging.current} seeking=${playerState.isSeeking.current} mounted=${playerState.isMounted.current} bg=${setupHook.isAppBackgrounded.current}`);
+      }
+      return;
+    }
+
+    const timeSinceLastUpdate = now - lastProgressUpdateRef.current;
+
+    // Throttle updates based on device type
+    if (timeSinceLastUpdate < PROGRESS_UPDATE_INTERVAL_MS) return;
+
     const currentTimeInSeconds = data.currentTime;
-    if (Math.abs(currentTimeInSeconds - playerState.currentTime) > 0.5) {
+    // Only update if time has changed significantly (1 second threshold)
+    // Use ref to access current time without needing it in dependency array
+    if (Math.abs(currentTimeInSeconds - playerCurrentTimeRef.current) > 1.0) {
+      if (DEBUG_PLAYER_STATE) {
+        console.log(`[AndroidVideoPlayer] PROGRESS_UPDATE time=${currentTimeInSeconds.toFixed(2)}s playable=${data.playableDuration?.toFixed(2)}s`);
+      }
+      lastProgressUpdateRef.current = now;
       playerState.setCurrentTime(currentTimeInSeconds);
       playerState.setBuffered(data.playableDuration || currentTimeInSeconds);
     }
-  }, [playerState.currentTime, playerState.isDragging, playerState.isSeeking, setupHook.isAppBackgrounded]);
+  }, [playerState.isDragging, playerState.isSeeking, setupHook.isAppBackgrounded, isTVDevice]);
 
   // Sync custom subtitle text with current playback time
   useEffect(() => {
@@ -530,6 +656,108 @@ const AndroidVideoPlayer: React.FC = () => {
     playerState.setShowControls(false);
   }, []);
 
+  // Memoized callbacks for TVPlayerControls to prevent unnecessary re-renders
+  const showControls = useCallback(() => {
+    playerState.setShowControls(true);
+  }, []);
+
+  // CRITICAL: Extract setter functions to avoid depending on the entire modals object
+  // The modals object reference changes on every render, causing callback recreation
+  const {
+    setShowSubtitleModal,
+    setShowAudioModal,
+    setShowSourcesModal,
+    setShowEpisodesModal,
+    setShowEpisodeStreamsModal,
+    setSelectedEpisodeForStreams,
+  } = modals;
+
+  const handleShowSubtitles = useCallback(() => {
+    setShowSubtitleModal(true);
+  }, [setShowSubtitleModal]);
+
+  const handleShowAudioTracks = useCallback(() => {
+    setShowAudioModal(true);
+  }, [setShowAudioModal]);
+
+  const handleShowSources = useCallback(() => {
+    setShowSourcesModal(true);
+  }, [setShowSourcesModal]);
+
+  const handleShowEpisodes = useCallback(() => {
+    setShowEpisodesModal(true);
+  }, [setShowEpisodesModal]);
+
+  // CRITICAL: Extract specific functions from controlsHook to avoid depending on the whole object
+  // The controlsHook object is recreated on every render (even though its functions are stable)
+  // Depending on controlsHook causes handleSeek/handleSeekTo to recreate, triggering TVPlayerControls re-renders
+  const { skip: controlsSkip, seekToTime: controlsSeekToTime } = controlsHook;
+
+  const handleSeek = useCallback((seconds: number) => {
+    if (DEBUG_PLAYER_STATE) {
+      console.log(`[AndroidVideoPlayer] HANDLE_SEEK relative=${seconds}s`);
+    }
+    controlsSkip(seconds);
+  }, [controlsSkip]);
+
+  const handleSeekTo = useCallback((seconds: number) => {
+    if (DEBUG_PLAYER_STATE) {
+      console.log(`[AndroidVideoPlayer] HANDLE_SEEK_TO absolute=${seconds.toFixed(2)}s`);
+    }
+    controlsSeekToTime(seconds);
+  }, [controlsSeekToTime]);
+
+  const handleFocusRestored = useCallback(() => {
+    setShouldRestoreFocus(false);
+  }, []);
+
+  // Memoized callback for modal closed events
+  const handleModalClosed = useCallback(() => {
+    setShouldRestoreFocus(true);
+  }, []);
+
+  // Memoized callback for subtitle track selection
+  const handleSelectTextTrack = useCallback((trackId: number) => {
+    tracksHook.setSelectedTextTrack(trackId);
+    if (activePlayerRef.current) {
+      activePlayerRef.current.setSubtitleTrack(trackId);
+    }
+    setUseCustomSubtitles(false);
+    setShowSubtitleModal(false);
+    if (isTVDevice) {
+      setShouldRestoreFocus(true);
+    }
+  }, [tracksHook, activePlayerRef, setShowSubtitleModal, isTVDevice]);
+
+  // Memoized callback for episode selection
+  const handleSelectEpisode = useCallback((ep: any) => {
+    setSelectedEpisodeForStreams(ep);
+    setShowEpisodesModal(false);
+    setShowEpisodeStreamsModal(true);
+  }, [setSelectedEpisodeForStreams, setShowEpisodesModal, setShowEpisodeStreamsModal]);
+
+  // Memoized callback for closing episode streams modal
+  const handleCloseEpisodeStreams = useCallback(() => {
+    setShowEpisodeStreamsModal(false);
+    setShowEpisodesModal(false);
+  }, [setShowEpisodeStreamsModal, setShowEpisodesModal]);
+
+  // Memoize conditional callbacks to avoid creating new references on every render
+  const showSourcesCallback = useMemo(() => {
+    return Object.keys(availableStreams).length > 0 ? handleShowSources : undefined;
+  }, [availableStreams, handleShowSources]);
+
+  const showEpisodesCallback = useMemo(() => {
+    return type === 'series' ? handleShowEpisodes : undefined;
+  }, [type, handleShowEpisodes]);
+
+  // Memoize the modalOpen boolean to prevent reference changes
+  const isModalOpen = useMemo(() => {
+    return modals.showSubtitleModal || modals.showAudioModal || modals.showEpisodesModal ||
+           modals.showSourcesModal || modals.showSpeedModal || modals.showEpisodeStreamsModal;
+  }, [modals.showSubtitleModal, modals.showAudioModal, modals.showEpisodesModal,
+      modals.showSourcesModal, modals.showSpeedModal, modals.showEpisodeStreamsModal]);
+
   const loadStartAtRef = useRef<number | null>(null);
   const firstFrameAtRef = useRef<number | null>(null);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -539,11 +767,60 @@ const AndroidVideoPlayer: React.FC = () => {
     else navigation.reset({ index: 0, routes: [{ name: 'Home' }] } as any);
   }, [navigation]);
 
+  // Open current stream in external player via Android intent chooser
+  const handleOpenExternal = useCallback(async () => {
+    const success = await VideoPlayerService.playVideo(currentStreamUrl, {
+      useExternalPlayer: true,
+      title: title,
+      episodeTitle: episodeTitle,
+      episodeNumber: season && episode ? `S${season}E${episode}` : undefined,
+    });
+
+    if (success) {
+      // Exit internal player when external opens
+      handleClose();
+    } else {
+      toast.error('Failed to open external player');
+    }
+  }, [currentStreamUrl, title, episodeTitle, season, episode, handleClose]);
+
+  // Handle audio track change with buffering - pauses video, switches track, then resumes
+  const handleAudioTrackChange = useCallback(async (trackId: number | null) => {
+    if (trackId === null) return;
+
+    const wasPaused = playerState.paused;
+
+    // 1. Pause video
+    if (!wasPaused) {
+      playerState.setPaused(true);
+    }
+    setIsChangingAudioTrack(true);
+
+    // 2. Switch track
+    tracksHook.setSelectedAudioTrack({ type: 'index', value: trackId });
+    if (activePlayerRef.current) {
+      activePlayerRef.current.setAudioTrack(trackId);
+    }
+
+    // 3. Wait for buffer (300ms)
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // 4. Resume playback if it wasn't paused before
+    setIsChangingAudioTrack(false);
+    if (!wasPaused) {
+      playerState.setPaused(false);
+    }
+  }, [playerState, tracksHook, activePlayerRef]);
+
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
       modals.setShowSourcesModal(false);
       return;
     }
+
+    // Capture current position to resume from on new source
+    const currentPosition = playerState.currentTime;
+
     modals.setShowSourcesModal(false);
     playerState.setPaused(true);
 
@@ -563,7 +840,8 @@ const AndroidVideoPlayer: React.FC = () => {
         streamProvider: newProvider,
         streamName: newStreamName,
         headers: newStream.headers,
-        availableStreams: availableStreams
+        availableStreams: availableStreams,
+        resumeFromPosition: currentPosition, // Preserve timeline position when switching sources
       });
     }, 300);
   };
@@ -644,10 +922,14 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [imdbId, type, season, episode]);
 
+  // Store currentTime in ref so loadWyzieSubtitle doesn't need it in dependencies
+  const currentTimeRef = useRef(playerState.currentTime);
+  currentTimeRef.current = playerState.currentTime;
+
   const loadWyzieSubtitle = useCallback(async (subtitle: WyzieSubtitle) => {
     if (!subtitle.url) return;
 
-    modals.setShowSubtitleModal(false);
+    setShowSubtitleModal(false);
     // Trigger focus restoration immediately on TV
     if (isTVDevice) {
       setShouldRestoreFocus(true);
@@ -675,8 +957,8 @@ const AndroidVideoPlayer: React.FC = () => {
         activePlayerRef.current.setSubtitleTrack(-1);
       }
 
-      // Set initial subtitle based on current time
-      const adjustedTime = playerState.currentTime;
+      // Set initial subtitle based on current time (use ref to avoid dependency)
+      const adjustedTime = currentTimeRef.current;
       const cueNow = parsedCues.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end);
       setCurrentSubtitle(cueNow ? cueNow.text : '');
 
@@ -688,7 +970,7 @@ const AndroidVideoPlayer: React.FC = () => {
     } finally {
       setIsLoadingSubtitles(false);
     }
-  }, [modals, playerState.currentTime, tracksHook]);
+  }, [setShowSubtitleModal, isTVDevice, tracksHook, activePlayerRef]);
 
   const disableCustomSubtitles = useCallback(() => {
     setUseCustomSubtitles(false);
@@ -775,7 +1057,7 @@ const AndroidVideoPlayer: React.FC = () => {
               modals.setErrorDetails(displayError);
               modals.setShowErrorModal(true);
             }}
-            onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
+            onBuffer={handleBuffer}
             onTracksChanged={(data) => {
               console.log('[AndroidVideoPlayer] onTracksChanged:', data);
               let formattedAudioTracks: any[] = [];
@@ -894,19 +1176,21 @@ const AndroidVideoPlayer: React.FC = () => {
             season={season}
             episode={episode}
             onTogglePlayback={controlsHook.togglePlayback}
-            onSeek={(seconds) => controlsHook.skip(seconds)}
-            onSeekTo={(seconds) => controlsHook.seekToTime(seconds)}
+            onSeek={handleSeek}
+            onSeekTo={handleSeekTo}
             onClose={handleClose}
-            onShowControls={() => playerState.setShowControls(true)}
-            onHideControls={() => playerState.setShowControls(false)}
-            onShowSubtitles={() => modals.setShowSubtitleModal(true)}
-            onShowAudioTracks={() => modals.setShowAudioModal(true)}
-            onShowEpisodes={type === 'series' ? () => modals.setShowEpisodesModal(true) : undefined}
+            onShowControls={showControls}
+            onHideControls={hideControls}
+            onShowSubtitles={handleShowSubtitles}
+            onShowAudioTracks={handleShowAudioTracks}
+            onShowSources={showSourcesCallback}
+            onOpenExternal={handleOpenExternal}
+            onShowEpisodes={showEpisodesCallback}
             playbackSpeed={speedControl.playbackSpeed}
             buffered={playerState.duration > 0 ? playerState.buffered / playerState.duration : 0}
             restoreFocus={shouldRestoreFocus}
-            onFocusRestored={() => setShouldRestoreFocus(false)}
-            modalOpen={modals.showSubtitleModal || modals.showAudioModal || modals.showEpisodesModal || modals.showSourcesModal || modals.showSpeedModal || modals.showEpisodeStreamsModal}
+            onFocusRestored={handleFocusRestored}
+            modalOpen={isModalOpen}
           />
         ) : (
           <PlayerControls
@@ -990,136 +1274,124 @@ const AndroidVideoPlayer: React.FC = () => {
         />
       </View>
 
-      <AudioTrackModal
-        showAudioModal={modals.showAudioModal}
-        setShowAudioModal={modals.setShowAudioModal}
-        ksAudioTracks={tracksHook.ksAudioTracks}
-        selectedAudioTrack={tracksHook.computedSelectedAudioTrack}
-        selectAudioTrack={(trackId) => {
-          tracksHook.setSelectedAudioTrack(trackId === null ? null : { type: 'index', value: trackId });
-          // Tell the active player to switch the audio track
-          if (trackId !== null && activePlayerRef.current) {
-            activePlayerRef.current.setAudioTrack(trackId);
-          }
-        }}
-        onModalClosed={() => setShouldRestoreFocus(true)}
-      />
+      {/* Only mount AudioTrackModal when visible to avoid render overhead */}
+      {modals.showAudioModal && (
+        <AudioTrackModal
+          showAudioModal={modals.showAudioModal}
+          setShowAudioModal={modals.setShowAudioModal}
+          ksAudioTracks={tracksHook.ksAudioTracks}
+          selectedAudioTrack={tracksHook.computedSelectedAudioTrack}
+          selectAudioTrack={handleAudioTrackChange}
+          isLoading={isChangingAudioTrack}
+          onModalClosed={handleModalClosed}
+        />
+      )}
 
-      <SubtitleModals
-        showSubtitleModal={modals.showSubtitleModal}
-        setShowSubtitleModal={modals.setShowSubtitleModal}
-        showSubtitleLanguageModal={false}
-        setShowSubtitleLanguageModal={() => { }}
-        isLoadingSubtitleList={isLoadingSubtitleList}
-        isLoadingSubtitles={isLoadingSubtitles}
-        customSubtitles={[]}
-        availableSubtitles={availableSubtitles}
-        ksTextTracks={tracksHook.ksTextTracks}
-        selectedTextTrack={tracksHook.computedSelectedTextTrack}
-        useCustomSubtitles={useCustomSubtitles}
-        isKsPlayerActive={true}
-        subtitleSize={subtitleSize}
-        subtitleBackground={subtitleBackground}
-        fetchAvailableSubtitles={fetchAvailableSubtitles}
-        loadWyzieSubtitle={loadWyzieSubtitle}
-        selectTextTrack={(trackId) => {
-          tracksHook.setSelectedTextTrack(trackId);
-          // Tell the active player to switch the subtitle track
-          if (activePlayerRef.current) {
-            activePlayerRef.current.setSubtitleTrack(trackId);
-          }
-          // Disable custom subtitles when selecting built-in track
-          setUseCustomSubtitles(false);
-          modals.setShowSubtitleModal(false);
-          // Trigger focus restoration immediately on TV
-          if (isTVDevice) {
-            setShouldRestoreFocus(true);
-          }
-        }}
-        disableCustomSubtitles={disableCustomSubtitles}
-        increaseSubtitleSize={() => setSubtitleSize(prev => Math.min(prev + 2, 60))}
-        decreaseSubtitleSize={() => setSubtitleSize(prev => Math.max(prev - 2, 12))}
-        toggleSubtitleBackground={() => setSubtitleBackground(prev => !prev)}
-        subtitleTextColor={subtitleTextColor}
-        setSubtitleTextColor={setSubtitleTextColor}
-        subtitleBgOpacity={subtitleBgOpacity}
-        setSubtitleBgOpacity={setSubtitleBgOpacity}
-        subtitleTextShadow={subtitleTextShadow}
-        setSubtitleTextShadow={setSubtitleTextShadow}
-        subtitleOutline={subtitleOutline}
-        setSubtitleOutline={setSubtitleOutline}
-        subtitleOutlineColor={subtitleOutlineColor}
-        setSubtitleOutlineColor={setSubtitleOutlineColor}
-        subtitleOutlineWidth={subtitleOutlineWidth}
-        setSubtitleOutlineWidth={setSubtitleOutlineWidth}
-        subtitleAlign={subtitleAlign}
-        setSubtitleAlign={setSubtitleAlign}
-        subtitleBottomOffset={subtitleBottomOffset}
-        setSubtitleBottomOffset={setSubtitleBottomOffset}
-        subtitleLetterSpacing={subtitleLetterSpacing}
-        setSubtitleLetterSpacing={setSubtitleLetterSpacing}
-        subtitleLineHeightMultiplier={subtitleLineHeightMultiplier}
-        setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
-        subtitleOffsetSec={subtitleOffsetSec}
-        setSubtitleOffsetSec={setSubtitleOffsetSec}
-        onModalClosed={() => setShouldRestoreFocus(true)}
-      />
+      {/* Only mount SubtitleModals when visible to avoid render overhead */}
+      {modals.showSubtitleModal && (
+        <SubtitleModals
+          showSubtitleModal={modals.showSubtitleModal}
+          setShowSubtitleModal={modals.setShowSubtitleModal}
+          showSubtitleLanguageModal={false}
+          setShowSubtitleLanguageModal={() => { }}
+          isLoadingSubtitleList={isLoadingSubtitleList}
+          isLoadingSubtitles={isLoadingSubtitles}
+          customSubtitles={[]}
+          availableSubtitles={availableSubtitles}
+          ksTextTracks={tracksHook.ksTextTracks}
+          selectedTextTrack={tracksHook.computedSelectedTextTrack}
+          useCustomSubtitles={useCustomSubtitles}
+          isKsPlayerActive={true}
+          subtitleSize={subtitleSize}
+          subtitleBackground={subtitleBackground}
+          fetchAvailableSubtitles={fetchAvailableSubtitles}
+          loadWyzieSubtitle={loadWyzieSubtitle}
+          selectTextTrack={handleSelectTextTrack}
+          disableCustomSubtitles={disableCustomSubtitles}
+          increaseSubtitleSize={() => setSubtitleSize(prev => Math.min(prev + 2, 60))}
+          decreaseSubtitleSize={() => setSubtitleSize(prev => Math.max(prev - 2, 12))}
+          toggleSubtitleBackground={() => setSubtitleBackground(prev => !prev)}
+          subtitleTextColor={subtitleTextColor}
+          setSubtitleTextColor={setSubtitleTextColor}
+          subtitleBgOpacity={subtitleBgOpacity}
+          setSubtitleBgOpacity={setSubtitleBgOpacity}
+          subtitleTextShadow={subtitleTextShadow}
+          setSubtitleTextShadow={setSubtitleTextShadow}
+          subtitleOutline={subtitleOutline}
+          setSubtitleOutline={setSubtitleOutline}
+          subtitleOutlineColor={subtitleOutlineColor}
+          setSubtitleOutlineColor={setSubtitleOutlineColor}
+          subtitleOutlineWidth={subtitleOutlineWidth}
+          setSubtitleOutlineWidth={setSubtitleOutlineWidth}
+          subtitleAlign={subtitleAlign}
+          setSubtitleAlign={setSubtitleAlign}
+          subtitleBottomOffset={subtitleBottomOffset}
+          setSubtitleBottomOffset={setSubtitleBottomOffset}
+          subtitleLetterSpacing={subtitleLetterSpacing}
+          setSubtitleLetterSpacing={setSubtitleLetterSpacing}
+          subtitleLineHeightMultiplier={subtitleLineHeightMultiplier}
+          setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
+          subtitleOffsetSec={subtitleOffsetSec}
+          setSubtitleOffsetSec={setSubtitleOffsetSec}
+          onModalClosed={handleModalClosed}
+        />
+      )}
 
-      <SourcesModal
-        showSourcesModal={modals.showSourcesModal}
-        setShowSourcesModal={modals.setShowSourcesModal}
-        availableStreams={availableStreams}
-        currentStreamUrl={currentStreamUrl}
-        onSelectStream={(stream) => handleSelectStream(stream)}
-      />
+      {/* Only mount modals when visible to avoid render overhead */}
+      {modals.showSourcesModal && (
+        <SourcesModal
+          showSourcesModal={modals.showSourcesModal}
+          setShowSourcesModal={modals.setShowSourcesModal}
+          availableStreams={availableStreams}
+          currentStreamUrl={currentStreamUrl}
+          onSelectStream={handleSelectStream}
+        />
+      )}
 
-      <SpeedModal
-        showSpeedModal={modals.showSpeedModal}
-        setShowSpeedModal={modals.setShowSpeedModal}
-        currentSpeed={speedControl.playbackSpeed}
-        setPlaybackSpeed={speedControl.setPlaybackSpeed}
-        holdToSpeedEnabled={speedControl.holdToSpeedEnabled}
-        setHoldToSpeedEnabled={speedControl.setHoldToSpeedEnabled}
-        holdToSpeedValue={speedControl.holdToSpeedValue}
-        setHoldToSpeedValue={speedControl.setHoldToSpeedValue}
-      />
+      {modals.showSpeedModal && (
+        <SpeedModal
+          showSpeedModal={modals.showSpeedModal}
+          setShowSpeedModal={modals.setShowSpeedModal}
+          currentSpeed={speedControl.playbackSpeed}
+          setPlaybackSpeed={speedControl.setPlaybackSpeed}
+          holdToSpeedEnabled={speedControl.holdToSpeedEnabled}
+          setHoldToSpeedEnabled={speedControl.setHoldToSpeedEnabled}
+          holdToSpeedValue={speedControl.holdToSpeedValue}
+          setHoldToSpeedValue={speedControl.setHoldToSpeedValue}
+        />
+      )}
 
-      <EpisodesModal
-        showEpisodesModal={modals.showEpisodesModal}
-        setShowEpisodesModal={modals.setShowEpisodesModal}
-        groupedEpisodes={groupedEpisodes || (metadataResult as any)?.groupedEpisodes}
-        currentEpisode={season && episode ? { season, episode } : undefined}
-        metadata={metadata}
-        onSelectEpisode={(ep) => {
-          modals.setSelectedEpisodeForStreams(ep);
-          modals.setShowEpisodesModal(false);
-          modals.setShowEpisodeStreamsModal(true);
-        }}
-        onModalClosed={() => setShouldRestoreFocus(true)}
-      />
+      {modals.showEpisodesModal && (
+        <EpisodesModal
+          showEpisodesModal={modals.showEpisodesModal}
+          setShowEpisodesModal={modals.setShowEpisodesModal}
+          groupedEpisodes={groupedEpisodes || (metadataResult as any)?.groupedEpisodes}
+          currentEpisode={season && episode ? { season, episode } : undefined}
+          metadata={metadata}
+          onSelectEpisode={handleSelectEpisode}
+          onModalClosed={handleModalClosed}
+        />
+      )}
 
+      {modals.showErrorModal && (
+        <ErrorModal
+          showErrorModal={modals.showErrorModal}
+          setShowErrorModal={modals.setShowErrorModal}
+          errorDetails={modals.errorDetails}
+          onDismiss={handleClose}
+        />
+      )}
 
-
-      <ErrorModal
-        showErrorModal={modals.showErrorModal}
-        setShowErrorModal={modals.setShowErrorModal}
-        errorDetails={modals.errorDetails}
-        onDismiss={handleClose}
-      />
-
-      <EpisodeStreamsModal
-        visible={modals.showEpisodeStreamsModal}
-        onClose={() => {
-          // Close both stream and episode modals when back is pressed
-          modals.setShowEpisodeStreamsModal(false);
-          modals.setShowEpisodesModal(false);
-        }}
-        episode={modals.selectedEpisodeForStreams}
-        onSelectStream={handleEpisodeStreamSelect}
-        metadata={{ id: id, name: title }}
-        onModalClosed={() => setShouldRestoreFocus(true)}
-      />
-
+      {modals.showEpisodeStreamsModal && (
+        <EpisodeStreamsModal
+          visible={modals.showEpisodeStreamsModal}
+          onClose={handleCloseEpisodeStreams}
+          episode={modals.selectedEpisodeForStreams}
+          onSelectStream={handleEpisodeStreamSelect}
+          metadata={{ id: id, name: title }}
+          onModalClosed={handleModalClosed}
+        />
+      )}
     </View>
   );
 };

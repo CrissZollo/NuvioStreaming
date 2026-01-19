@@ -1,5 +1,5 @@
-import React, { useEffect, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, StyleSheet, Platform, BackHandler } from 'react-native';
+import React, { useEffect, useCallback, useRef, memo } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, StyleSheet, Platform, BackHandler, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -8,9 +8,14 @@ import Animated, {
   SlideOutDown,
 } from 'react-native-reanimated';
 import { getTrackDisplayName, DEBUG_MODE } from '../utils/playerUtils';
+
+// Debug logging for performance analysis
+const DEBUG_AUDIO_MODAL = false; // Disabled after debugging
+let audioModalRenderCount = 0;
 import { logger } from '../../../utils/logger';
 import { useIsTV } from '../../../contexts/TVContext';
 import { Focusable } from '../../tv/Focusable';
+import { perfMonitor, PERF_MONITOR_ENABLED } from '../../../utils/performanceMonitor';
 
 interface AudioTrack {
   id: number;
@@ -25,6 +30,8 @@ interface AudioTrackModalProps {
   ksAudioTracks: Array<AudioTrack>;
   selectedAudioTrack: number | null;
   selectAudioTrack: (trackId: number) => void;
+  /** Whether track switching is in progress */
+  isLoading?: boolean;
   /** Called when modal is closed (for TV focus restoration) */
   onModalClosed?: () => void;
 }
@@ -35,8 +42,15 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   ksAudioTracks,
   selectedAudioTrack,
   selectAudioTrack,
+  isLoading = false,
   onModalClosed,
 }) => {
+  const renderStartTime = PERF_MONITOR_ENABLED ? performance.now() : 0;
+  audioModalRenderCount++;
+  if (DEBUG_AUDIO_MODAL) {
+    console.log(`[AudioTrackModal] RENDER START #${audioModalRenderCount} showAudioModal=${showAudioModal}`);
+  }
+
   const { width, height } = useWindowDimensions();
   const isTVDevice = useIsTV();
 
@@ -72,7 +86,17 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
     return () => backHandler.remove();
   }, [showAudioModal, setShowAudioModal, isTVDevice, onModalClosed]);
 
-  if (!showAudioModal) return null;
+  if (!showAudioModal) {
+    if (PERF_MONITOR_ENABLED) {
+      perfMonitor.recordRender('AudioTrackModal(hidden)', performance.now() - renderStartTime);
+    }
+    return null;
+  }
+
+  if (PERF_MONITOR_ENABLED) {
+    const renderTime = performance.now() - renderStartTime;
+    perfMonitor.recordRender('AudioTrackModal(visible)', renderTime);
+  }
 
   return (
     <View style={StyleSheet.absoluteFill} zIndex={9999}>
@@ -105,8 +129,11 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
           }}
         >
           {/* Header with shared aesthetics */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, position: 'relative' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, position: 'relative' }}>
             <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>Audio Tracks</Text>
+            {isLoading && (
+              <ActivityIndicator size="small" color="white" />
+            )}
           </View>
 
           <ScrollView
@@ -206,4 +233,14 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   );
 };
 
-export default AudioTrackModal;
+// Memoize to prevent re-renders when parent re-renders but props haven't changed
+// This is critical for performance - the modal was re-rendering on every currentTime update
+export default memo(AudioTrackModal, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  return (
+    prevProps.showAudioModal === nextProps.showAudioModal &&
+    prevProps.selectedAudioTrack === nextProps.selectedAudioTrack &&
+    prevProps.isLoading === nextProps.isLoading &&
+    prevProps.ksAudioTracks === nextProps.ksAudioTracks
+  );
+});

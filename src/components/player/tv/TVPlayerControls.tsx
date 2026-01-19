@@ -12,6 +12,10 @@ import ReanimatedLib, {
   useAnimatedStyle,
   useDerivedValue,
   runOnJS,
+  interpolate,
+  interpolateColor,
+  SharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,8 +23,128 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Focusable, FocusableRef } from '../../tv/Focusable';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useTVKeyEvent } from '../../../hooks/useTVKeyEvent';
+import { ExitConfirmationBanner } from './ExitConfirmationBanner';
+import { perfMonitor, PERF_MONITOR_ENABLED } from '../../../utils/performanceMonitor';
 
 const AnimatedView = ReanimatedLib.createAnimatedComponent(View);
+const AnimatedText = ReanimatedLib.createAnimatedComponent(Text);
+
+// Optimized button component that uses Reanimated shared values for focus styling
+// This avoids React state updates on focus/blur which cause lag during rapid navigation
+interface TVButtonProps {
+  iconName: keyof typeof MaterialIcons.glyphMap;
+  label: string;
+  onPress: () => void;
+  focusableRef?: React.RefObject<FocusableRef | null>;
+  onFocusCallback?: () => void; // Called on focus (e.g., to reset auto-hide timer)
+}
+
+const TVButton = memo(({ iconName, label, onPress, focusableRef, onFocusCallback }: TVButtonProps) => {
+  const internalRef = useRef<FocusableRef | null>(null);
+  const actualRef = focusableRef || internalRef;
+
+  // Create local shared value for focus animation
+  const focusProgress = useSharedValue(0);
+
+  // Debounce onFocusCallback to avoid rapid timer resets during fast navigation
+  const lastFocusCallbackTime = useRef(0);
+  const FOCUS_CALLBACK_DEBOUNCE_MS = 200;
+
+  // Sync with Focusable's shared value via onFocus/onBlur
+  // Use 165ms (5 frames at 30fps) for smooth animations on low-end TV devices
+  const handleFocus = useCallback(() => {
+    focusProgress.value = withTiming(1, { duration: 165 });
+    // Debounced callback
+    if (onFocusCallback) {
+      const now = Date.now();
+      if (now - lastFocusCallbackTime.current >= FOCUS_CALLBACK_DEBOUNCE_MS) {
+        lastFocusCallbackTime.current = now;
+        onFocusCallback();
+      }
+    }
+  }, [focusProgress, onFocusCallback]);
+
+  const handleBlur = useCallback(() => {
+    focusProgress.value = withTiming(0, { duration: 165 });
+  }, [focusProgress]);
+
+  // We can't animate color directly on MaterialIcons, so we use two icons
+  // and crossfade between them using opacity
+  const unfocusedIconStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      opacity: interpolate(focusProgress.value, [0, 1], [1, 0]),
+      position: 'absolute' as const,
+    };
+  });
+
+  const focusedIconStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      opacity: interpolate(focusProgress.value, [0, 1], [0, 1]),
+      position: 'absolute' as const,
+    };
+  });
+
+  // Animated style for text color
+  const animatedTextStyle = useAnimatedStyle(() => {
+    'worklet';
+    const color = interpolateColor(
+      focusProgress.value,
+      [0, 1],
+      ['#FFFFFF', '#000000']
+    );
+    return { color };
+  });
+
+  return (
+    <Focusable
+      ref={actualRef}
+      onPress={onPress}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      style={buttonStyles.container}
+      borderRadius={8}
+      focusScale={1.05}
+      animateBackground={true}
+      showFocusBorder={true}
+    >
+      <View style={buttonStyles.iconContainer}>
+        <AnimatedView style={unfocusedIconStyle}>
+          <MaterialIcons name={iconName} size={12} color="white" />
+        </AnimatedView>
+        <AnimatedView style={focusedIconStyle}>
+          <MaterialIcons name={iconName} size={12} color="black" />
+        </AnimatedView>
+      </View>
+      <AnimatedText style={[buttonStyles.text, animatedTextStyle]}>
+        {label}
+      </AnimatedText>
+    </Focusable>
+  );
+});
+
+TVButton.displayName = 'TVButton';
+
+const buttonStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginHorizontal: 4,
+    minWidth: 60,
+  },
+  iconContainer: {
+    width: 12,
+    height: 12,
+    marginRight: 4,
+  },
+  text: {
+    fontSize: 8,
+    fontWeight: '500',
+  },
+});
 
 interface TVPlayerControlsProps {
   /** Whether controls are currently visible */
@@ -57,6 +181,10 @@ interface TVPlayerControlsProps {
   onShowAudioTracks?: () => void;
   /** Show episodes modal */
   onShowEpisodes?: () => void;
+  /** Show sources modal */
+  onShowSources?: () => void;
+  /** Open external player */
+  onOpenExternal?: () => void;
   /** Current playback speed */
   playbackSpeed?: number;
   /** Buffered amount (0-1) */
@@ -72,7 +200,14 @@ interface TVPlayerControlsProps {
 }
 
 const AUTO_HIDE_DELAY = 3000; // 3 seconds
-const DEBUG_UI = false; // Enable UI debug logging
+const EXIT_CONFIRM_TIMEOUT = 5000; // 5 seconds for exit confirmation
+const DEBUG_UI = false; // Disabled after debugging
+
+// Performance tracking
+const DEBUG_PERF = true; // ENABLED for debugging performance issues
+const DEBUG_SEEK = true; // ENABLED for debugging seek operations
+let tvControlsRenderCount = 0;
+let lastSeekLogTime = 0;
 
 // Module-level variable to track if seeking is active
 // This is used by the memo comparison function which can't access component state
@@ -104,17 +239,30 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   onShowSubtitles,
   onShowAudioTracks,
   onShowEpisodes,
+  onShowSources,
+  onOpenExternal,
   playbackSpeed = 1,
   buffered = 0,
   restoreFocus = false,
   onFocusRestored,
   modalOpen = false,
 }) => {
+  const renderStartTime = PERF_MONITOR_ENABLED ? performance.now() : 0;
+  tvControlsRenderCount++;
+  if (DEBUG_PERF) {
+    console.log(`[TVPlayerControls] RENDER START #${tvControlsRenderCount} visible=${visible} modalOpen=${modalOpen} paused=${paused}`);
+  }
+
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [timelineFocused, setTimelineFocused] = useState(false);
+
+  // Exit confirmation state
+  const [exitConfirmVisible, setExitConfirmVisible] = useState(false);
+  const exitConfirmVisibleRef = useRef(exitConfirmVisible);
+  exitConfirmVisibleRef.current = exitConfirmVisible;
 
   // Track visible state in ref for use in callbacks
   // Update synchronously during render AND in effect to ensure ref is always current
@@ -304,6 +452,11 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   const seekCommitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const SEEK_COMMIT_DELAY = 600; // Commit seek 600ms after last key press (increased for key repeat gaps)
 
+  // Throttle rapid key events - TV remotes often send 30+ events per second when held
+  // At 30fps target, process at most 1 key event per 100ms (10 fps for seek updates)
+  const lastSeekKeyTimeRef = useRef<number>(0);
+  const SEEK_KEY_THROTTLE_MS = 100; // Only process 1 key event per 100ms (10 fps max)
+
   // Ref to hold commitSeek so addToSeekPreview can call it without circular dependency
   const commitSeekRef = useRef<() => void>(() => {});
 
@@ -311,6 +464,11 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   const commitSeek = useCallback(() => {
     const previewTime = seekPreviewTimeRef.current;
     const baseTime = seekBaseTimeRef.current;
+    const commitStartTime = performance.now();
+
+    if (DEBUG_SEEK) {
+      console.log(`[TVPlayerControls] COMMIT_SEEK START previewTime=${previewTime?.toFixed(2)} baseTime=${baseTime?.toFixed(2)}`);
+    }
 
     if (previewTime !== null && baseTime !== null) {
       // Save the committed position for potential follow-up seeks
@@ -321,6 +479,9 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       const totalOffset = previewTime - baseTime;
 
       if (totalOffset !== 0) {
+        if (DEBUG_SEEK) {
+          console.log(`[TVPlayerControls] COMMIT_SEEK calling ${onSeekTo ? 'onSeekTo' : 'onSeek'} with ${onSeekTo ? previewTime.toFixed(2) : totalOffset.toFixed(2)}`);
+        }
         // Use onSeekTo for absolute positioning if available
         if (onSeekTo) {
           onSeekTo(previewTime);
@@ -333,7 +494,13 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       // Resume playback if we paused it during seek
       // Do this after seeking so the video starts from the new position
       if (setPaused && wasPausedBeforeSeekRef.current === false) {
+        if (DEBUG_SEEK) {
+          console.log(`[TVPlayerControls] COMMIT_SEEK scheduling resume in 150ms`);
+        }
         setTimeout(() => {
+          if (DEBUG_SEEK) {
+            console.log(`[TVPlayerControls] COMMIT_SEEK resuming playback (setPaused=false)`);
+          }
           setPaused(false);
         }, 150);
       }
@@ -346,6 +513,10 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     seekPreviewTimeRef.current = null;
     seekBaseTimeRef.current = null;
     updateSeekDisplay(null);
+
+    if (DEBUG_SEEK) {
+      console.log(`[TVPlayerControls] COMMIT_SEEK END took ${(performance.now() - commitStartTime).toFixed(2)}ms`);
+    }
   }, [onSeekTo, setPaused, updateSeekDisplay]);
 
   // Update ref whenever commitSeek changes
@@ -359,9 +530,32 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
   // 1. Synchronous: Calculate and set UI state (instant)
   // 2. Async: Everything else (pause, commit scheduling)
   const addToSeekPreview = useCallback((direction: 'forward' | 'backward') => {
-    const offset = direction === 'forward' ? SEEK_INTERVAL : -SEEK_INTERVAL;
+    const keyPressTime = performance.now();
     const now = Date.now();
+
+    // THROTTLE: Skip rapid key events (TV remotes send 30+ events/sec when held)
+    // First press is never throttled, subsequent presses are throttled
     const isFirstPress = seekBaseTimeRef.current === null;
+    const timeSinceLastKey = now - lastSeekKeyTimeRef.current;
+    if (!isFirstPress && timeSinceLastKey < SEEK_KEY_THROTTLE_MS) {
+      // Still update the commit timeout so we don't commit early
+      if (seekCommitTimeoutRef.current) {
+        clearTimeout(seekCommitTimeoutRef.current);
+      }
+      seekCommitTimeoutRef.current = setTimeout(() => {
+        commitSeekRef.current();
+      }, SEEK_COMMIT_DELAY);
+      return; // Skip this key event
+    }
+    lastSeekKeyTimeRef.current = now;
+
+    const offset = direction === 'forward' ? SEEK_INTERVAL : -SEEK_INTERVAL;
+
+    if (DEBUG_SEEK) {
+      const timeSinceLastLog = keyPressTime - lastSeekLogTime;
+      lastSeekLogTime = keyPressTime;
+      console.log(`[TVPlayerControls] SEEK_PREVIEW ${direction} isFirstPress=${isFirstPress} timeSinceLastPress=${timeSinceLastLog.toFixed(0)}ms`);
+    }
 
     // ===== PART 1: SYNCHRONOUS - Calculate and update UI =====
     let newPreviewTime: number;
@@ -372,16 +566,26 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
         : currentTimeRef.current;
       seekBaseTimeRef.current = startPosition;
       newPreviewTime = Math.max(0, Math.min(startPosition + offset, durationRef.current));
+      if (DEBUG_SEEK) {
+        console.log(`[TVPlayerControls] SEEK_PREVIEW first press, startPosition=${startPosition.toFixed(2)}, newPreview=${newPreviewTime.toFixed(2)}`);
+      }
     } else {
       newPreviewTime = Math.max(0, Math.min(seekPreviewTimeRef.current! + offset, durationRef.current));
     }
 
     // Update ref immediately - this is synchronous and always up-to-date
     seekPreviewTimeRef.current = newPreviewTime;
-    // Update module-level flag for memo comparison
+    // Update module-level flag for memo comparison BEFORE any state changes
+    // This prevents re-renders from being triggered by setPaused
     isCurrentlySeeking = true;
     // Update the Reanimated shared value directly (updates on UI thread)
     updateSeekDisplay(newPreviewTime);
+
+    const uiUpdateTime = performance.now() - keyPressTime;
+    if (DEBUG_SEEK && uiUpdateTime > 5) {
+      // Only log slow updates to reduce log spam
+      console.log(`[TVPlayerControls] SEEK_PREVIEW slow UI update: ${uiUpdateTime.toFixed(2)}ms`);
+    }
 
     // ===== PART 2: ASYNC - Everything else (runs after React commit) =====
     // Use setImmediate (or setTimeout 0) to run after the current frame
@@ -390,6 +594,9 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       if (isFirstPress && setPaused && wasPausedBeforeSeekRef.current === null) {
         wasPausedBeforeSeekRef.current = paused;
         if (!paused) {
+          if (DEBUG_SEEK) {
+            console.log(`[TVPlayerControls] SEEK_PREVIEW pausing video for seek`);
+          }
           setPaused(true);
         }
       }
@@ -402,6 +609,9 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
 
       // Schedule commit after delay (when user stops pressing)
       seekCommitTimeoutRef.current = setTimeout(() => {
+        if (DEBUG_SEEK) {
+          console.log(`[TVPlayerControls] SEEK_PREVIEW commit timeout fired (${SEEK_COMMIT_DELAY}ms)`);
+        }
         commitSeekRef.current();
       }, SEEK_COMMIT_DELAY);
     };
@@ -514,7 +724,7 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
       }
     },
     onBack: () => {
-      if (DEBUG_UI) console.log('[TVPlayerControls] onBack - modal:', modalOpenRef.current, 'visible:', visibleRef.current);
+      if (DEBUG_UI) console.log('[TVPlayerControls] onBack - modal:', modalOpenRef.current, 'visible:', visibleRef.current, 'exitConfirm:', exitConfirmVisibleRef.current);
       // If a modal is open, don't handle here - let the modal's BackHandler handle it
       if (modalOpenRef.current) return;
 
@@ -537,9 +747,17 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
         }, 200);
         onHideControlsRef.current?.();
       } else {
-        // If controls are hidden, exit the player
-        if (DEBUG_UI) console.log('[TVPlayerControls] onBack - exiting player');
-        onClose();
+        // Controls are hidden - handle exit confirmation flow
+        if (exitConfirmVisibleRef.current) {
+          // Exit confirmation is showing and back pressed again - exit player
+          if (DEBUG_UI) console.log('[TVPlayerControls] onBack - confirming exit');
+          setExitConfirmVisible(false);
+          onClose();
+        } else {
+          // Show exit confirmation banner
+          if (DEBUG_UI) console.log('[TVPlayerControls] onBack - showing exit confirmation');
+          setExitConfirmVisible(true);
+        }
       }
     },
   });
@@ -615,7 +833,8 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
 
       const isVisible = visibleRef.current;
       const isModalOpen = modalOpenRef.current;
-      if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler pressed - visible:', isVisible, 'modal:', isModalOpen);
+      const isExitConfirmVisible = exitConfirmVisibleRef.current;
+      if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler pressed - visible:', isVisible, 'modal:', isModalOpen, 'exitConfirm:', isExitConfirmVisible);
 
       // If a modal is open, let the modal's BackHandler handle it
       if (isModalOpen) {
@@ -641,9 +860,17 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
         onHideControlsRef.current?.();
         return true;
       } else {
-        // If controls are hidden, exit the player
-        if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler - exiting player');
-        onClose();
+        // Controls are hidden - handle exit confirmation flow
+        if (isExitConfirmVisible) {
+          // Exit confirmation is showing and back pressed again - exit player
+          if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler - confirming exit');
+          setExitConfirmVisible(false);
+          onClose();
+        } else {
+          // Show exit confirmation banner
+          if (DEBUG_UI) console.log('[TVPlayerControls] BackHandler - showing exit confirmation');
+          setExitConfirmVisible(true);
+        }
         return true;
       }
     });
@@ -703,24 +930,38 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     };
   });
 
-  // State for time text display (updated from shared value via runOnJS)
+  // State for time text display - ONLY updated when seeking commits, not during preview
+  // This prevents re-renders during rapid seeking
   const [displayTimeState, setDisplayTimeState] = useState(currentTime);
+  const lastDisplayUpdateRef = useRef(0);
+  const DISPLAY_UPDATE_INTERVAL_MS = 500; // Only update display text every 500ms max
 
-  // Update display time state when shared value changes
-  // This is throttled by React's batching but that's OK for text
+  // Update display time state - heavily throttled to prevent re-renders during seeking
   const updateDisplayTimeJS = useCallback((time: number) => {
-    setDisplayTimeState(time);
+    const now = Date.now();
+    // Only update if enough time has passed
+    if (now - lastDisplayUpdateRef.current >= DISPLAY_UPDATE_INTERVAL_MS) {
+      lastDisplayUpdateRef.current = now;
+      setDisplayTimeState(time);
+    }
   }, []);
 
   // Sync shared value changes to React state for text display
+  // DISABLED during rapid seeking - we use refs instead
+  // Only sync when NOT seeking to keep the displayed time accurate after seek completes
   useDerivedValue(() => {
     'worklet';
-    runOnJS(updateDisplayTimeJS)(seekDisplayTimeShared.value);
+    // Only call runOnJS when not actively seeking (checked via module-level variable)
+    // This prevents the constant re-renders during seeking
+    if (!isCurrentlySeeking) {
+      runOnJS(updateDisplayTimeJS)(seekDisplayTimeShared.value);
+    }
     return seekDisplayTimeShared.value;
   });
 
   // For non-animated elements that need the current values
-  const displayTime = displayTimeState;
+  // Use the ref value during seeking for instant UI updates, state otherwise
+  const displayTime = seekPreviewTimeRef.current !== null ? seekPreviewTimeRef.current : displayTimeState;
   const bufferedProgress = duration > 0 ? buffered * 100 : 0;
   const isSeeking = seekPreviewTime !== null;
 
@@ -729,10 +970,19 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
     ? `${title} - S${season}E${episode}: ${episodeTitle}`
     : title;
 
+  // Callback to hide exit confirmation banner after timeout
+  const handleExitConfirmTimeout = useCallback(() => {
+    setExitConfirmVisible(false);
+  }, []);
+
   // When controls are hidden, render a transparent focusable overlay
   // Key events are handled by useTVKeyEvent - no need for onFocus handler
   // (onFocus was causing controls to immediately re-show after hiding)
   if (!visible) {
+    if (PERF_MONITOR_ENABLED) {
+      const renderTime = performance.now() - renderStartTime;
+      perfMonitor.recordRender('TVPlayerControls(hidden)', renderTime);
+    }
     return (
       <View style={styles.hiddenOverlay} pointerEvents="box-only">
         <Focusable
@@ -746,8 +996,19 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
         >
           <View />
         </Focusable>
+        {/* Exit confirmation banner - visible when user presses back with controls hidden */}
+        <ExitConfirmationBanner
+          visible={exitConfirmVisible}
+          onTimeout={handleExitConfirmTimeout}
+          timeoutDuration={EXIT_CONFIRM_TIMEOUT}
+        />
       </View>
     );
+  }
+
+  if (PERF_MONITOR_ENABLED) {
+    const renderTime = performance.now() - renderStartTime;
+    perfMonitor.recordRender('TVPlayerControls(visible)', renderTime);
   }
 
   return (
@@ -840,121 +1101,63 @@ const TVPlayerControlsInner: React.FC<TVPlayerControlsProps> = ({
           </View>
         </Focusable>
 
-        {/* Bottom buttons */}
+        {/* Bottom buttons - using optimized TVButton to avoid React state updates on focus */}
         <View style={styles.bottomButtons}>
           {onShowSubtitles && (
-            <Focusable
-              ref={subtitlesRef}
+            <TVButton
+              focusableRef={subtitlesRef}
+              iconName="subtitles"
+              label="Subtitles"
               onPress={onShowSubtitles}
-              onFocus={resetAutoHideTimer}
-              style={styles.bottomButton}
-              borderRadius={8}
-              focusScale={1.05}
-              animateBackground={true}
-              showFocusBorder={true}
-            >
-              {(focused) => (
-                <>
-                  <MaterialIcons
-                    name="subtitles"
-                    size={12}
-                    color={focused ? '#000' : 'white'}
-                  />
-                  <Text style={[
-                    styles.bottomButtonText,
-                    focused && styles.bottomButtonTextFocused
-                  ]}>
-                    Subtitles
-                  </Text>
-                </>
-              )}
-            </Focusable>
+              onFocusCallback={resetAutoHideTimer}
+            />
           )}
 
           {onShowAudioTracks && (
-            <Focusable
-              ref={audioRef}
+            <TVButton
+              focusableRef={audioRef}
+              iconName="audiotrack"
+              label="Audio"
               onPress={onShowAudioTracks}
-              onFocus={resetAutoHideTimer}
-              style={styles.bottomButton}
-              borderRadius={8}
-              focusScale={1.05}
-              animateBackground={true}
-              showFocusBorder={true}
-            >
-              {(focused) => (
-                <>
-                  <MaterialIcons
-                    name="audiotrack"
-                    size={12}
-                    color={focused ? '#000' : 'white'}
-                  />
-                  <Text style={[
-                    styles.bottomButtonText,
-                    focused && styles.bottomButtonTextFocused
-                  ]}>
-                    Audio
-                  </Text>
-                </>
-              )}
-            </Focusable>
+              onFocusCallback={resetAutoHideTimer}
+            />
+          )}
+
+          {onShowSources && (
+            <TVButton
+              iconName="cloud"
+              label="Sources"
+              onPress={onShowSources}
+              onFocusCallback={resetAutoHideTimer}
+            />
+          )}
+
+          {onOpenExternal && (
+            <TVButton
+              iconName="open-in-new"
+              label="External"
+              onPress={onOpenExternal}
+              onFocusCallback={resetAutoHideTimer}
+            />
           )}
 
           {onShowEpisodes && (
-            <Focusable
-              ref={episodesRef}
+            <TVButton
+              focusableRef={episodesRef}
+              iconName="playlist-play"
+              label="Episodes"
               onPress={onShowEpisodes}
-              onFocus={resetAutoHideTimer}
-              style={styles.bottomButton}
-              borderRadius={8}
-              focusScale={1.05}
-              animateBackground={true}
-              showFocusBorder={true}
-            >
-              {(focused) => (
-                <>
-                  <MaterialIcons
-                    name="playlist-play"
-                    size={12}
-                    color={focused ? '#000' : 'white'}
-                  />
-                  <Text style={[
-                    styles.bottomButtonText,
-                    focused && styles.bottomButtonTextFocused
-                  ]}>
-                    Episodes
-                  </Text>
-                </>
-              )}
-            </Focusable>
+              onFocusCallback={resetAutoHideTimer}
+            />
           )}
 
-          <Focusable
-            ref={closeRef}
+          <TVButton
+            focusableRef={closeRef}
+            iconName="close"
+            label="Exit"
             onPress={onClose}
-            onFocus={resetAutoHideTimer}
-            style={styles.bottomButton}
-            borderRadius={8}
-            focusScale={1.05}
-            animateBackground={true}
-            showFocusBorder={true}
-          >
-            {(focused) => (
-              <>
-                <MaterialIcons
-                  name="close"
-                  size={12}
-                  color={focused ? '#000' : 'white'}
-                />
-                <Text style={[
-                  styles.bottomButtonText,
-                  focused && styles.bottomButtonTextFocused
-                ]}>
-                  Exit
-                </Text>
-              </>
-            )}
-          </Focusable>
+            onFocusCallback={resetAutoHideTimer}
+          />
         </View>
       </LinearGradient>
     </Animated.View>
@@ -1102,7 +1305,116 @@ const styles = StyleSheet.create({
   },
 });
 
-// Use default memo - seeking state is managed internally via state
-export const TVPlayerControls = memo(TVPlayerControlsInner);
+// Custom memo comparison to prevent re-renders during playback when controls are hidden
+// The key insight: when controls are hidden, we don't need to update the time display
+// When visible, we need updates but can throttle to ~1 second intervals
+let lastRenderTime = 0;
+const RENDER_THROTTLE_MS = 1000; // Only re-render for time changes once per second
+
+export const TVPlayerControls = memo(TVPlayerControlsInner, (prevProps, nextProps) => {
+  // Always re-render if visibility changes
+  if (prevProps.visible !== nextProps.visible) return false;
+
+  // Skip paused state changes during seeking - we use Reanimated shared values
+  // for the seek preview display, so we don't need React to re-render
+  if (prevProps.paused !== nextProps.paused) {
+    // Only re-render for paused changes when NOT seeking
+    // During seeking, the play/pause icon isn't visible anyway
+    if (!isCurrentlySeeking) {
+      return false;
+    }
+    // During seeking, skip re-render for paused changes
+    if (DEBUG_PERF) {
+      console.log(`[TVPlayerControls] MEMO skipping paused change during seeking (${prevProps.paused} -> ${nextProps.paused})`);
+    }
+  }
+
+  // Always re-render if modal state changes
+  if (prevProps.modalOpen !== nextProps.modalOpen) return false;
+
+  // Always re-render if restoreFocus changes
+  if (prevProps.restoreFocus !== nextProps.restoreFocus) return false;
+
+  // Re-render if duration changes (but not time)
+  if (prevProps.duration !== nextProps.duration) return false;
+
+  // Re-render if buffered changes significantly (>5%)
+  const bufferedDiff = Math.abs((prevProps.buffered || 0) - (nextProps.buffered || 0));
+  if (bufferedDiff > 0.05) return false;
+
+  // Re-render if title/episode info changes
+  if (prevProps.title !== nextProps.title ||
+      prevProps.episodeTitle !== nextProps.episodeTitle ||
+      prevProps.season !== nextProps.season ||
+      prevProps.episode !== nextProps.episode) return false;
+
+  // Re-render if playback speed changes
+  if (prevProps.playbackSpeed !== nextProps.playbackSpeed) return false;
+
+  // Re-render if callbacks change (they shouldn't with proper memoization, but check anyway)
+  // CRITICAL: If this returns false for callback changes, it means callbacks are being
+  // recreated unnecessarily in the parent component and causing re-renders
+  if (prevProps.onTogglePlayback !== nextProps.onTogglePlayback ||
+      prevProps.onClose !== nextProps.onClose ||
+      prevProps.onShowControls !== nextProps.onShowControls ||
+      prevProps.onHideControls !== nextProps.onHideControls ||
+      prevProps.onSeek !== nextProps.onSeek ||
+      prevProps.onSeekTo !== nextProps.onSeekTo ||
+      prevProps.onShowSubtitles !== nextProps.onShowSubtitles ||
+      prevProps.onShowAudioTracks !== nextProps.onShowAudioTracks ||
+      prevProps.onShowSources !== nextProps.onShowSources ||
+      prevProps.onShowEpisodes !== nextProps.onShowEpisodes ||
+      prevProps.onOpenExternal !== nextProps.onOpenExternal ||
+      prevProps.onFocusRestored !== nextProps.onFocusRestored) {
+    if (DEBUG_PERF) {
+      // Log which callback changed for debugging
+      const changedCallbacks: string[] = [];
+      if (prevProps.onTogglePlayback !== nextProps.onTogglePlayback) changedCallbacks.push('onTogglePlayback');
+      if (prevProps.onClose !== nextProps.onClose) changedCallbacks.push('onClose');
+      if (prevProps.onShowControls !== nextProps.onShowControls) changedCallbacks.push('onShowControls');
+      if (prevProps.onHideControls !== nextProps.onHideControls) changedCallbacks.push('onHideControls');
+      if (prevProps.onSeek !== nextProps.onSeek) changedCallbacks.push('onSeek');
+      if (prevProps.onSeekTo !== nextProps.onSeekTo) changedCallbacks.push('onSeekTo');
+      if (prevProps.onShowSubtitles !== nextProps.onShowSubtitles) changedCallbacks.push('onShowSubtitles');
+      if (prevProps.onShowAudioTracks !== nextProps.onShowAudioTracks) changedCallbacks.push('onShowAudioTracks');
+      if (prevProps.onShowSources !== nextProps.onShowSources) changedCallbacks.push('onShowSources');
+      if (prevProps.onShowEpisodes !== nextProps.onShowEpisodes) changedCallbacks.push('onShowEpisodes');
+      if (prevProps.onOpenExternal !== nextProps.onOpenExternal) changedCallbacks.push('onOpenExternal');
+      if (prevProps.onFocusRestored !== nextProps.onFocusRestored) changedCallbacks.push('onFocusRestored');
+      console.log(`[TVPlayerControls] MEMO callback changed: ${changedCallbacks.join(', ')}`);
+    }
+    return false;
+  }
+
+  // Handle currentTime changes:
+  // - If controls are hidden, skip re-render entirely (time not visible)
+  // - If seeking is active, SKIP re-render (Reanimated handles display updates)
+  // - If controls are visible and not seeking, throttle to once per second
+  if (prevProps.currentTime !== nextProps.currentTime) {
+    // If controls are hidden, skip re-render for time changes
+    if (!nextProps.visible) {
+      return true; // Skip re-render
+    }
+
+    // If currently seeking, SKIP re-render - Reanimated shared values handle the display
+    // This is critical for performance during rapid seeking
+    if (isCurrentlySeeking) {
+      if (DEBUG_PERF) {
+        console.log(`[TVPlayerControls] MEMO skipping currentTime change during seeking`);
+      }
+      return true; // Skip re-render
+    }
+
+    // Throttle time updates to once per second when visible
+    const now = Date.now();
+    if (now - lastRenderTime < RENDER_THROTTLE_MS) {
+      return true; // Skip re-render
+    }
+    lastRenderTime = now;
+    return false; // Re-render
+  }
+
+  return true; // Props are equal, skip re-render
+});
 
 export default TVPlayerControls;

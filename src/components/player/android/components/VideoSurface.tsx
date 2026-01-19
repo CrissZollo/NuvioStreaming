@@ -122,6 +122,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
                 onProgress={handleProgress}
                 onEnd={handleEnd}
                 onError={handleError}
+                onBuffer={onBuffer}
                 onTracksChanged={onTracksChanged}
             />
         );

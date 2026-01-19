@@ -16,10 +16,17 @@ import Animated, {
   SharedValue,
 } from 'react-native-reanimated';
 import { useIsTV } from '../../contexts/TVContext';
+import { perfMonitor, PERF_MONITOR_ENABLED } from '../../utils/performanceMonitor';
 
 // PERFORMANCE: Use longer animation duration for low-end TV devices
-// 80ms = 2-3 frames at 30fps (jerky), 120ms = 4 frames (smooth)
-const TV_ANIMATION_DURATION = Platform.isTV ? 120 : 80;
+// At 30fps, 1 frame = 33ms. Use 165ms (5 frames) for smooth animations
+// This is slower but ensures smooth visual feedback on low-end devices
+const TV_ANIMATION_DURATION = Platform.isTV ? 165 : 80;
+
+// Debug logging for performance analysis
+const DEBUG_FOCUSABLE = false; // Disabled after debugging
+let focusableRenderCount = 0;
+let focusableInstanceCount = 0;
 
 interface FocusableProps {
   /** Content to render inside the focusable container */
@@ -147,6 +154,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     },
     ref
   ) => {
+    // Performance tracking
+    const instanceId = useRef(++focusableInstanceCount).current;
+    const renderStartTime = (DEBUG_FOCUSABLE || PERF_MONITOR_ENABLED) ? performance.now() : 0;
+
     const isTV = useIsTV();
     const innerRef = useRef<View>(null);
     // Use external viewRef if provided, otherwise use internal ref
@@ -201,10 +212,18 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     // Optimized focus handler - removed all logging calls for TV performance
     // Even disabled logging functions have call overhead on low-end devices
     const handleFocus = useCallback(() => {
+      const focusStartTime = DEBUG_FOCUSABLE ? performance.now() : 0;
+      if (DEBUG_FOCUSABLE) {
+        console.log(`[Focusable #${instanceId}] FOCUS START testID=${testID}`);
+      }
+
       isFocusedRef.current = true;
 
       // Only update state if we have a render prop that needs it
       if (needsFocusState) {
+        if (DEBUG_FOCUSABLE) {
+          console.log(`[Focusable #${instanceId}] Setting focus state (needsFocusState=true)`);
+        }
         setIsFocusedState(true);
       }
 
@@ -213,14 +232,26 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       focusProgress.value = withTiming(1, { duration: TV_ANIMATION_DURATION });
 
       onFocus?.();
-    }, [onFocus, focusProgress, needsFocusState]);
+
+      if (DEBUG_FOCUSABLE) {
+        console.log(`[Focusable #${instanceId}] FOCUS COMPLETE took ${(performance.now() - focusStartTime).toFixed(2)}ms`);
+      }
+    }, [onFocus, focusProgress, needsFocusState, instanceId, testID]);
 
     // Optimized blur handler - removed all logging calls for TV performance
     const handleBlur = useCallback(() => {
+      const blurStartTime = DEBUG_FOCUSABLE ? performance.now() : 0;
+      if (DEBUG_FOCUSABLE) {
+        console.log(`[Focusable #${instanceId}] BLUR START testID=${testID}`);
+      }
+
       isFocusedRef.current = false;
 
       // Only update state if we have a render prop that needs it
       if (needsFocusState) {
+        if (DEBUG_FOCUSABLE) {
+          console.log(`[Focusable #${instanceId}] Clearing focus state (needsFocusState=true)`);
+        }
         setIsFocusedState(false);
       }
 
@@ -228,7 +259,11 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       focusProgress.value = withTiming(0, { duration: TV_ANIMATION_DURATION });
 
       onBlur?.();
-    }, [onBlur, focusProgress, needsFocusState]);
+
+      if (DEBUG_FOCUSABLE) {
+        console.log(`[Focusable #${instanceId}] BLUR COMPLETE took ${(performance.now() - blurStartTime).toFixed(2)}ms`);
+      }
+    }, [onBlur, focusProgress, needsFocusState, instanceId, testID]);
 
     // Expose focus methods via ref
     useImperativeHandle(ref, () => ({
@@ -340,16 +375,38 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       // Accelerated curve: border reaches full opacity faster (at 40% of animation)
       // and starts fading earlier (at 60% of animation going out)
       // This makes the border feel more responsive while scale still animates smoothly
-      const opacity = interpolate(
+      const rawOpacity = interpolate(
         focusProgress.value,
         [0, 0.4, 1],
         [0, 1, 1]
       );
+      // Clamp and round to avoid scientific notation values that cause Reanimated errors
+      // e.g., 6.848392044966639e-7 is invalid - round to 2 decimal places
+      const opacity = Math.round(Math.max(0, Math.min(1, rawOpacity)) * 100) / 100;
       return {
         borderWidth: BORDER_WIDTH,
-        borderColor: `rgba(255, 255, 255, ${opacity})`,
+        borderColor: opacity > 0 ? `rgba(255, 255, 255, ${opacity})` : 'transparent',
       };
     });
+
+    // Log render time
+    if (PERF_MONITOR_ENABLED) {
+      const renderTime = performance.now() - renderStartTime;
+      // Only track slow Focusable renders to avoid flooding the monitor
+      if (renderTime > 10) {
+        perfMonitor.recordRender(`Focusable(${testID || instanceId})`, renderTime);
+      }
+    }
+    if (DEBUG_FOCUSABLE) {
+      const renderTime = performance.now() - renderStartTime;
+      if (renderTime > 5) { // Only log slow renders (>5ms)
+        console.log(`[Focusable #${instanceId}] SLOW RENDER: ${renderTime.toFixed(2)}ms testID=${testID} needsFocusState=${needsFocusState} animateBackground=${animateBackground}`);
+      }
+      focusableRenderCount++;
+      if (focusableRenderCount % 50 === 0) {
+        console.log(`[Focusable] Total renders: ${focusableRenderCount}, instances: ${focusableInstanceCount}`);
+      }
+    }
 
     return (
       <AnimatedPressable
