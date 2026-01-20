@@ -1097,6 +1097,14 @@ const AndroidVideoPlayer: React.FC = () => {
             screenDimensions={playerState.screenDimensions}
             useHardwareDecoding={settings.useHardwareDecoding}
             enableAudioPassthrough={settings.enableAudioPassthrough}
+            // Subtitle styling for embedded subtitles (native ExoPlayer)
+            subtitleSize={subtitleSize}
+            subtitleColor={subtitleTextColor}
+            subtitleBackground={subtitleBackground}
+            subtitleBackgroundOpacity={subtitleBgOpacity}
+            subtitleOutline={subtitleOutline}
+            subtitleOutlineColor={subtitleOutlineColor}
+            subtitleBottomOffset={subtitleBottomOffset}
           />
         )}
 

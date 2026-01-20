@@ -21,6 +21,14 @@ export interface ExoPlayerProps {
     resizeMode?: 'contain' | 'cover' | 'stretch';
     style?: any;
     enableAudioPassthrough?: boolean;
+    // Subtitle styling props
+    subtitleSize?: number;
+    subtitleColor?: string;
+    subtitleBackground?: boolean;
+    subtitleBackgroundOpacity?: number;
+    subtitleOutline?: boolean;
+    subtitleOutlineColor?: string;
+    subtitleBottomOffset?: number;
     onLoad?: (data: { duration: number; width: number; height: number }) => void;
     onProgress?: (data: { currentTime: number; duration: number }) => void;
     onEnd?: () => void;
@@ -331,11 +339,21 @@ const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
             useTextureView={false}
             selectedAudioTrack={selectedAudioTrack}
             selectedTextTrack={selectedTextTrack}
-            // Note: subtitleStyle doesn't support backgroundColor
-            // The black background is ExoPlayer's default - no way to remove it via JS
+            // Extended subtitleStyle - native patch in ExoPlayerView.kt handles these
+            // Note: subtitleStyle is re-created when any prop changes to force native update
             subtitleStyle={{
-                paddingBottom: 50,
+                fontSize: props.subtitleSize || 24,
+                paddingBottom: props.subtitleBottomOffset ?? 50,
                 subtitlesFollowVideo: true,
+                // Extended props handled by native patch
+                foregroundColor: props.subtitleColor || '#FFFFFF',
+                backgroundColor: props.subtitleBackground
+                    ? `rgba(0,0,0,${props.subtitleBackgroundOpacity ?? 0.75})`
+                    : 'transparent',
+                // Edge type: 0=NONE, 1=OUTLINE, 2=DROP_SHADOW
+                edgeType: props.subtitleOutline ? 2 : 0,
+                edgeColor: props.subtitleOutlineColor || '#000000',
+                useOutline: props.subtitleOutline ?? true,
             }}
             progressUpdateInterval={1000}
             bufferConfig={TV_BUFFER_CONFIG}

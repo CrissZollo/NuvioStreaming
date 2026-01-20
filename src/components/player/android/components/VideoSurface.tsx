@@ -40,6 +40,15 @@ interface VideoSurfaceProps {
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
     useHardwareDecoding?: boolean;
     enableAudioPassthrough?: boolean;
+
+    // Subtitle styling props (for embedded subtitles)
+    subtitleSize?: number;
+    subtitleColor?: string;
+    subtitleBackground?: boolean;
+    subtitleBackgroundOpacity?: number;
+    subtitleOutline?: boolean;
+    subtitleOutlineColor?: string;
+    subtitleBottomOffset?: number;
 }
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
@@ -65,6 +74,14 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
     onTracksChanged,
     useHardwareDecoding,
     enableAudioPassthrough,
+    // Subtitle styling
+    subtitleSize,
+    subtitleColor,
+    subtitleBackground,
+    subtitleBackgroundOpacity,
+    subtitleOutline,
+    subtitleOutlineColor,
+    subtitleBottomOffset,
 }) => {
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
@@ -118,6 +135,14 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
                 resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
                 style={localStyles.player}
                 enableAudioPassthrough={enableAudioPassthrough}
+                // Subtitle styling (passed to native ExoPlayer)
+                subtitleSize={subtitleSize}
+                subtitleColor={subtitleColor}
+                subtitleBackground={subtitleBackground}
+                subtitleBackgroundOpacity={subtitleBackgroundOpacity}
+                subtitleOutline={subtitleOutline}
+                subtitleOutlineColor={subtitleOutlineColor}
+                subtitleBottomOffset={subtitleBottomOffset}
                 onLoad={handleLoad}
                 onProgress={handleProgress}
                 onEnd={handleEnd}
