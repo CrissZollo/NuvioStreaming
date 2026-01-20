@@ -175,6 +175,31 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = memo(({
             </PinchGestureHandler>
         </View>
     );
+}, (prevProps, nextProps) => {
+    // Custom comparison to prevent re-renders during subtitle style changes
+    // Only re-render for critical playback props, not subtitle styling
+    const criticalPropsEqual =
+        prevProps.processedStreamUrl === nextProps.processedStreamUrl &&
+        prevProps.currentStreamUrl === nextProps.currentStreamUrl &&
+        prevProps.paused === nextProps.paused &&
+        prevProps.volume === nextProps.volume &&
+        prevProps.playbackSpeed === nextProps.playbackSpeed &&
+        prevProps.resizeMode === nextProps.resizeMode &&
+        prevProps.screenDimensions.width === nextProps.screenDimensions.width &&
+        prevProps.screenDimensions.height === nextProps.screenDimensions.height &&
+        prevProps.enableAudioPassthrough === nextProps.enableAudioPassthrough;
+
+    // Allow re-render for subtitle style changes but not block on them
+    const subtitlePropsEqual =
+        prevProps.subtitleSize === nextProps.subtitleSize &&
+        prevProps.subtitleColor === nextProps.subtitleColor &&
+        prevProps.subtitleBackground === nextProps.subtitleBackground &&
+        prevProps.subtitleBackgroundOpacity === nextProps.subtitleBackgroundOpacity &&
+        prevProps.subtitleOutline === nextProps.subtitleOutline &&
+        prevProps.subtitleOutlineColor === nextProps.subtitleOutlineColor &&
+        prevProps.subtitleBottomOffset === nextProps.subtitleBottomOffset;
+
+    return criticalPropsEqual && subtitlePropsEqual;
 });
 
 const localStyles = StyleSheet.create({

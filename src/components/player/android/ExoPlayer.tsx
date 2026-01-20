@@ -1,4 +1,4 @@
-import React, { useRef, forwardRef, useImperativeHandle, useState, useMemo } from 'react';
+import React, { useRef, forwardRef, useImperativeHandle, useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType } from 'react-native-video';
 
@@ -322,6 +322,31 @@ const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
         return config;
     }, [props.source, props.headers])
 
+    // Memoize subtitle style to prevent unnecessary re-renders
+    // Only recreate when actual subtitle styling props change
+    const subtitleStyle = useMemo(() => ({
+        fontSize: props.subtitleSize || 24,
+        paddingBottom: props.subtitleBottomOffset ?? 50,
+        subtitlesFollowVideo: true,
+        // Extended props handled by native patch
+        foregroundColor: props.subtitleColor || '#FFFFFF',
+        backgroundColor: props.subtitleBackground
+            ? `rgba(0,0,0,${props.subtitleBackgroundOpacity ?? 0.75})`
+            : 'transparent',
+        // Edge type: 0=NONE, 1=OUTLINE, 2=DROP_SHADOW
+        edgeType: props.subtitleOutline ? 2 : 0,
+        edgeColor: props.subtitleOutlineColor || '#000000',
+        useOutline: props.subtitleOutline ?? true,
+    }), [
+        props.subtitleSize,
+        props.subtitleBottomOffset,
+        props.subtitleColor,
+        props.subtitleBackground,
+        props.subtitleBackgroundOpacity,
+        props.subtitleOutline,
+        props.subtitleOutlineColor,
+    ]);
+
     return (
         <Video
             ref={videoRef}
@@ -340,21 +365,7 @@ const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
             selectedAudioTrack={selectedAudioTrack}
             selectedTextTrack={selectedTextTrack}
             // Extended subtitleStyle - native patch in ExoPlayerView.kt handles these
-            // Note: subtitleStyle is re-created when any prop changes to force native update
-            subtitleStyle={{
-                fontSize: props.subtitleSize || 24,
-                paddingBottom: props.subtitleBottomOffset ?? 50,
-                subtitlesFollowVideo: true,
-                // Extended props handled by native patch
-                foregroundColor: props.subtitleColor || '#FFFFFF',
-                backgroundColor: props.subtitleBackground
-                    ? `rgba(0,0,0,${props.subtitleBackgroundOpacity ?? 0.75})`
-                    : 'transparent',
-                // Edge type: 0=NONE, 1=OUTLINE, 2=DROP_SHADOW
-                edgeType: props.subtitleOutline ? 2 : 0,
-                edgeColor: props.subtitleOutlineColor || '#000000',
-                useOutline: props.subtitleOutline ?? true,
-            }}
+            subtitleStyle={subtitleStyle}
             progressUpdateInterval={1000}
             bufferConfig={TV_BUFFER_CONFIG}
             onLoad={handleLoad}
