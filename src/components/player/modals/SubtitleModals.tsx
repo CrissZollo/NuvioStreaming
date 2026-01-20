@@ -86,7 +86,7 @@ const MorphingTab = ({ label, isSelected, onPress, isTVDevice, autoFocus, viewRe
         style={{ flex: 1 }}
         borderRadius={10}
         focusScale={1.05}
-        animateBackground={true}
+        animateBackground={false}
         showFocusBorder={true}
         viewRef={viewRef}
         {...focusProps}
@@ -97,9 +97,9 @@ const MorphingTab = ({ label, isSelected, onPress, isTVDevice, autoFocus, viewRe
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: isSelected ? 10 : 40,
-            backgroundColor: (isSelected || focused) ? 'white' : 'rgba(255,255,255,0.06)',
+            backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.06)',
           }]}>
-            <Text style={{ color: (isSelected || focused) ? 'black' : 'white', fontWeight: (isSelected || focused) ? '700' : '400', fontSize: 15 }}>
+            <Text style={{ color: isSelected ? 'black' : 'white', fontWeight: (isSelected || focused) ? '700' : '400', fontSize: 15 }}>
               {label}
             </Text>
           </View>
@@ -266,14 +266,14 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       onPress={() => { selectTextTrack(-1); setSelectedOnlineSubtitleId(null); }}
                       autoFocus={true}
                       blockDown={ksTextTracks.length === 0}
-                      style={{ padding: 14, borderRadius: 12, backgroundColor: selectedTextTrack === -1 ? 'white' : 'rgba(242, 184, 181, 1)' }}
+                      style={{ padding: 14, borderRadius: 12, backgroundColor: selectedTextTrack === -1 ? 'white' : 'rgba(255,255,255,0.05)' }}
                       borderRadius={12}
                       focusScale={1.02}
-                      animateBackground={true}
+                      animateBackground={false}
                       showFocusBorder={true}
                     >
                       {(focused) => (
-                        <Text style={{ color: (selectedTextTrack === -1 || focused) ? 'black' : 'rgba(96, 20, 16)', fontWeight: '600', fontSize: 16 }}>None</Text>
+                        <Text style={{ color: selectedTextTrack === -1 ? 'black' : 'white', fontWeight: (selectedTextTrack === -1 || focused) ? '700' : '400', fontSize: 16 }}>None</Text>
                       )}
                     </Focusable>
                   ) : (
@@ -298,12 +298,12 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           style={{ padding: 14, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                           borderRadius={12}
                           focusScale={1.02}
-                          animateBackground={true}
+                          animateBackground={false}
                           showFocusBorder={true}
                         >
                           {(focused) => (
                             <>
-                              <Text style={{ color: (isSelected || focused) ? 'black' : 'white', fontWeight: (isSelected || focused) ? '700' : '400', fontSize: 16 }}>{getTrackDisplayName(track)}</Text>
+                              <Text style={{ color: isSelected ? 'black' : 'white', fontWeight: (isSelected || focused) ? '700' : '400', fontSize: 16 }}>{getTrackDisplayName(track)}</Text>
                               {isSelected && <MaterialIcons name="check" size={18} color="black" />}
                             </>
                           )}
@@ -371,26 +371,26 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ padding: 8, paddingLeft: 12, paddingRight: 14, borderRadius: 12, backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                             borderRadius={12}
                             focusScale={1.02}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
                             {(focused) => (
                               <>
                                 <View style={{ flex: 1 }}>
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <Text style={{ marginLeft: 5, color: (isSelected || focused) ? 'black' : 'white', fontWeight: '600', fontSize: 16 }}>
+                                    <Text style={{ marginLeft: 5, color: isSelected ? 'black' : 'white', fontWeight: (isSelected || focused) ? '700' : '600', fontSize: 16 }}>
                                       {formatLanguage(sub.language) || sub.display}
                                     </Text>
-                                    <View style={{ backgroundColor: (isSelected || focused) ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                      <Text style={{ color: (isSelected || focused) ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' }}>External</Text>
+                                    <View style={{ backgroundColor: isSelected ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <Text style={{ color: isSelected ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' }}>External</Text>
                                     </View>
                                     {isHearingImpaired && (
-                                      <View style={{ backgroundColor: (isSelected || focused) ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                        <Text style={{ color: (isSelected || focused) ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' }}>HI</Text>
+                                      <View style={{ backgroundColor: isSelected ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                        <Text style={{ color: isSelected ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '600' }}>HI</Text>
                                       </View>
                                     )}
                                   </View>
-                                  <Text style={{ marginLeft: 5, color: (isSelected || focused) ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 12, paddingBottom: 3 }}>{sourceName}</Text>
+                                  <Text style={{ marginLeft: 5, color: isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontSize: 12, paddingBottom: 3 }}>{sourceName}</Text>
                                 </View>
                                 {isSelected && <MaterialIcons name="check" size={18} color="black" />}
                               </>
@@ -482,10 +482,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ paddingHorizontal: chipPadH + 4, paddingVertical: chipPadV + 2, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
                             borderRadius={20}
                             focusScale={1.05}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <Text style={{ color: focused ? '#000' : '#fff', fontWeight: '600', fontSize: 14 }}>Default</Text>}
+                            {(focused) => <Text style={{ color: '#fff', fontWeight: focused ? '700' : '600', fontSize: 14 }}>Default</Text>}
                           </Focusable>
                           <Focusable
                             onPress={() => {
@@ -494,10 +494,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ paddingHorizontal: chipPadH + 4, paddingVertical: chipPadV + 2, borderRadius: 20, backgroundColor: 'rgba(255,215,0,0.12)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.35)' }}
                             borderRadius={20}
                             focusScale={1.05}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <Text style={{ color: focused ? '#000' : '#FFD700', fontWeight: '700', fontSize: 14 }}>Yellow</Text>}
+                            {() => <Text style={{ color: '#FFD700', fontWeight: '700', fontSize: 14 }}>Yellow</Text>}
                           </Focusable>
                           <Focusable
                             onPress={() => {
@@ -506,10 +506,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ paddingHorizontal: chipPadH + 4, paddingVertical: chipPadV + 2, borderRadius: 20, backgroundColor: 'rgba(34,197,94,0.12)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.35)' }}
                             borderRadius={20}
                             focusScale={1.05}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <Text style={{ color: focused ? '#000' : '#22C55E', fontWeight: '700', fontSize: 14 }}>High Contrast</Text>}
+                            {() => <Text style={{ color: '#22C55E', fontWeight: '700', fontSize: 14 }}>High Contrast</Text>}
                           </Focusable>
                           <Focusable
                             onPress={() => {
@@ -518,10 +518,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ paddingHorizontal: chipPadH + 4, paddingVertical: chipPadV + 2, borderRadius: 20, backgroundColor: 'rgba(59,130,246,0.12)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.35)' }}
                             borderRadius={20}
                             focusScale={1.05}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <Text style={{ color: focused ? '#000' : '#3B82F6', fontWeight: '700', fontSize: 14 }}>Large</Text>}
+                            {() => <Text style={{ color: '#3B82F6', fontWeight: '700', fontSize: 14 }}>Large</Text>}
                           </Focusable>
                         </>
                       ) : (
@@ -587,10 +587,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                               style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
                               borderRadius={controlBtn.radius}
                               focusScale={1.1}
-                              animateBackground={true}
+                              animateBackground={false}
                               showFocusBorder={true}
                             >
-                              {(focused) => <MaterialIcons name="remove" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                              {() => <MaterialIcons name="remove" size={20} color="#FFFFFF" />}
                             </Focusable>
                             <View style={{ minWidth: 42, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
                               <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '700' }}>{subtitleSize}</Text>
@@ -600,10 +600,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                               style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
                               borderRadius={controlBtn.radius}
                               focusScale={1.1}
-                              animateBackground={true}
+                              animateBackground={false}
                               showFocusBorder={true}
                             >
-                              {(focused) => <MaterialIcons name="add" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                              {() => <MaterialIcons name="add" size={20} color="#FFFFFF" />}
                             </Focusable>
                           </>
                         ) : (
@@ -692,10 +692,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
                             borderRadius={controlBtn.radius}
                             focusScale={1.1}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <MaterialIcons name="remove" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                            {() => <MaterialIcons name="remove" size={20} color="#FFFFFF" />}
                           </Focusable>
                           <View style={{ minWidth: 48, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
                             <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '700' }}>{subtitleBgOpacity.toFixed(1)}</Text>
@@ -705,10 +705,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
                             borderRadius={controlBtn.radius}
                             focusScale={1.1}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <MaterialIcons name="add" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                            {() => <MaterialIcons name="add" size={20} color="#FFFFFF" />}
                           </Focusable>
                         </View>
                       </View>
@@ -767,10 +767,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
                             borderRadius={controlBtn.radius}
                             focusScale={1.1}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <MaterialIcons name="remove" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                            {() => <MaterialIcons name="remove" size={20} color="#FFFFFF" />}
                           </Focusable>
                           <View style={{ minWidth: 42, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
                             <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '700' }}>{subtitleOutlineWidth}</Text>
@@ -780,10 +780,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
                             borderRadius={controlBtn.radius}
                             focusScale={1.1}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <MaterialIcons name="add" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                            {() => <MaterialIcons name="add" size={20} color="#FFFFFF" />}
                           </Focusable>
                         </View>
                       </View>
@@ -834,10 +834,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                               style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: subtitleAlign === a.key ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
                               borderRadius={8}
                               focusScale={1.1}
-                              animateBackground={true}
+                              animateBackground={false}
                               showFocusBorder={true}
                             >
-                              {(focused) => <MaterialIcons name={a.icon as any} size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                              {() => <MaterialIcons name={a.icon as any} size={20} color="#FFFFFF" />}
                             </Focusable>
                           ))}
                         </View>
@@ -857,10 +857,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
                             borderRadius={controlBtn.radius}
                             focusScale={1.1}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <MaterialIcons name="keyboard-arrow-down" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                            {() => <MaterialIcons name="keyboard-arrow-down" size={20} color="#FFFFFF" />}
                           </Focusable>
                           <View style={{ minWidth: 46, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
                             <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '700' }}>{subtitleBottomOffset}</Text>
@@ -870,10 +870,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             style={{ width: controlBtn.size + 4, height: controlBtn.size + 4, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}
                             borderRadius={controlBtn.radius}
                             focusScale={1.1}
-                            animateBackground={true}
+                            animateBackground={false}
                             showFocusBorder={true}
                           >
-                            {(focused) => <MaterialIcons name="keyboard-arrow-up" size={20} color={focused ? '#000' : '#FFFFFF'} />}
+                            {() => <MaterialIcons name="keyboard-arrow-up" size={20} color="#FFFFFF" />}
                           </Focusable>
                         </View>
                       </View>
@@ -892,10 +892,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
                           borderRadius={8}
                           focusScale={1.05}
-                          animateBackground={true}
+                          animateBackground={false}
                           showFocusBorder={true}
                         >
-                          {(focused) => <Text style={{ color: focused ? '#000' : '#fff', fontWeight: '600', fontSize: 14 }}>Reset to Defaults</Text>}
+                          {() => <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Reset to Defaults</Text>}
                         </Focusable>
                       </View>
                     )}

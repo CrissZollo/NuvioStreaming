@@ -154,12 +154,12 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                   <>
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       {isUnsupported && (
-                        <MaterialIcons name="warning" size={16} color={(isSelected || focused) ? '#B45309' : '#F59E0B'} />
+                        <MaterialIcons name="warning" size={16} color={isSelected ? '#B45309' : '#F59E0B'} />
                       )}
                       <Text style={{
                         color: isUnsupported
-                          ? ((isSelected || focused) ? '#B45309' : '#F59E0B')
-                          : ((isSelected || focused) ? 'black' : 'white'),
+                          ? (isSelected ? '#B45309' : '#F59E0B')
+                          : (isSelected ? 'black' : 'white'),
                         fontWeight: (isSelected || focused) ? '700' : '400',
                         fontSize: isTVDevice ? 18 : 15,
                         flex: 1
@@ -193,7 +193,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
                       }}
                       borderRadius={12}
                       focusScale={1.02}
-                      animateBackground={true}
+                      animateBackground={false}
                       showFocusBorder={true}
                     >
                       {(focused) => trackContent(focused)}

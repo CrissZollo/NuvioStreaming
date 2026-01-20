@@ -137,11 +137,11 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                 backgroundColor: 'rgba(255,255,255,0.1)',
               }}
               borderRadius={20}
-              animateBackground={true}
+              animateBackground={false}
               showFocusBorder={true}
             >
-              {(focused) => (
-                <MaterialIcons name="close" size={24} color={focused ? 'black' : 'white'} />
+              {() => (
+                <MaterialIcons name="close" size={24} color="white" />
               )}
             </Focusable>
           )}
@@ -193,7 +193,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Text style={{
-                              color: (isSelected || focused) ? 'black' : 'white',
+                              color: isSelected ? 'black' : 'white',
                               fontWeight: (isSelected || focused) ? '700' : '500',
                               fontSize: isTVDevice ? 16 : 14,
                               flex: 1,
@@ -207,7 +207,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
                               {stream.size && (
                                 <Text style={{
-                                  color: (isSelected || focused) ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)',
+                                  color: isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)',
                                   fontSize: isTVDevice ? 13 : 11,
                                 }}>
                                   {(stream.size / (1024 * 1024 * 1024)).toFixed(1)} GB
@@ -215,7 +215,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                               )}
                               {stream.lang && (
                                 <Text style={{
-                                  color: (isSelected || focused) ? 'rgba(59, 130, 246, 1)' : 'rgba(59, 130, 246, 0.8)',
+                                  color: isSelected ? 'rgba(59, 130, 246, 1)' : 'rgba(59, 130, 246, 0.8)',
                                   fontSize: isTVDevice ? 13 : 11,
                                   fontWeight: '600',
                                 }}>
@@ -230,7 +230,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                           {isSelected ? (
                             <MaterialIcons name="check" size={isTVDevice ? 24 : 20} color="black" />
                           ) : (
-                            <MaterialIcons name="play-arrow" size={isTVDevice ? 24 : 20} color={(focused) ? 'black' : 'rgba(255,255,255,0.3)'} />
+                            <MaterialIcons name="play-arrow" size={isTVDevice ? 24 : 20} color="rgba(255,255,255,0.3)" />
                           )}
                         </View>
                       </View>
@@ -251,7 +251,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                           }}
                           borderRadius={12}
                           focusScale={1.0}
-                          animateBackground={!isSelected}
+                          animateBackground={false}
                           showFocusBorder={!isSelected}
                           autoFocus={isFirstStream}
                           disabled={isChangingSource === true}

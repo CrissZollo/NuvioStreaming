@@ -68,35 +68,6 @@ const TVButton = memo(({ iconName, label, onPress, focusableRef, onFocusCallback
     focusProgress.value = withTiming(0, { duration: 165 });
   }, [focusProgress]);
 
-  // We can't animate color directly on MaterialIcons, so we use two icons
-  // and crossfade between them using opacity
-  const unfocusedIconStyle = useAnimatedStyle(() => {
-    'worklet';
-    return {
-      opacity: interpolate(focusProgress.value, [0, 1], [1, 0]),
-      position: 'absolute' as const,
-    };
-  });
-
-  const focusedIconStyle = useAnimatedStyle(() => {
-    'worklet';
-    return {
-      opacity: interpolate(focusProgress.value, [0, 1], [0, 1]),
-      position: 'absolute' as const,
-    };
-  });
-
-  // Animated style for text color
-  const animatedTextStyle = useAnimatedStyle(() => {
-    'worklet';
-    const color = interpolateColor(
-      focusProgress.value,
-      [0, 1],
-      ['#FFFFFF', '#000000']
-    );
-    return { color };
-  });
-
   return (
     <Focusable
       ref={actualRef}
@@ -106,20 +77,15 @@ const TVButton = memo(({ iconName, label, onPress, focusableRef, onFocusCallback
       style={buttonStyles.container}
       borderRadius={8}
       focusScale={1.05}
-      animateBackground={true}
+      animateBackground={false}
       showFocusBorder={true}
     >
       <View style={buttonStyles.iconContainer}>
-        <AnimatedView style={unfocusedIconStyle}>
-          <MaterialIcons name={iconName} size={12} color="white" />
-        </AnimatedView>
-        <AnimatedView style={focusedIconStyle}>
-          <MaterialIcons name={iconName} size={12} color="black" />
-        </AnimatedView>
+        <MaterialIcons name={iconName} size={12} color="white" />
       </View>
-      <AnimatedText style={[buttonStyles.text, animatedTextStyle]}>
+      <Text style={buttonStyles.text}>
         {label}
-      </AnimatedText>
+      </Text>
     </Focusable>
   );
 });
@@ -143,6 +109,7 @@ const buttonStyles = StyleSheet.create({
   text: {
     fontSize: 8,
     fontWeight: '500',
+    color: 'white',
   },
 });
 
