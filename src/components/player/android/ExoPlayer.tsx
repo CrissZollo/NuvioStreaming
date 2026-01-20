@@ -5,7 +5,11 @@ import Video, { VideoRef, SelectedTrack, SelectedTrackType } from 'react-native-
 export interface ExoPlayerRef {
     seek: (positionSeconds: number) => void;
     setAudioTrack: (trackId: number) => void;
-    setSubtitleTrack: (trackId: number) => void;
+    /**
+     * Set the subtitle track. Pass trackId=-1 to disable subtitles.
+     * Uses LANGUAGE-based selection first (most reliable), then TITLE, then INDEX as fallback.
+     */
+    setSubtitleTrack: (trackId: number, title?: string, language?: string) => void;
 }
 
 export interface ExoPlayerProps {
@@ -62,12 +66,30 @@ const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
             console.log(`[ExoPlayer] setAudioTrack called: ${trackId}`);
             setSelectedAudioTrack({ type: SelectedTrackType.INDEX, value: trackId });
         },
-        setSubtitleTrack: (trackId: number) => {
-            console.log(`[ExoPlayer] setSubtitleTrack called: ${trackId}`);
+        setSubtitleTrack: (trackId: number, title?: string, language?: string) => {
+            console.log(`[ExoPlayer] setSubtitleTrack called with trackId: ${trackId}, title: ${title}, language: ${language}`);
             if (trackId === -1) {
+                console.log(`[ExoPlayer] Disabling subtitles`);
                 setSelectedTextTrack({ type: SelectedTrackType.DISABLED, value: '' });
             } else {
-                setSelectedTextTrack({ type: SelectedTrackType.INDEX, value: trackId });
+                // Workaround for react-native-video Android bug:
+                // First disable, then after a brief delay, set the new track
+                // This forces ExoPlayer to properly switch tracks
+                console.log(`[ExoPlayer] Applying track switch workaround - disabling first`);
+                setSelectedTextTrack({ type: SelectedTrackType.DISABLED, value: '' });
+
+                setTimeout(() => {
+                    if (language && language !== 'und') {
+                        console.log(`[ExoPlayer] Setting subtitle track to LANGUAGE: ${language}`);
+                        setSelectedTextTrack({ type: SelectedTrackType.LANGUAGE, value: language });
+                    } else if (title) {
+                        console.log(`[ExoPlayer] Setting subtitle track to TITLE: ${title}`);
+                        setSelectedTextTrack({ type: SelectedTrackType.TITLE, value: title });
+                    } else {
+                        console.log(`[ExoPlayer] Setting subtitle track to INDEX: ${trackId}`);
+                        setSelectedTextTrack({ type: SelectedTrackType.INDEX, value: trackId });
+                    }
+                }, 50);
             }
         },
     }));
@@ -81,19 +103,118 @@ const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
     const handleLoad = (data: any) => {
         console.log('[ExoPlayer] onLoad event:', data);
 
-        // Extract tracks information
-        const audioTracks = data.audioTracks?.map((track: any, index: number) => ({
-            id: index,
-            name: track.title || track.language || `Audio ${index + 1}`,
-            language: track.language || 'und',
-            supported: true,
-        })) || [];
+        // Extract tracks information - use track.index if available (react-native-video internal index)
+        const audioTracks = data.audioTracks?.map((track: any, index: number) => {
+            // Build descriptive name with additional info
+            let name = track.title || track.language || `Audio ${index + 1}`;
+            const flags: string[] = [];
+            if (track.type) flags.push(track.type);
+            if (flags.length > 0) name += ` (${flags.join(', ')})`;
 
-        const subtitleTracks = data.textTracks?.map((track: any, index: number) => ({
-            id: index,
-            name: track.title || track.language || `Subtitle ${index + 1}`,
-            language: track.language || 'und',
-        })) || [];
+            return {
+                id: track.index !== undefined ? track.index : index,
+                name,
+                language: track.language || 'und',
+                supported: true,
+            };
+        }) || [];
+
+        const subtitleTracks = data.textTracks?.map((track: any, index: number) => {
+            // Language code to name mapping for display
+            const languageNames: { [key: string]: string } = {
+                'en': 'English', 'eng': 'English',
+                'es': 'Spanish', 'spa': 'Spanish',
+                'fr': 'French', 'fra': 'French', 'fre': 'French',
+                'de': 'German', 'deu': 'German', 'ger': 'German',
+                'it': 'Italian', 'ita': 'Italian',
+                'pt': 'Portuguese', 'por': 'Portuguese',
+                'ru': 'Russian', 'rus': 'Russian',
+                'ja': 'Japanese', 'jpn': 'Japanese',
+                'ko': 'Korean', 'kor': 'Korean',
+                'zh': 'Chinese', 'zho': 'Chinese', 'chi': 'Chinese',
+                'ar': 'Arabic', 'ara': 'Arabic',
+                'hi': 'Hindi', 'hin': 'Hindi',
+                'nl': 'Dutch', 'nld': 'Dutch', 'dut': 'Dutch',
+                'pl': 'Polish', 'pol': 'Polish',
+                'tr': 'Turkish', 'tur': 'Turkish',
+                'sv': 'Swedish', 'swe': 'Swedish',
+                'da': 'Danish', 'dan': 'Danish',
+                'no': 'Norwegian', 'nor': 'Norwegian',
+                'fi': 'Finnish', 'fin': 'Finnish',
+                'cs': 'Czech', 'ces': 'Czech', 'cze': 'Czech',
+                'hu': 'Hungarian', 'hun': 'Hungarian',
+                'el': 'Greek', 'ell': 'Greek', 'gre': 'Greek',
+                'he': 'Hebrew', 'heb': 'Hebrew',
+                'th': 'Thai', 'tha': 'Thai',
+                'vi': 'Vietnamese', 'vie': 'Vietnamese',
+                'id': 'Indonesian', 'ind': 'Indonesian',
+                'ms': 'Malay', 'msa': 'Malay',
+                'ro': 'Romanian', 'ron': 'Romanian', 'rum': 'Romanian',
+                'uk': 'Ukrainian', 'ukr': 'Ukrainian',
+                'bg': 'Bulgarian', 'bul': 'Bulgarian',
+                'hr': 'Croatian', 'hrv': 'Croatian',
+                'sk': 'Slovak', 'slk': 'Slovak', 'slo': 'Slovak',
+                'sl': 'Slovenian', 'slv': 'Slovenian',
+                'und': 'Unknown',
+            };
+
+            // Get language display name
+            const langCode = (track.language || '').toLowerCase();
+            const languageName = languageNames[langCode] || (langCode ? langCode.toUpperCase() : null);
+
+            // Build display name: prefer language name, then title (if meaningful), then fallback
+            let name: string;
+            const titleLower = (track.title || '').toLowerCase();
+
+            // Check if title is just generic like "Regular", "Forced", or a MIME type
+            const isGenericTitle = !track.title ||
+                titleLower === 'regular' ||
+                titleLower === 'forced' ||
+                titleLower.includes('application/') ||
+                titleLower.includes('x-media');
+
+            if (languageName && languageName !== 'Unknown') {
+                name = languageName;
+            } else if (!isGenericTitle && track.title) {
+                name = track.title;
+            } else {
+                name = `Subtitle ${index + 1}`;
+            }
+
+            // Build flags for additional info
+            const flags: string[] = [];
+
+            // Check for SDH/CC indicators
+            if (track.type === 'captions' || /\b(cc|sdh|hearing)\b/i.test(track.title || '')) {
+                flags.push('SDH');
+            }
+            // Check for forced subtitles
+            if (track.forced || titleLower === 'forced' || /\bforced\b/i.test(track.title || '')) {
+                flags.push('Forced');
+            }
+
+            if (flags.length > 0) name += ` [${flags.join(', ')}]`;
+
+            // IMPORTANT: Use the array index (position) as the ID, NOT track.index
+            // react-native-video's setSelectedTrack with type "index" expects the
+            // groupIndex which corresponds to the position in the track list, not
+            // the track's internal index property
+            return {
+                id: index,
+                name,
+                // Preserve original title for TITLE-based selection (more reliable on Android)
+                title: track.title || undefined,
+                language: track.language || 'und',
+                type: track.type,
+                forced: track.forced,
+            };
+        }) || [];
+
+        if (DEBUG_EXOPLAYER) {
+            console.log('[ExoPlayer] Raw textTracks from player:', JSON.stringify(data.textTracks));
+            console.log('[ExoPlayer] Formatted subtitleTracks:', JSON.stringify(subtitleTracks));
+            console.log('[ExoPlayer] Raw audioTracks from player:', JSON.stringify(data.audioTracks));
+        }
 
         // Notify about tracks
         if (props.onTracksChanged && (audioTracks.length > 0 || subtitleTracks.length > 0)) {
@@ -210,6 +331,12 @@ const ExoPlayer = forwardRef<ExoPlayerRef, ExoPlayerProps>((props, ref) => {
             useTextureView={false}
             selectedAudioTrack={selectedAudioTrack}
             selectedTextTrack={selectedTextTrack}
+            // Note: subtitleStyle doesn't support backgroundColor
+            // The black background is ExoPlayer's default - no way to remove it via JS
+            subtitleStyle={{
+                paddingBottom: 50,
+                subtitlesFollowVideo: true,
+            }}
             progressUpdateInterval={1000}
             bufferConfig={TV_BUFFER_CONFIG}
             onLoad={handleLoad}

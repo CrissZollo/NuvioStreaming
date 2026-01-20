@@ -91,11 +91,24 @@ export const formatLanguage = (code?: string): string => {
 };
 
 // Helper function to extract a display name from the track's name property
-export const getTrackDisplayName = (track: { name?: string, id: number, language?: string }): string => {
+export const getTrackDisplayName = (track: { name?: string, id: number, language?: string, type?: string, forced?: boolean }): string => {
   if (!track) return 'Unknown Track';
 
-  // If no name, use track number
-  if (!track.name) return `Track ${track.id}`;
+  // If no name, use track number with language if available
+  if (!track.name) {
+    if (track.language) {
+      const formattedLang = formatLanguage(track.language);
+      if (formattedLang !== 'Unknown' && !formattedLang.includes('Unknown')) {
+        return formattedLang;
+      }
+    }
+    return `Track ${track.id}`;
+  }
+
+  // If the name already contains flags like [SDH], use it as-is
+  if (track.name.includes('[') && track.name.includes(']')) {
+    return track.name;
+  }
 
   // If the name is already well-formatted (contains • separators), use it as-is
   if (track.name.includes('•')) {
@@ -108,50 +121,75 @@ export const getTrackDisplayName = (track: { name?: string, id: number, language
     return track.name;
   }
 
+  // Build a better display name
+  let displayName = '';
+
   // If we have a language field, use that for better display (only for simple track names)
-  if (track.language && track.language !== 'Unknown') {
+  if (track.language && track.language !== 'Unknown' && track.language !== 'und') {
     const formattedLanguage = formatLanguage(track.language);
     if (formattedLanguage !== 'Unknown' && !formattedLanguage.includes('Unknown')) {
-      return formattedLanguage;
+      displayName = formattedLanguage;
     }
   }
 
-  // Try to extract language from name like "Some Info - [English]"
-  const languageMatch = track.name.match(/\[(.*?)\]/);
-  if (languageMatch && languageMatch[1]) {
-    return languageMatch[1];
+  // If we still don't have a display name, try to extract from the track name
+  if (!displayName) {
+    // Try to extract language from name like "Some Info - [English]"
+    const languageMatch = track.name.match(/\[(.*?)\]/);
+    if (languageMatch && languageMatch[1]) {
+      displayName = languageMatch[1];
+    }
   }
 
-  // Handle generic VLC track names like "Audio 1", "Track 1"
-  const genericTrackMatch = track.name.match(/^(Audio|Track)\s+(\d+)$/i);
-  if (genericTrackMatch) {
-    return `Audio ${genericTrackMatch[2]}`;
-  }
-
-  // Check for common language patterns in the name
-  const languagePatterns = [
-    /\b(english|spanish|french|german|italian|japanese|korean|chinese|russian|portuguese|hindi|arabic|dutch|swedish|norwegian|finnish|danish|polish|turkish|czech|hungarian|greek|thai|vietnamese)\b/i,
-    /\b(en|es|fr|de|it|ja|ko|zh|ru|pt|hi|ar|nl|sv|no|fi|da|pl|tr|cs|hu|el|th|vi)\b/i
-  ];
-
-  for (const pattern of languagePatterns) {
-    const match = track.name.match(pattern);
-    if (match) {
-      const detectedLang = match[1];
-      const formatted = formatLanguage(detectedLang);
-      if (formatted !== 'Unknown' && !formatted.includes('Unknown')) {
-        return formatted;
+  if (!displayName) {
+    // Handle generic VLC track names like "Audio 1", "Track 1"
+    const genericTrackMatch = track.name.match(/^(Audio|Track|Subtitle)\s+(\d+)$/i);
+    if (genericTrackMatch) {
+      // Fall back to language if available
+      if (track.language && track.language !== 'und') {
+        const formattedLang = formatLanguage(track.language);
+        if (formattedLang !== 'Unknown') {
+          displayName = formattedLang;
+        } else {
+          displayName = `${genericTrackMatch[1]} ${genericTrackMatch[2]}`;
+        }
+      } else {
+        displayName = `${genericTrackMatch[1]} ${genericTrackMatch[2]}`;
       }
     }
   }
 
-  // If name contains only numbers or is very short, it's probably not meaningful
-  if (/^\d+$/.test(track.name.trim()) || track.name.trim().length <= 2) {
-    return `Audio ${track.id}`;
+  if (!displayName) {
+    // Check for common language patterns in the name
+    const languagePatterns = [
+      /\b(english|spanish|french|german|italian|japanese|korean|chinese|russian|portuguese|hindi|arabic|dutch|swedish|norwegian|finnish|danish|polish|turkish|czech|hungarian|greek|thai|vietnamese)\b/i,
+      /\b(en|es|fr|de|it|ja|ko|zh|ru|pt|hi|ar|nl|sv|no|fi|da|pl|tr|cs|hu|el|th|vi)\b/i
+    ];
+
+    for (const pattern of languagePatterns) {
+      const match = track.name.match(pattern);
+      if (match) {
+        const detectedLang = match[1];
+        const formatted = formatLanguage(detectedLang);
+        if (formatted !== 'Unknown' && !formatted.includes('Unknown')) {
+          displayName = formatted;
+          break;
+        }
+      }
+    }
   }
 
-  // Use the name as-is if it seems meaningful
-  return track.name;
+  if (!displayName) {
+    // If name contains only numbers or is very short, it's probably not meaningful
+    if (/^\d+$/.test(track.name.trim()) || track.name.trim().length <= 2) {
+      displayName = `Track ${track.id}`;
+    } else {
+      // Use the name as-is if it seems meaningful
+      displayName = track.name;
+    }
+  }
+
+  return displayName;
 };
 
 // Format time function for the player

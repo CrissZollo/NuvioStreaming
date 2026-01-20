@@ -290,10 +290,12 @@ const AndroidVideoPlayer: React.FC = () => {
     } else if (settings.defaultSubtitleLanguage && subtitleTracks && subtitleTracks.length > 0) {
       const matchingSubtitleTrackId = findTrackByLanguage(subtitleTracks, settings.defaultSubtitleLanguage);
       if (matchingSubtitleTrackId !== null) {
-        console.log('[AndroidVideoPlayer] Auto-selecting subtitle track:', matchingSubtitleTrackId);
+        // Find the track object to get its title and language for selection
+        const matchingTrack = subtitleTracks.find((t: any) => t.id === matchingSubtitleTrackId);
+        console.log('[AndroidVideoPlayer] Auto-selecting subtitle track:', matchingSubtitleTrackId, 'title:', matchingTrack?.title, 'language:', matchingTrack?.language);
         tracksHook.setSelectedTextTrack(matchingSubtitleTrackId);
         if (activePlayerRef.current) {
-          activePlayerRef.current.setSubtitleTrack(matchingSubtitleTrackId);
+          activePlayerRef.current.setSubtitleTrack(matchingSubtitleTrackId, matchingTrack?.title, matchingTrack?.language);
         }
       } else {
         // No matching language found - disable subtitles (don't default to first available)
@@ -717,10 +719,11 @@ const AndroidVideoPlayer: React.FC = () => {
   }, []);
 
   // Memoized callback for subtitle track selection
-  const handleSelectTextTrack = useCallback((trackId: number) => {
+  // Pass track language for LANGUAGE-based selection (most reliable on Android)
+  const handleSelectTextTrack = useCallback((trackId: number, trackTitle?: string, trackLanguage?: string) => {
     tracksHook.setSelectedTextTrack(trackId);
     if (activePlayerRef.current) {
-      activePlayerRef.current.setSubtitleTrack(trackId);
+      activePlayerRef.current.setSubtitleTrack(trackId, trackTitle, trackLanguage);
     }
     setUseCustomSubtitles(false);
     setShowSubtitleModal(false);

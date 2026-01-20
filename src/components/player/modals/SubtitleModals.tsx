@@ -28,7 +28,7 @@ interface SubtitleModalsProps {
   isLoadingSubtitles: boolean;
   customSubtitles: SubtitleCue[];
   availableSubtitles: WyzieSubtitle[];
-  ksTextTracks: Array<{id: number, name: string, language?: string}>;
+  ksTextTracks: Array<{id: number, name: string, language?: string, title?: string}>;
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   isKsPlayerActive?: boolean;
@@ -36,7 +36,7 @@ interface SubtitleModalsProps {
   subtitleBackground: boolean;
   fetchAvailableSubtitles: () => void;
   loadWyzieSubtitle: (subtitle: WyzieSubtitle) => void;
-  selectTextTrack: (trackId: number) => void;
+  selectTextTrack: (trackId: number, trackTitle?: string, trackLanguage?: string) => void;
   disableCustomSubtitles: () => void;
   increaseSubtitleSize: () => void;
   decreaseSubtitleSize: () => void;
@@ -287,7 +287,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   {ksTextTracks.map((track, index) => {
                     const isSelected = selectedTextTrack === track.id;
                     const isLast = index === ksTextTracks.length - 1;
-                    const handleSelect = () => { selectTextTrack(track.id); setSelectedOnlineSubtitleId(null); };
+                    // Pass track language for LANGUAGE-based selection (most reliable on Android)
+                    const handleSelect = () => { selectTextTrack(track.id, track.title, track.language); setSelectedOnlineSubtitleId(null); };
 
                     if (isTVDevice) {
                       return (
