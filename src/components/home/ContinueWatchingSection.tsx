@@ -25,6 +25,7 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import * as Haptics from 'expo-haptics';
 import { TraktService } from '../../services/traktService';
+import { watchedService } from '../../services/watchedService';
 import { stremioService } from '../../services/stremioService';
 import { streamCacheService } from '../../services/streamCacheService';
 import { useSettings } from '../../hooks/useSettings';
@@ -1183,26 +1184,25 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     }
   }, [navigation, settings.useCachedStreams, settings.openMetadataScreenWhenCacheDisabled]);
 
-  // Handle long press to delete (moved before renderContinueWatchingItem)
+  // Handle long press to show action menu (moved before renderContinueWatchingItem)
   const handleLongPress = useCallback((item: ContinueWatchingItem) => {
     try {
-      // Trigger haptic feedback
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (error) {
-      // Ignore haptic errors
-    }
+    } catch (error) {}
 
-    setAlertTitle('Remove from Continue Watching');
-    setAlertMessage(`Remove "${item.name}" from your continue watching list?`);
+    const itemName = item.type === 'series' && item.season !== undefined && item.episode !== undefined
+      ? `${item.name} S${item.season}E${item.episode}`
+      : item.name;
+
+    setAlertTitle(itemName);
+    setAlertMessage('');
     setAlertActions([
       {
         label: 'Cancel',
-        style: { color: '#888' },
         onPress: () => { },
       },
       {
-        label: 'Remove',
-        style: { color: currentTheme.colors.error },
+        label: 'Clear Progress',
         onPress: async () => {
           setDeletingItemId(item.id);
           try {
@@ -1211,24 +1211,44 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
             const traktService = TraktService.getInstance();
             const isAuthed = await traktService.isAuthenticated();
             if (isAuthed) {
-              let traktResult = false;
               if (item.type === 'movie') {
-                traktResult = await traktService.removeMovieFromHistory(item.id);
+                await traktService.removeMovieFromHistory(item.id);
               } else if (item.type === 'series' && item.season !== undefined && item.episode !== undefined) {
-                traktResult = await traktService.removeEpisodeFromHistory(item.id, item.season, item.episode);
+                await traktService.removeEpisodeFromHistory(item.id, item.season, item.episode);
               } else {
-                traktResult = await traktService.removeShowFromHistory(item.id);
+                await traktService.removeShowFromHistory(item.id);
               }
             }
             const itemKey = `${item.type}:${item.id}`;
             recentlyRemovedRef.current.add(itemKey);
             await storageService.addContinueWatchingRemoved(item.id, item.type);
-            setTimeout(() => {
-              recentlyRemovedRef.current.delete(itemKey);
-            }, REMOVAL_IGNORE_DURATION);
+            setTimeout(() => recentlyRemovedRef.current.delete(itemKey), REMOVAL_IGNORE_DURATION);
             setContinueWatchingItems(prev => prev.filter(i => i.id !== item.id));
           } catch (error) {
-            // Continue even if removal fails
+            logger.error('[ContinueWatching] Failed to clear progress:', error);
+          } finally {
+            setDeletingItemId(null);
+          }
+        },
+      },
+      {
+        label: 'Mark as Watched',
+        onPress: async () => {
+          setDeletingItemId(item.id);
+          try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            if (item.type === 'movie') {
+              await watchedService.markMovieAsWatched(item.id);
+            } else if (item.type === 'series' && item.season !== undefined && item.episode !== undefined) {
+              await watchedService.markEpisodeAsWatched(item.id, item.id, item.season, item.episode);
+            }
+            const itemKey = `${item.type}:${item.id}`;
+            recentlyRemovedRef.current.add(itemKey);
+            await storageService.addContinueWatchingRemoved(item.id, item.type);
+            setTimeout(() => recentlyRemovedRef.current.delete(itemKey), REMOVAL_IGNORE_DURATION);
+            setContinueWatchingItems(prev => prev.filter(i => i.id !== item.id));
+          } catch (error) {
+            logger.error('[ContinueWatching] Failed to mark as watched:', error);
           } finally {
             setDeletingItemId(null);
           }
@@ -1236,7 +1256,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
       },
     ]);
     setAlertVisible(true);
-  }, [currentTheme.colors.error]);
+  }, []);
 
   // Memoized render function for continue watching items
   // PERFORMANCE: Uses pre-memoized styles instead of creating objects on every render

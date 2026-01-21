@@ -114,17 +114,15 @@ export const CustomAlert = ({
               </Text>
 
               {/* Message */}
-              <Text style={styles.message}>
-                {message}
-              </Text>
+              {message ? (
+                <Text style={styles.message}>
+                  {message}
+                </Text>
+              ) : null}
 
               {/* Actions */}
-              <View style={[
-                styles.actionsRow,
-                actions.length === 1 && { justifyContent: 'center' }
-              ]}>
+              <View style={styles.actionsRow}>
                 {actions.map((action, idx) => {
-                  const isPrimary = idx === actions.length - 1;
                   const isFirst = idx === 0;
 
                   if (isTV) {
@@ -135,30 +133,18 @@ export const CustomAlert = ({
                           actionRefs.current[idx] = ref;
                         }}
                         onPress={() => handleActionPress(action)}
-                        style={[
-                          styles.actionButton,
-                          isPrimary
-                            ? { backgroundColor: themeColors.primary }
-                            : styles.secondaryButton,
-                          action.style,
-                          actions.length === 1 && { minWidth: 120, maxWidth: '100%' }
-                        ]}
+                        style={styles.actionButton}
                         autoFocus={isFirst}
-                        borderRadius={12}
-                        focusScale={1.05}
-                        animateBackground={true}
+                        borderRadius={6}
+                        focusScale={1}
+                        animateBackground={false}
                         showFocusBorder={true}
                         nextFocusLeft={idx > 0 ? actionRefs.current[idx - 1]?.getViewRef() : undefined}
                         nextFocusRight={idx < actions.length - 1 ? actionRefs.current[idx + 1]?.getViewRef() : undefined}
                       >
-                        {(focused) => (
-                          <Text style={[
-                            styles.actionText,
-                            { color: focused ? '#000' : '#FFFFFF' }
-                          ]}>
-                            {action.label}
-                          </Text>
-                        )}
+                        <Text style={styles.actionText}>
+                          {action.label}
+                        </Text>
                       </Focusable>
                     );
                   }
@@ -166,23 +152,11 @@ export const CustomAlert = ({
                   return (
                     <TouchableOpacity
                       key={action.label}
-                      style={[
-                        styles.actionButton,
-                        isPrimary
-                          ? { backgroundColor: themeColors.primary }
-                          : styles.secondaryButton,
-                        action.style,
-                        actions.length === 1 && { minWidth: 120, maxWidth: '100%' }
-                      ]}
+                      style={styles.actionButton}
                       onPress={() => handleActionPress(action)}
                       activeOpacity={0.7}
                     >
-                      <Text style={[
-                        styles.actionText,
-                        isPrimary
-                          ? { color: '#FFFFFF' }
-                          : { color: '#FFFFFF' }
-                      ]}>
+                      <Text style={styles.actionText}>
                         {action.label}
                       </Text>
                     </TouchableOpacity>
@@ -239,41 +213,31 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 16,
     textAlign: 'center',
     letterSpacing: 0.2,
   },
   message: {
     color: '#AAAAAA',
     fontSize: 15,
-    marginBottom: 24,
+    marginBottom: 16,
     textAlign: 'center',
     lineHeight: 22,
     letterSpacing: 0.1,
   },
   actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 4,
+    justifyContent: 'center',
+    gap: 24,
   },
   actionButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    minWidth: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1, // Distribute space
-    maxWidth: 200, // But limit width
-  },
-  secondaryButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   actionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 
