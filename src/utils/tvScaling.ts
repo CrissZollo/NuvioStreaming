@@ -212,3 +212,13 @@ export const getScreenInfo = () => {
 
 // Re-export for convenience
 export { DESIGN_WIDTH, DESIGN_HEIGHT };
+
+// Re-export device capabilities from the dedicated module
+export {
+  getTVDeviceCapabilities,
+  getDeviceEasing,
+  getAnimationDuration,
+  TV_EASING,
+  TV_ANIMATION_CONFIG,
+  type TVDeviceCapabilities,
+} from './tvDeviceCapabilities';

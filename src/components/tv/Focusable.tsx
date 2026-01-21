@@ -7,6 +7,7 @@ import {
   StyleProp,
   findNodeHandle,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -17,11 +18,23 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useIsTV } from '../../contexts/TVContext';
 import { perfMonitor, PERF_MONITOR_ENABLED } from '../../utils/performanceMonitor';
+import {
+  getTVDeviceCapabilities,
+  getDeviceEasing,
+  TV_ANIMATION_CONFIG,
+  TV_EASING,
+} from '../../utils/tvDeviceCapabilities';
+
+// Get device capabilities once at module load for performance
+const deviceCapabilities = getTVDeviceCapabilities();
 
 // PERFORMANCE: Use longer animation duration for low-end TV devices
 // At 30fps, 1 frame = 33ms. Use 165ms (5 frames) for smooth animations
 // This is slower but ensures smooth visual feedback on low-end devices
-const TV_ANIMATION_DURATION = Platform.isTV ? 165 : 80;
+const TV_ANIMATION_DURATION = Platform.isTV ? TV_ANIMATION_CONFIG.focusDuration : 80;
+
+// Get optimized easing for the device (linear on low-end, Material curve on others)
+const TV_FOCUS_EASING = getDeviceEasing('focus');
 
 // Debug logging for performance analysis
 const DEBUG_FOCUSABLE = false; // Disabled after debugging
@@ -176,6 +189,9 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     // Store own node handle for block* props - use ref to avoid re-renders
     const selfNodeHandleRef = useRef<number | null>(null);
 
+    // Track pending InteractionManager tasks for cleanup
+    const pendingInteractionRef = useRef<ReturnType<typeof InteractionManager.runAfterInteractions> | null>(null);
+
     // Ref callback to capture node handle synchronously when view mounts
     const refCallback = useCallback((node: View | null) => {
       // Update the internal ref
@@ -209,61 +225,107 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       return handle ?? undefined;
     };
 
-    // Optimized focus handler - removed all logging calls for TV performance
-    // Even disabled logging functions have call overhead on low-end devices
+    // Optimized focus handler with InteractionManager debouncing
+    // During rapid D-pad navigation, this prevents cascading re-renders by deferring
+    // state updates until after the current interaction completes
     const handleFocus = useCallback(() => {
       const focusStartTime = DEBUG_FOCUSABLE ? performance.now() : 0;
       if (DEBUG_FOCUSABLE) {
         console.log(`[Focusable #${instanceId}] FOCUS START testID=${testID}`);
       }
 
+      // Update ref immediately for synchronous checks
       isFocusedRef.current = true;
 
-      // Only update state if we have a render prop that needs it
-      if (needsFocusState) {
-        if (DEBUG_FOCUSABLE) {
-          console.log(`[Focusable #${instanceId}] Setting focus state (needsFocusState=true)`);
+      // Start animation immediately for visual responsiveness
+      // Use optimized easing curve for the device (linear on low-end, Material curve on others)
+      focusProgress.value = withTiming(1, {
+        duration: TV_ANIMATION_DURATION,
+        easing: TV_FOCUS_EASING,
+      });
+
+      // Defer state updates and callbacks using InteractionManager
+      // This prevents frame drops during rapid D-pad spam by batching updates
+      if (deviceCapabilities.useDeferredFocusEvents) {
+        // Cancel any pending interaction from previous focus/blur
+        pendingInteractionRef.current?.cancel();
+
+        pendingInteractionRef.current = InteractionManager.runAfterInteractions(() => {
+          // Only update state if we have a render prop that needs it
+          if (needsFocusState) {
+            if (DEBUG_FOCUSABLE) {
+              console.log(`[Focusable #${instanceId}] Setting focus state (deferred)`);
+            }
+            setIsFocusedState(true);
+          }
+
+          onFocus?.();
+
+          if (DEBUG_FOCUSABLE) {
+            console.log(`[Focusable #${instanceId}] FOCUS COMPLETE (deferred) took ${(performance.now() - focusStartTime).toFixed(2)}ms`);
+          }
+        });
+      } else {
+        // Non-TV: immediate updates
+        if (needsFocusState) {
+          setIsFocusedState(true);
         }
-        setIsFocusedState(true);
-      }
-
-      // 80ms animation - balanced for responsiveness without causing frame drops on low-end TV
-      // 50ms was too fast and caused frame skipping, 100ms+ feels sluggish
-      focusProgress.value = withTiming(1, { duration: TV_ANIMATION_DURATION });
-
-      onFocus?.();
-
-      if (DEBUG_FOCUSABLE) {
-        console.log(`[Focusable #${instanceId}] FOCUS COMPLETE took ${(performance.now() - focusStartTime).toFixed(2)}ms`);
+        onFocus?.();
       }
     }, [onFocus, focusProgress, needsFocusState, instanceId, testID]);
 
-    // Optimized blur handler - removed all logging calls for TV performance
+    // Optimized blur handler with InteractionManager debouncing
     const handleBlur = useCallback(() => {
       const blurStartTime = DEBUG_FOCUSABLE ? performance.now() : 0;
       if (DEBUG_FOCUSABLE) {
         console.log(`[Focusable #${instanceId}] BLUR START testID=${testID}`);
       }
 
+      // Update ref immediately for synchronous checks
       isFocusedRef.current = false;
 
-      // Only update state if we have a render prop that needs it
-      if (needsFocusState) {
-        if (DEBUG_FOCUSABLE) {
-          console.log(`[Focusable #${instanceId}] Clearing focus state (needsFocusState=true)`);
+      // Start animation immediately for visual responsiveness
+      // Use optimized easing curve for the device
+      focusProgress.value = withTiming(0, {
+        duration: TV_ANIMATION_DURATION,
+        easing: TV_FOCUS_EASING,
+      });
+
+      // Defer state updates and callbacks using InteractionManager
+      if (deviceCapabilities.useDeferredFocusEvents) {
+        // Cancel any pending interaction from previous focus/blur
+        pendingInteractionRef.current?.cancel();
+
+        pendingInteractionRef.current = InteractionManager.runAfterInteractions(() => {
+          // Only update state if we have a render prop that needs it
+          if (needsFocusState) {
+            if (DEBUG_FOCUSABLE) {
+              console.log(`[Focusable #${instanceId}] Clearing focus state (deferred)`);
+            }
+            setIsFocusedState(false);
+          }
+
+          onBlur?.();
+
+          if (DEBUG_FOCUSABLE) {
+            console.log(`[Focusable #${instanceId}] BLUR COMPLETE (deferred) took ${(performance.now() - blurStartTime).toFixed(2)}ms`);
+          }
+        });
+      } else {
+        // Non-TV: immediate updates
+        if (needsFocusState) {
+          setIsFocusedState(false);
         }
-        setIsFocusedState(false);
-      }
-
-      // 80ms animation - balanced for responsiveness without causing frame drops on low-end TV
-      focusProgress.value = withTiming(0, { duration: TV_ANIMATION_DURATION });
-
-      onBlur?.();
-
-      if (DEBUG_FOCUSABLE) {
-        console.log(`[Focusable #${instanceId}] BLUR COMPLETE took ${(performance.now() - blurStartTime).toFixed(2)}ms`);
+        onBlur?.();
       }
     }, [onBlur, focusProgress, needsFocusState, instanceId, testID]);
+
+    // Cleanup pending interactions on unmount
+    useEffect(() => {
+      return () => {
+        pendingInteractionRef.current?.cancel();
+      };
+    }, []);
 
     // Expose focus methods via ref
     useImperativeHandle(ref, () => ({
@@ -272,7 +334,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         if (needsFocusState) {
           setIsFocusedState(true);
         }
-        focusProgress.value = withTiming(1, { duration: TV_ANIMATION_DURATION });
+        focusProgress.value = withTiming(1, {
+          duration: TV_ANIMATION_DURATION,
+          easing: TV_FOCUS_EASING,
+        });
         if (actualRef.current) {
           (actualRef.current as any).setNativeProps?.({
             hasTVPreferredFocus: true,
@@ -284,7 +349,10 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         if (needsFocusState) {
           setIsFocusedState(false);
         }
-        focusProgress.value = withTiming(0, { duration: TV_ANIMATION_DURATION });
+        focusProgress.value = withTiming(0, {
+          duration: TV_ANIMATION_DURATION,
+          easing: TV_FOCUS_EASING,
+        });
       },
       isFocused: () => isFocusedRef.current,
       getViewRef: () => actualRef,
