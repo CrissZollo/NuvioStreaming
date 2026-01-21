@@ -497,40 +497,7 @@ const UpdateScreen: React.FC = () => {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        {isTV ? (
-          <Focusable
-            ref={backButtonRef}
-            onPress={() => navigation.goBack()}
-            autoFocus
-            nextFocusDown={checkUpdatesRef.current?.getViewRef()}
-            borderRadius={8}
-            focusScale={1.05}
-            showFocusBorder={false}
-            animateBackground={false}
-          >
-            {(focused) => (
-              <View style={[
-                styles.backButton,
-                {
-                  backgroundColor: 'transparent',
-                  borderRadius: 8,
-                }
-              ]}>
-                <MaterialIcons
-                  name="arrow-back"
-                  size={24}
-                  color={currentTheme.colors.highEmphasis}
-                />
-                <Text style={[
-                  styles.backText,
-                  { color: currentTheme.colors.highEmphasis }
-                ]}>
-                  Settings
-                </Text>
-              </View>
-            )}
-          </Focusable>
-        ) : (
+        {!isTV && (
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}

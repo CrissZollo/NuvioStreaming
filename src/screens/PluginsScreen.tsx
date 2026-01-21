@@ -1390,25 +1390,7 @@ const PluginsScreen: React.FC = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        {isTV ? (
-          <Focusable
-            ref={backButtonRef}
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            autoFocus
-            borderRadius={8}
-            focusScale={1.05}
-            animateBackground={true}
-            showFocusBorder={true}
-          >
-            {(focused) => (
-              <>
-                <Ionicons name="arrow-back" size={24} color={colors.primary} />
-                <Text style={styles.backText}>Settings</Text>
-              </>
-            )}
-          </Focusable>
-        ) : (
+        {!isTV && (
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -1449,25 +1431,27 @@ const PluginsScreen: React.FC = () => {
       <ScrollView
         style={styles.scrollView}
         refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={async () => {
-              try {
-                setIsRefreshing(true);
-                logger.log('[PluginsScreen] Pull-to-refresh: Starting hard refresh...');
+          !isTV ? (
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={async () => {
+                try {
+                  setIsRefreshing(true);
+                  logger.log('[PluginsScreen] Pull-to-refresh: Starting hard refresh...');
 
-                // Force hard refresh of repository
-                await pluginService.refreshRepository();
-                await loadScrapers();
+                  // Force hard refresh of repository
+                  await pluginService.refreshRepository();
+                  await loadScrapers();
 
-                logger.log('[PluginsScreen] Pull-to-refresh completed');
-              } catch (error) {
-                logger.error('[PluginsScreen] Pull-to-refresh failed:', error);
-              } finally {
-                setIsRefreshing(false);
-              }
-            }}
-          />
+                  logger.log('[PluginsScreen] Pull-to-refresh completed');
+                } catch (error) {
+                  logger.error('[PluginsScreen] Pull-to-refresh failed:', error);
+                } finally {
+                  setIsRefreshing(false);
+                }
+              }}
+            />
+          ) : undefined
         }
       >
         {/* Quick Setup banner removed */}

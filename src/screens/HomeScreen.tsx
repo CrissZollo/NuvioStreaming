@@ -1115,6 +1115,7 @@ const HomeScreen = () => {
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           nestedScrollEnabled={true}
+          scrollEnabled={!isTVDevice}
           estimatedItemSize={isTVDevice ? 350 : 300}
           // TV needs larger drawDistance to ensure scrollToIndex works for items further down
           // 1500px = ~4-5 catalog rows pre-rendered, balancing memory vs scroll reliability

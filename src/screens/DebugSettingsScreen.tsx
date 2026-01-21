@@ -278,31 +278,7 @@ const DebugSettingsScreen: React.FC = () => {
       />
 
       <View style={styles.header}>
-        {isTV ? (
-          <Focusable
-            ref={backButtonRef}
-            onPress={handleBack}
-            style={styles.backButton}
-            autoFocus
-            borderRadius={8}
-            focusScale={1.05}
-            animateBackground={false}
-            showFocusBorder={true}
-          >
-            {(focused) => (
-              <>
-                <MaterialIcons
-                  name="arrow-back"
-                  size={24}
-                  color={currentTheme.colors.text}
-                />
-                <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
-                  Settings
-                </Text>
-              </>
-            )}
-          </Focusable>
-        ) : (
+        {!isTV && (
           <TouchableOpacity
             onPress={handleBack}
             style={styles.backButton}

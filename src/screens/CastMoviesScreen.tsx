@@ -740,26 +740,7 @@ const CastMoviesScreen: React.FC = () => {
           entering={SlideInDown.delay(100)}
           style={{ flexDirection: 'row', alignItems: 'center' }}
         >
-          {isTV ? (
-            <Focusable
-              onPress={handleBack}
-              viewRef={backButtonRef}
-              borderRadius={18}
-              focusScale={1.1}
-              showFocusBorder={true}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 16,
-              }}
-            >
-              <MaterialIcons name="arrow-back" size={20} color="rgba(255, 255, 255, 0.9)" />
-            </Focusable>
-          ) : (
+          {!isTV && (
             <TouchableOpacity
               style={{
                 width: 36,

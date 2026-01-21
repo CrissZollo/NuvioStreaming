@@ -515,25 +515,7 @@ const CatalogSettingsScreen = () => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
         <View style={styles.header}>
-          {isTV ? (
-            <Focusable
-              ref={backButtonRef}
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-              autoFocus
-              borderRadius={8}
-              focusScale={1.05}
-              animateBackground={false}
-              showFocusBorder={true}
-            >
-              {(focused) => (
-                <>
-                  <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
-                  <Text style={[styles.backText, {}]}>Settings</Text>
-                </>
-              )}
-            </Focusable>
-          ) : (
+          {!isTV && (
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}
@@ -555,25 +537,7 @@ const CatalogSettingsScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        {isTV ? (
-          <Focusable
-            ref={backButtonRef}
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            autoFocus
-            borderRadius={8}
-            focusScale={1.05}
-            animateBackground={false}
-            showFocusBorder={true}
-          >
-            {(focused) => (
-              <>
-                <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
-                <Text style={[styles.backText, {}]}>Settings</Text>
-              </>
-            )}
-          </Focusable>
-        ) : (
+        {!isTV && (
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}

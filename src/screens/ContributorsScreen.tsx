@@ -640,25 +640,7 @@ const ContributorsScreen: React.FC = () => {
 
       <View style={[styles.headerContainer, { paddingTop: topSpacing }]}>
         <View style={styles.header}>
-          {isTV ? (
-            <Focusable
-              ref={backButtonRef}
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-              borderRadius={8}
-              focusScale={1.05}
-              animateBackground={true}
-              showFocusBorder={true}
-              nextFocusDown={contributorsTabRef.current?.getViewRef()}
-            >
-              {(focused) => (
-                <>
-                  <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
-                  <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
-                </>
-              )}
-            </Focusable>
-          ) : (
+          {!isTV && (
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}
@@ -841,12 +823,14 @@ const ContributorsScreen: React.FC = () => {
                     isTablet && styles.tabletListContent
                   ]}
                   refreshControl={
-                    <RefreshControl
-                      refreshing={refreshing}
-                      onRefresh={handleRefresh}
-                      tintColor={currentTheme.colors.primary}
-                      colors={[currentTheme.colors.primary]}
-                    />
+                    !isTV ? (
+                      <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={currentTheme.colors.primary}
+                        colors={[currentTheme.colors.primary]}
+                      />
+                    ) : undefined
                   }
                   showsVerticalScrollIndicator={false}
                 >

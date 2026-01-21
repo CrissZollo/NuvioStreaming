@@ -613,27 +613,7 @@ const ThemeScreen: React.FC = () => {
       <StatusBar barStyle="light-content" />
 
       <View style={[styles.header, { paddingTop: headerTopPadding }]}>
-        {isTV ? (
-          <Focusable
-            ref={backButtonRef}
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            autoFocus
-            borderRadius={8}
-            focusScale={1.05}
-            animateBackground={true}
-            showFocusBorder={true}
-          >
-            {(focused) => (
-              <>
-                <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
-                <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
-                  Settings
-                </Text>
-              </>
-            )}
-          </Focusable>
-        ) : (
+        {!isTV && (
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}

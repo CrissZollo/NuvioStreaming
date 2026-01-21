@@ -618,20 +618,7 @@ const ContinueWatchingListScreen = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        {isTVDevice ? (
-          <Focusable
-            viewRef={backButtonRef}
-            onPress={() => navigation.goBack()}
-            focusScale={1.05}
-            borderRadius={8}
-            showFocusBorder={true}
-            nextFocusLeftId={getMenuFirstItemNodeHandle() ?? undefined}
-          >
-            {backButton}
-          </Focusable>
-        ) : (
-          backButton
-        )}
+        {!isTVDevice && backButton}
       </View>
 
       <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>
@@ -660,12 +647,14 @@ const ContinueWatchingListScreen = () => {
           }}
           ItemSeparatorComponent={() => <View style={{ height: layout.itemSpacing }} />}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={currentTheme.colors.primary}
-              colors={[currentTheme.colors.primary]}
-            />
+            !isTVDevice ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={currentTheme.colors.primary}
+                colors={[currentTheme.colors.primary]}
+              />
+            ) : undefined
           }
         />
       )}

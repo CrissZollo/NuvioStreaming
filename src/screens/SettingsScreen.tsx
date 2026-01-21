@@ -1183,6 +1183,7 @@ const SettingsScreen: React.FC = () => {
               style={styles.tabletScrollView}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.tabletScrollContent}
+              scrollEnabled={!isTVDevice}
             >
               {renderCategoryContent(selectedCategory)}
 
@@ -1300,6 +1301,7 @@ const SettingsScreen: React.FC = () => {
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
+            scrollEnabled={!isTVDevice}
           >
             {renderCategoryContent('account')}
             {renderCategoryContent('content')}

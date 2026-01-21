@@ -1017,22 +1017,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     }, [isTVDevice, navigation])
   );
 
-  // TV-specific back button component - moved before early returns so it can be used in all states
+  // Back button component - only shown on mobile (TV uses remote back button)
   const BackButton = useCallback(() => {
     if (isTVDevice) {
-      return (
-        <Focusable
-          viewRef={backButtonRef}
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          focusScale={1.1}
-          showFocusBorder={true}
-          borderRadius={8}
-        >
-          <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-          <Text style={styles.backText}>Back</Text>
-        </Focusable>
-      );
+      return null;
     }
     return (
       <TouchableOpacity
@@ -1161,12 +1149,14 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           numColumns={effectiveNumColumns}
           key={`${effectiveNumColumns}-${isTVDevice}`}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[colors.primary]}
-              tintColor={colors.primary}
-            />
+            !isTVDevice ? (
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[colors.primary]}
+                tintColor={colors.primary}
+              />
+            ) : undefined
           }
           contentContainerStyle={[styles.list, { paddingHorizontal: (screenData as any).containerPadding ?? SPACING.lg, paddingTop: SPACING.sm, paddingBottom: SPACING.lg }]}
           showsVerticalScrollIndicator={false}

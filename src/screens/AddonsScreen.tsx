@@ -1332,25 +1332,7 @@ const AddonsScreen = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        {isTV ? (
-          <Focusable
-            ref={backButtonRef}
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            autoFocus
-            borderRadius={8}
-            focusScale={1.05}
-            animateBackground={true}
-            showFocusBorder={true}
-          >
-            {(focused) => (
-              <>
-                <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-                <Text style={styles.backText}>Settings</Text>
-              </>
-            )}
-          </Focusable>
-        ) : (
+        {!isTV && (
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}

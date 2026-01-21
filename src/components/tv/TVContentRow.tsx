@@ -226,6 +226,7 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
         keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={false}
         contentContainerStyle={styles.listContent}
         getItemLayout={getItemLayout}
         initialNumToRender={5}

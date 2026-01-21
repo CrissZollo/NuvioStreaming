@@ -45,6 +45,7 @@ import { useMetadata } from '../../hooks/useMetadata';
 import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
 import stremioService from '../../services/stremioService';
 import { logger } from '../../utils/logger';
+import { useIsTV } from '../../contexts/TVContext';
 
 // Utils
 import { formatTime } from './utils/playerUtils';
@@ -77,6 +78,7 @@ const KSPlayerCore: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const insets = useSafeAreaInsets();
+  const isTVDevice = useIsTV();
   const params = route.params as PlayerRouteParams;
 
   // Deconstruct params
@@ -549,20 +551,22 @@ const KSPlayerCore: React.FC = () => {
         controlsFixedOffset={106}
       />
 
-      {/* Gesture Controls Overlay (Pan/Tap) */}
-      <GestureControls
-        screenDimensions={screenDimensions}
-        gestureControls={gestureControls}
-        onLongPressActivated={speedControl.activateSpeedBoost}
-        onLongPressEnd={speedControl.deactivateSpeedBoost}
-        onLongPressStateChange={() => { }}
-        toggleControls={toggleControls}
-        showControls={showControls}
-        hideControls={hideControls}
-        volume={volume}
-        brightness={brightness}
-        controlsTimeout={controlsTimeout}
-      />
+      {/* Gesture Controls Overlay (Pan/Tap) - Only on mobile, TV uses remote */}
+      {!isTVDevice && (
+        <GestureControls
+          screenDimensions={screenDimensions}
+          gestureControls={gestureControls}
+          onLongPressActivated={speedControl.activateSpeedBoost}
+          onLongPressEnd={speedControl.deactivateSpeedBoost}
+          onLongPressStateChange={() => { }}
+          toggleControls={toggleControls}
+          showControls={showControls}
+          hideControls={hideControls}
+          volume={volume}
+          brightness={brightness}
+          controlsTimeout={controlsTimeout}
+        />
+      )}
 
       {/* UI Controls */}
       {isVideoLoaded && (

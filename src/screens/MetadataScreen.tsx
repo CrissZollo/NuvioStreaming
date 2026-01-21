@@ -954,6 +954,7 @@ const MetadataScreen: React.FC = () => {
               contentContainerStyle={styles.scrollContent}
               removeClippedSubviews={false}
               focusable={false}
+              scrollEnabled={!isTVDevice}
             >
               {/* Hero Section - Optimized */}
               <HeroSection

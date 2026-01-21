@@ -2085,22 +2085,7 @@ const DebridIntegrationScreen = () => {
             <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
 
             <View style={styles.header}>
-                {isTV ? (
-                    <Focusable
-                        ref={backButtonRef}
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
-                        autoFocus
-                        borderRadius={8}
-                        focusScale={1.05}
-                        animateBackground={false}
-                        showFocusBorder={true}
-                    >
-                        {(focused) => (
-                            <Feather name="arrow-left" size={24} color={colors.white} />
-                        )}
-                    </Focusable>
-                ) : (
+                {!isTV && (
                     <TouchableOpacity
                         onPress={() => navigation.goBack()}
                         style={styles.backButton}
@@ -2173,12 +2158,14 @@ const DebridIntegrationScreen = () => {
                     style={styles.content}
                     contentContainerStyle={{ paddingBottom: 40 }}
                     refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor={colors.primary}
-                            colors={[colors.primary]}
-                        />
+                        !isTV ? (
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                tintColor={colors.primary}
+                                colors={[colors.primary]}
+                            />
+                        ) : undefined
                     }
                 >
                     {activeTab === 'torbox' ? renderTorboxTab() : renderTorrentioTab()}

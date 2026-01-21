@@ -244,25 +244,7 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
       
       {/* Header */}
       <View style={styles.header}>
-        {isTV ? (
-          <Focusable
-            ref={backButtonRef}
-            onPress={handleBack}
-            style={styles.backButton}
-            autoFocus
-            borderRadius={8}
-            focusScale={1.05}
-            animateBackground={false}
-            showFocusBorder={true}
-          >
-            {(focused) => (
-              <>
-                <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-                <Text style={styles.backText}>Settings</Text>
-              </>
-            )}
-          </Focusable>
-        ) : (
+        {!isTV && (
           <TouchableOpacity
             style={styles.backButton}
             onPress={handleBack}

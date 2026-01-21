@@ -393,20 +393,7 @@ const CalendarScreen = () => {
       <StatusBar barStyle="light-content" />
       
       <View style={[styles.header, { borderBottomColor: currentTheme.colors.border }, isTVDevice && styles.headerTV]}>
-        {isTVDevice ? (
-          <Focusable
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            borderRadius={8}
-            focusScale={1.1}
-            showFocusBorder={true}
-            autoFocus
-          >
-            {(focused) => (
-              <MaterialIcons name="arrow-back" size={24} color={focused ? currentTheme.colors.primary : currentTheme.colors.text} />
-            )}
-          </Focusable>
-        ) : (
+        {!isTVDevice && (
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -543,12 +530,14 @@ const CalendarScreen = () => {
               windowSize={7}
               removeClippedSubviews
               refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={currentTheme.colors.primary}
-                  colors={[currentTheme.colors.primary]}
-                />
+                !isTVDevice ? (
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={currentTheme.colors.primary}
+                    colors={[currentTheme.colors.primary]}
+                  />
+                ) : undefined
               }
             />
           ) : selectedDate && filteredEpisodes.length === 0 ? (
@@ -579,12 +568,14 @@ const CalendarScreen = () => {
               updateCellsBatchingPeriod={50}
               windowSize={7}
               refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={currentTheme.colors.primary}
-                  colors={[currentTheme.colors.primary]}
-                />
+                !isTVDevice ? (
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={currentTheme.colors.primary}
+                    colors={[currentTheme.colors.primary]}
+                  />
+                ) : undefined
               }
             />
           ) : (

@@ -408,31 +408,7 @@ const HomeScreenSettings: React.FC = () => {
     ]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
-        {isTV ? (
-          <Focusable
-            ref={backButtonRef}
-            onPress={handleBack}
-            style={styles.backButton}
-            autoFocus
-            borderRadius={8}
-            focusScale={1.05}
-            animateBackground={false}
-            showFocusBorder={true}
-          >
-            {(focused) => (
-              <>
-                <MaterialIcons
-                  name="arrow-back"
-                  size={24}
-                  color={isDarkMode ? colors.highEmphasis : colors.textDark}
-                />
-                <Text style={[styles.backText, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-                  Settings
-                </Text>
-              </>
-            )}
-          </Focusable>
-        ) : (
+        {!isTV && (
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <MaterialIcons
               name="arrow-back"

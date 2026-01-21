@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo, useState, Suspense } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -33,48 +33,192 @@ if (Platform.OS === 'ios') {
   }
 }
 
-// Import screens with their proper types
+// Check if running on TV at module load time (for static imports)
+const isTV = Platform.isTV === true;
+
+// Core screens - loaded eagerly on all platforms (needed immediately)
 import HomeScreen from '../screens/HomeScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import DownloadsScreen from '../screens/DownloadsScreen';
-import MetadataScreen from '../screens/MetadataScreen';
-import KSPlayerCore from '../components/player/KSPlayerCore';
-import AndroidVideoPlayer from '../components/player/AndroidVideoPlayer';
-import CatalogScreen from '../screens/CatalogScreen';
-import AddonsScreen from '../screens/AddonsScreen';
 import SearchScreen from '../screens/SearchScreen';
-import ShowRatingsScreen from '../screens/ShowRatingsScreen';
-import CatalogSettingsScreen from '../screens/CatalogSettingsScreen';
-import StreamsScreen from '../screens/StreamsScreen';
-import CalendarScreen from '../screens/CalendarScreen';
-import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
-import MDBListSettingsScreen from '../screens/MDBListSettingsScreen';
-import TMDBSettingsScreen from '../screens/TMDBSettingsScreen';
-import HomeScreenSettings from '../screens/HomeScreenSettings';
-import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
-import TraktSettingsScreen from '../screens/TraktSettingsScreen';
-import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
-import ThemeScreen from '../screens/ThemeScreen';
+import MetadataScreen from '../screens/MetadataScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
-import AuthScreen from '../screens/AuthScreen';
-import AccountManageScreen from '../screens/AccountManageScreen';
+
+// Mobile-only screens - loaded eagerly on mobile, lazy on TV
+// TV uses TVNavigator which doesn't include these in main navigation
+import DownloadsScreen from '../screens/DownloadsScreen';
+
+// Platform-specific players - only load the one needed
+// iOS player - never needed on TV (Android TV only)
+const KSPlayerCore = Platform.OS === 'ios'
+  ? require('../components/player/KSPlayerCore').default
+  : React.lazy(() => import('../components/player/KSPlayerCore'));
+
+// Android player - always needed on Android (mobile + TV)
+import AndroidVideoPlayer from '../components/player/AndroidVideoPlayer';
+
+// Shared screens - loaded eagerly on mobile for responsiveness, lazy on TV to reduce bundle parsing
+// TV devices have weaker CPUs so we lazy-load more aggressively there
+const CatalogScreen = isTV
+  ? React.lazy(() => import('../screens/CatalogScreen'))
+  : require('../screens/CatalogScreen').default;
+const AddonsScreen = isTV
+  ? React.lazy(() => import('../screens/AddonsScreen'))
+  : require('../screens/AddonsScreen').default;
+const StreamsScreen = isTV
+  ? React.lazy(() => import('../screens/StreamsScreen'))
+  : require('../screens/StreamsScreen').default;
+
+// Settings screens - lazy on TV, eager on mobile
+const ShowRatingsScreen = isTV
+  ? React.lazy(() => import('../screens/ShowRatingsScreen'))
+  : require('../screens/ShowRatingsScreen').default;
+const CatalogSettingsScreen = isTV
+  ? React.lazy(() => import('../screens/CatalogSettingsScreen'))
+  : require('../screens/CatalogSettingsScreen').default;
+const CalendarScreen = isTV
+  ? React.lazy(() => import('../screens/CalendarScreen'))
+  : require('../screens/CalendarScreen').default;
+const NotificationSettingsScreen = isTV
+  ? React.lazy(() => import('../screens/NotificationSettingsScreen'))
+  : require('../screens/NotificationSettingsScreen').default;
+const MDBListSettingsScreen = isTV
+  ? React.lazy(() => import('../screens/MDBListSettingsScreen'))
+  : require('../screens/MDBListSettingsScreen').default;
+const TMDBSettingsScreen = isTV
+  ? React.lazy(() => import('../screens/TMDBSettingsScreen'))
+  : require('../screens/TMDBSettingsScreen').default;
+const HomeScreenSettings = isTV
+  ? React.lazy(() => import('../screens/HomeScreenSettings'))
+  : require('../screens/HomeScreenSettings').default;
+const HeroCatalogsScreen = isTV
+  ? React.lazy(() => import('../screens/HeroCatalogsScreen'))
+  : require('../screens/HeroCatalogsScreen').default;
+const TraktSettingsScreen = isTV
+  ? React.lazy(() => import('../screens/TraktSettingsScreen'))
+  : require('../screens/TraktSettingsScreen').default;
+const PlayerSettingsScreen = isTV
+  ? React.lazy(() => import('../screens/PlayerSettingsScreen'))
+  : require('../screens/PlayerSettingsScreen').default;
+const ThemeScreen = isTV
+  ? React.lazy(() => import('../screens/ThemeScreen'))
+  : require('../screens/ThemeScreen').default;
+const AuthScreen = isTV
+  ? React.lazy(() => import('../screens/AuthScreen'))
+  : require('../screens/AuthScreen').default;
+const AccountManageScreen = isTV
+  ? React.lazy(() => import('../screens/AccountManageScreen'))
+  : require('../screens/AccountManageScreen').default;
+const PluginsScreen = isTV
+  ? React.lazy(() => import('../screens/PluginsScreen'))
+  : require('../screens/PluginsScreen').default;
+const CastMoviesScreen = isTV
+  ? React.lazy(() => import('../screens/CastMoviesScreen'))
+  : require('../screens/CastMoviesScreen').default;
+const UpdateScreen = isTV
+  ? React.lazy(() => import('../screens/UpdateScreen'))
+  : require('../screens/UpdateScreen').default;
+const AISettingsScreen = isTV
+  ? React.lazy(() => import('../screens/AISettingsScreen'))
+  : require('../screens/AISettingsScreen').default;
+const AIChatScreen = isTV
+  ? React.lazy(() => import('../screens/AIChatScreen'))
+  : require('../screens/AIChatScreen').default;
+const BackdropGalleryScreen = isTV
+  ? React.lazy(() => import('../screens/BackdropGalleryScreen'))
+  : require('../screens/BackdropGalleryScreen').default;
+const BackupScreen = isTV
+  ? React.lazy(() => import('../screens/BackupScreen'))
+  : require('../screens/BackupScreen').default;
+const ContinueWatchingSettingsScreen = isTV
+  ? React.lazy(() => import('../screens/ContinueWatchingSettingsScreen'))
+  : require('../screens/ContinueWatchingSettingsScreen').default;
+const ContributorsScreen = isTV
+  ? React.lazy(() => import('../screens/ContributorsScreen'))
+  : require('../screens/ContributorsScreen').default;
+const DebridIntegrationScreen = isTV
+  ? React.lazy(() => import('../screens/DebridIntegrationScreen'))
+  : require('../screens/DebridIntegrationScreen').default;
+const ContinueWatchingListScreen = isTV
+  ? React.lazy(() => import('../screens/ContinueWatchingListScreen'))
+  : require('../screens/ContinueWatchingListScreen').default;
+const DebugSettingsScreen = isTV
+  ? React.lazy(() => import('../screens/DebugSettingsScreen'))
+  : require('../screens/DebugSettingsScreen').default;
+
+// TV-only screens - lazy on mobile (never used), eager on TV
+const TVRestoreScreen = isTV
+  ? require('../screens/TVRestoreScreen').default
+  : React.lazy(() => import('../screens/TVRestoreScreen'));
+const TVAddonInstallScreen = isTV
+  ? require('../screens/TVAddonInstallScreen').default
+  : React.lazy(() => import('../screens/TVAddonInstallScreen'));
+
 import { useAccount } from '../contexts/AccountContext';
 import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
-import PluginsScreen from '../screens/PluginsScreen';
-import CastMoviesScreen from '../screens/CastMoviesScreen';
-import UpdateScreen from '../screens/UpdateScreen';
-import AISettingsScreen from '../screens/AISettingsScreen';
-import AIChatScreen from '../screens/AIChatScreen';
-import BackdropGalleryScreen from '../screens/BackdropGalleryScreen';
-import BackupScreen from '../screens/BackupScreen';
-import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsScreen';
-import ContributorsScreen from '../screens/ContributorsScreen';
-import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
-import ContinueWatchingListScreen from '../screens/ContinueWatchingListScreen';
-import TVRestoreScreen from '../screens/TVRestoreScreen';
-import TVAddonInstallScreen from '../screens/TVAddonInstallScreen';
-import DebugSettingsScreen from '../screens/DebugSettingsScreen';
+
+// Suspense fallback for lazy-loaded screens
+const ScreenLoadingFallback = () => (
+  <View style={{ flex: 1, backgroundColor: colors.darkBackground }} />
+);
+
+// Wrapper component for lazy-loaded screens with Suspense
+// Only wraps if the component is a lazy component
+const withSuspense = <P extends object>(
+  Component: React.ComponentType<P> | React.LazyExoticComponent<React.ComponentType<P>>
+): React.ComponentType<P> => {
+  // Check if it's a lazy component by looking for $$typeof
+  const isLazy = Component && (Component as any).$$typeof === Symbol.for('react.lazy');
+
+  if (!isLazy) {
+    // Already a regular component, return as-is
+    return Component as React.ComponentType<P>;
+  }
+
+  // Wrap lazy component with Suspense
+  return function SuspenseWrapper(props: P) {
+    return (
+      <Suspense fallback={<ScreenLoadingFallback />}>
+        <Component {...props} />
+      </Suspense>
+    );
+  };
+};
+
+// Wrapped components - withSuspense handles both lazy and eager components
+const WrappedDownloadsScreen = withSuspense(DownloadsScreen);
+const WrappedKSPlayerCore = withSuspense(KSPlayerCore);
+const WrappedAndroidVideoPlayer = withSuspense(AndroidVideoPlayer);
+const WrappedCatalogScreen = withSuspense(CatalogScreen);
+const WrappedAddonsScreen = withSuspense(AddonsScreen);
+const WrappedShowRatingsScreen = withSuspense(ShowRatingsScreen);
+const WrappedCatalogSettingsScreen = withSuspense(CatalogSettingsScreen);
+const WrappedStreamsScreen = withSuspense(StreamsScreen);
+const WrappedCalendarScreen = withSuspense(CalendarScreen);
+const WrappedNotificationSettingsScreen = withSuspense(NotificationSettingsScreen);
+const WrappedMDBListSettingsScreen = withSuspense(MDBListSettingsScreen);
+const WrappedTMDBSettingsScreen = withSuspense(TMDBSettingsScreen);
+const WrappedHomeScreenSettings = withSuspense(HomeScreenSettings);
+const WrappedHeroCatalogsScreen = withSuspense(HeroCatalogsScreen);
+const WrappedTraktSettingsScreen = withSuspense(TraktSettingsScreen);
+const WrappedPlayerSettingsScreen = withSuspense(PlayerSettingsScreen);
+const WrappedThemeScreen = withSuspense(ThemeScreen);
+const WrappedAuthScreen = withSuspense(AuthScreen);
+const WrappedAccountManageScreen = withSuspense(AccountManageScreen);
+const WrappedPluginsScreen = withSuspense(PluginsScreen);
+const WrappedCastMoviesScreen = withSuspense(CastMoviesScreen);
+const WrappedUpdateScreen = withSuspense(UpdateScreen);
+const WrappedAISettingsScreen = withSuspense(AISettingsScreen);
+const WrappedAIChatScreen = withSuspense(AIChatScreen);
+const WrappedBackdropGalleryScreen = withSuspense(BackdropGalleryScreen);
+const WrappedBackupScreen = withSuspense(BackupScreen);
+const WrappedContinueWatchingSettingsScreen = withSuspense(ContinueWatchingSettingsScreen);
+const WrappedContributorsScreen = withSuspense(ContributorsScreen);
+const WrappedDebridIntegrationScreen = withSuspense(DebridIntegrationScreen);
+const WrappedContinueWatchingListScreen = withSuspense(ContinueWatchingListScreen);
+const WrappedTVRestoreScreen = withSuspense(TVRestoreScreen);
+const WrappedTVAddonInstallScreen = withSuspense(TVAddonInstallScreen);
+const WrappedDebugSettingsScreen = withSuspense(DebugSettingsScreen);
 
 // Optional Android immersive mode module
 let RNImmersiveMode: any = null;
@@ -922,7 +1066,7 @@ const MainTabs = () => {
           {downloadsEnabled && (
             <IOSTab.Screen
               name="Downloads"
-              component={DownloadsScreen}
+              component={WrappedDownloadsScreen}
               options={{
                 title: 'Downloads',
                 tabBarIcon: () => ({ sfSymbol: 'arrow.down.circle' }),
@@ -1031,7 +1175,7 @@ const MainTabs = () => {
         {appSettings?.enableDownloads !== false && (
           <Tab.Screen
             name="Downloads"
-            component={DownloadsScreen}
+            component={WrappedDownloadsScreen}
             options={{
               tabBarLabel: 'Downloads',
               tabBarIcon: ({ color, size, focused }) => (
@@ -1141,6 +1285,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               headerShown: false,
               // Freeze non-focused stack screens to prevent background re-renders (e.g., SeriesContent behind player)
               freezeOnBlur: true,
+              // Disable swipe-back gestures on TV - use D-pad/remote back button instead
+              gestureEnabled: !isTV,
               // Use slide_from_right for consistency and smooth transitions
               animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
               animationDuration: Platform.OS === 'android' ? 250 : 300,
@@ -1170,7 +1316,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
           >
             <Stack.Screen
               name="Account"
-              component={AuthScreen as any}
+              component={WrappedAuthScreen as any}
               options={{
                 headerShown: false,
                 animation: 'fade',
@@ -1200,7 +1346,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="AccountManage"
-              component={AccountManageScreen as any}
+              component={WrappedAccountManageScreen as any}
               options={{
                 headerShown: false,
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
@@ -1220,7 +1366,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 ...(Platform.OS === 'ios' && {
                   cardStyleInterpolator: customFadeInterpolator,
                   animationTypeForReplace: 'push',
-                  gestureEnabled: true,
+                  gestureEnabled: !isTV,
                   gestureDirection: 'horizontal',
                 }),
                 contentStyle: {
@@ -1230,12 +1376,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="Streams"
-              component={StreamsScreen as any}
+              component={WrappedStreamsScreen as any}
               options={{
                 headerShown: false,
                 animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 200 : 300,
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: Platform.OS === 'ios' ? 'vertical' : 'horizontal',
                 ...(Platform.OS === 'ios' && { presentation: 'modal' }),
                 contentStyle: {
@@ -1247,7 +1393,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="PlayerIOS"
-              component={KSPlayerCore as any}
+              component={WrappedKSPlayerCore as any}
               options={{
                 animation: 'default',
                 animationDuration: 0,
@@ -1269,7 +1415,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="PlayerAndroid"
-              component={AndroidVideoPlayer as any}
+              component={WrappedAndroidVideoPlayer as any}
               options={{
                 animation: 'none',
                 animationDuration: 0,
@@ -1287,7 +1433,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="Catalog"
-              component={CatalogScreen as any}
+              component={WrappedCatalogScreen as any}
               options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
@@ -1298,7 +1444,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="Addons"
-              component={AddonsScreen as any}
+              component={WrappedAddonsScreen as any}
               options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
@@ -1313,7 +1459,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               options={{
                 animation: Platform.OS === 'android' ? 'none' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 0 : 350,
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
@@ -1322,7 +1468,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="CatalogSettings"
-              component={CatalogSettingsScreen as any}
+              component={WrappedCatalogSettingsScreen as any}
               options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
@@ -1333,12 +1479,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="HomeScreenSettings"
-              component={HomeScreenSettings}
+              component={WrappedHomeScreenSettings}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1348,12 +1494,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="ContinueWatchingSettings"
-              component={ContinueWatchingSettingsScreen}
+              component={WrappedContinueWatchingSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1363,12 +1509,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="Contributors"
-              component={ContributorsScreen}
+              component={WrappedContributorsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1378,12 +1524,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="DebugSettings"
-              component={DebugSettingsScreen}
+              component={WrappedDebugSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1393,12 +1539,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="HeroCatalogs"
-              component={HeroCatalogsScreen}
+              component={WrappedHeroCatalogsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1408,12 +1554,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="ShowRatings"
-              component={ShowRatingsScreen}
+              component={WrappedShowRatingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'fade_from_bottom' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 200 : 200,
                 ...(Platform.OS === 'ios' && { presentation: 'modal' }),
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1423,7 +1569,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="Calendar"
-              component={CalendarScreen as any}
+              component={WrappedCalendarScreen as any}
               options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
@@ -1434,7 +1580,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="NotificationSettings"
-              component={NotificationSettingsScreen as any}
+              component={WrappedNotificationSettingsScreen as any}
               options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
@@ -1445,12 +1591,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="MDBListSettings"
-              component={MDBListSettingsScreen}
+              component={WrappedMDBListSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1460,12 +1606,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="TMDBSettings"
-              component={TMDBSettingsScreen}
+              component={WrappedTMDBSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1475,12 +1621,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="TraktSettings"
-              component={TraktSettingsScreen}
+              component={WrappedTraktSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1490,12 +1636,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="PlayerSettings"
-              component={PlayerSettingsScreen}
+              component={WrappedPlayerSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1505,12 +1651,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="ThemeSettings"
-              component={ThemeScreen}
+              component={WrappedThemeScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1520,12 +1666,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="ScraperSettings"
-              component={PluginsScreen}
+              component={WrappedPluginsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1535,12 +1681,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="CastMovies"
-              component={CastMoviesScreen}
+              component={WrappedCastMoviesScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1550,12 +1696,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="Update"
-              component={UpdateScreen}
+              component={WrappedUpdateScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1565,12 +1711,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="AISettings"
-              component={AISettingsScreen}
+              component={WrappedAISettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1581,12 +1727,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
 
             <Stack.Screen
               name="Backup"
-              component={BackupScreen}
+              component={WrappedBackupScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1596,7 +1742,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="TVRestore"
-              component={TVRestoreScreen}
+              component={WrappedTVRestoreScreen}
               options={{
                 animation: 'fade',
                 animationDuration: 200,
@@ -1610,7 +1756,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="TVAddonInstall"
-              component={TVAddonInstallScreen}
+              component={WrappedTVAddonInstallScreen}
               options={{
                 animation: 'fade',
                 animationDuration: 200,
@@ -1624,12 +1770,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="AIChat"
-              component={AIChatScreen}
+              component={WrappedAIChatScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'fade' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 200 : 300,
                 presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'modal',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: Platform.OS === 'ios' ? 'horizontal' : 'vertical',
                 headerShown: false,
                 contentStyle: {
@@ -1639,7 +1785,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="BackdropGallery"
-              component={BackdropGalleryScreen}
+              component={WrappedBackdropGalleryScreen}
               options={{
                 animation: 'slide_from_right',
                 headerShown: false,
@@ -1650,12 +1796,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="DebridIntegration"
-              component={DebridIntegrationScreen}
+              component={WrappedDebridIntegrationScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {
@@ -1665,12 +1811,12 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             />
             <Stack.Screen
               name="ContinueWatchingList"
-              component={ContinueWatchingListScreen}
+              component={WrappedContinueWatchingListScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
-                gestureEnabled: true,
+                gestureEnabled: !isTV,
                 gestureDirection: 'horizontal',
                 headerShown: false,
                 contentStyle: {

@@ -553,26 +553,7 @@ const TMDBSettingsScreen = () => {
       <StatusBar barStyle="light-content" />
       <View style={[styles.headerContainer, { paddingTop: topSpacing }]}>
         <View style={styles.header}>
-          {isTV ? (
-            <Focusable
-              ref={backButtonRef}
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-              autoFocus
-              borderRadius={8}
-              focusScale={1.05}
-              animateBackground={false}
-              showFocusBorder={true}
-              nextFocusDown={enrichToggleRef.current?.getViewRef()}
-            >
-              {(focused) => (
-                <>
-                  <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.primary} />
-                  <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
-                </>
-              )}
-            </Focusable>
-          ) : (
+          {!isTV && (
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}

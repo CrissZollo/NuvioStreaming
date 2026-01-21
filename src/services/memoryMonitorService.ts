@@ -1,6 +1,16 @@
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import { logger } from '../utils/logger';
 import { memoryManager } from '../utils/memoryManager';
+
+// TV detection helper - check if running on Android TV
+const isTV = (): boolean => {
+  try {
+    // Platform.isTV is available in React Native
+    return Platform.isTV === true;
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Global memory monitoring service to prevent OutOfMemoryError
@@ -12,8 +22,9 @@ class MemoryMonitorService {
   private memoryCheckInterval: NodeJS.Timeout | null = null;
   private backgroundCleanupInterval: NodeJS.Timeout | null = null;
   private lastMemoryWarning: number = 0;
-  private readonly MEMORY_CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutes (was 30 seconds - too aggressive)
-  private readonly BACKGROUND_CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutes (was 5 minutes)
+  // TV devices have limited RAM (often 2GB or less), so check more frequently
+  private readonly MEMORY_CHECK_INTERVAL = isTV() ? 60 * 1000 : 2 * 60 * 1000; // 1 minute for TV, 2 minutes for mobile
+  private readonly BACKGROUND_CLEANUP_INTERVAL = isTV() ? 5 * 60 * 1000 : 10 * 60 * 1000; // 5 minutes for TV, 10 minutes for mobile
   private readonly MEMORY_WARNING_COOLDOWN = 5 * 60 * 1000; // 5 minutes (was 1 minute)
 
   private constructor() {
