@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Platform,
   findNodeHandle,
+  NativeModules,
+  NativeEventEmitter,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
@@ -131,6 +133,11 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
   const { getMenuFirstItemNodeHandle } = useTVFocus();
   const tvItemViewRefs = useRef<React.RefObject<View>[]>([]);
   const [tvRefsReady, setTvRefsReady] = useState(false);
+
+  // TV long press detection via native events
+  const LONG_PRESS_REPEAT_THRESHOLD = 3;
+  const focusedTVItemIndexRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
 
   // Enhanced responsive sizing for tablets and TV screens
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
@@ -311,9 +318,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     }
   }, []);
 
-  // Handle TV focus - no scrolling needed for grid layout
-  const handleTVItemFocus = useCallback(() => {
-    // Grid doesn't scroll, so no scroll logic needed
+  // Handle TV focus - track focused item for long press detection
+  const handleTVItemFocus = useCallback((item: ContinueWatchingItem, flatIndex: number) => {
+    // Track focused item for native long press detection
+    focusedTVItemIndexRef.current = flatIndex;
   }, []);
 
   // Alert state for CustomAlert
@@ -1258,6 +1266,42 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
     setAlertVisible(true);
   }, []);
 
+  // Native event listener for TV long press detection
+  useEffect(() => {
+    if (!isTVDevice || Platform.OS !== 'android' || continueWatchingItems.length === 0) return;
+
+    const { TVKeyEvent } = NativeModules;
+    if (!TVKeyEvent) return;
+
+    const eventEmitter = new NativeEventEmitter(TVKeyEvent);
+    const subscription = eventEmitter.addListener('onTVKeyEvent', (event: any) => {
+      const { key, action, repeatCount } = event;
+
+      // Only care about select button
+      if (key !== 'select') return;
+
+      // Reset long press flag on key up
+      if (action === 'up') {
+        longPressTriggeredRef.current = false;
+        return;
+      }
+
+      // Trigger long press when repeatCount reaches threshold
+      if (action === 'down' && repeatCount === LONG_PRESS_REPEAT_THRESHOLD && !longPressTriggeredRef.current) {
+        const focusedIndex = focusedTVItemIndexRef.current;
+        if (focusedIndex !== null && focusedIndex >= 0 && focusedIndex < continueWatchingItems.length) {
+          longPressTriggeredRef.current = true;
+          const item = continueWatchingItems[focusedIndex];
+          handleLongPress(item);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isTVDevice, continueWatchingItems, handleLongPress]);
+
   // Memoized render function for continue watching items
   // PERFORMANCE: Uses pre-memoized styles instead of creating objects on every render
   const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => {
@@ -1502,7 +1546,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef, ContinueWa
         viewRef={currentViewRef}
         onPress={() => handleContentPress(item)}
         onLongPress={() => handleLongPress(item)}
-        onFocus={handleTVItemFocus}
+        onFocus={() => handleTVItemFocus(item, flatIndex)}
         onLayout={() => registerItemNodeHandle(flatIndex, currentViewRef?.current ?? null)}
         focusScale={1.03}
         borderRadius={10}

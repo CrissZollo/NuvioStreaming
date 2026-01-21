@@ -4,6 +4,9 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  NativeModules,
+  NativeEventEmitter,
+  Platform,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -15,6 +18,8 @@ import { StreamingContent } from '../../../services/catalogService';
 import { Episode } from '../../../types/metadata';
 import { Focusable } from '../../tv/Focusable';
 import { storageService } from '../../../services/storageService';
+import { watchedService } from '../../../services/watchedService';
+import { CustomAlert } from '../../CustomAlert';
 
 const EPISODE_PLACEHOLDER = 'https://via.placeholder.com/500x280/1a1a1a/666666?text=No+Preview';
 
@@ -48,6 +53,17 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
   const { settings } = useSettings();
   const flatListRef = useRef<FlatList<Episode>>(null);
 
+  // Long press detection for TV
+  const LONG_PRESS_REPEAT_THRESHOLD = 3;
+  const focusedEpisodeIndexRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
+
+  // Alert state for episode long press menu
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([]);
+
   // Season dropdown state
   const [isSeasonDropdownOpen, setIsSeasonDropdownOpen] = useState(false);
   const seasonSelectorRef = useRef<View>(null);
@@ -57,6 +73,20 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
   // Episode progress tracking
   const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number } }>({});
 
+  // Get current season episodes - defined early for use in long press handler
+  const currentSeasonEpisodes = useMemo(() => {
+    return groupedEpisodes[selectedSeason] || [];
+  }, [groupedEpisodes, selectedSeason]);
+
+  // Get sorted seasons
+  const seasons = useMemo(() => {
+    return Object.keys(groupedEpisodes).map(Number).sort((a, b) => {
+      if (a === 0) return 1;
+      if (b === 0) return -1;
+      return a - b;
+    });
+  }, [groupedEpisodes]);
+
   // Load episode progress
   useEffect(() => {
     const loadProgress = async () => {
@@ -64,9 +94,14 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
         const allProgress = await storageService.getAllWatchProgress();
         const progressMap: { [key: string]: { currentTime: number; duration: number } } = {};
 
+        // Keys from getAllWatchProgress have format: "series:${showId}:${showId}:${season}:${episode}"
+        // We need to match and extract to our local key format: "${showId}:${season}:${episode}"
+        const seriesPrefix = `series:${metadata?.id}:`;
         for (const [key, value] of Object.entries(allProgress)) {
-          if (key.startsWith(metadata?.id || '')) {
-            progressMap[key] = value as { currentTime: number; duration: number };
+          if (key.startsWith(seriesPrefix)) {
+            // Extract the episodeId part (showId:season:episode)
+            const episodeId = key.substring('series:'.length);
+            progressMap[episodeId] = value as { currentTime: number; duration: number };
           }
         }
         setEpisodeProgress(progressMap);
@@ -80,20 +115,136 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
     }
   }, [metadata?.id]);
 
-  // Check if episode is watched (>= 85%)
+  // Build episode progress key that matches storage format
+  const getEpisodeProgressKey = useCallback((episode: Episode): string => {
+    // Storage key format after getAllWatchProgress strips prefix: "series:${showId}:${showId}:${season}:${episode}"
+    // But we store in progressMap with just the part after "series:": "${showId}:${showId}:${season}:${episode}"
+    return `${metadata?.id}:${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
+  }, [metadata?.id]);
+
+  // Check if episode is watched (>= 85%) - defined early for use in long press handler
   const isEpisodeWatched = useCallback((episode: Episode): boolean => {
-    const episodeId = (episode as any).stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
-    const progress = episodeProgress[episodeId];
+    const key = getEpisodeProgressKey(episode);
+    const progress = episodeProgress[key];
     if (!progress) return false;
     const progressPercent = (progress.currentTime / progress.duration) * 100;
     return progressPercent >= 85;
-  }, [episodeProgress, metadata?.id]);
+  }, [episodeProgress, getEpisodeProgressKey]);
 
   // Check if episode has any progress
   const hasProgress = useCallback((episode: Episode): boolean => {
-    const episodeId = (episode as any).stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
-    return !!episodeProgress[episodeId];
-  }, [episodeProgress, metadata?.id]);
+    const key = getEpisodeProgressKey(episode);
+    return !!episodeProgress[key];
+  }, [episodeProgress, getEpisodeProgressKey]);
+
+  // Handle episode long press - show mark as watched / clear progress menu
+  const handleEpisodeLongPress = useCallback((episode: Episode, episodeIndex: number) => {
+    const watched = isEpisodeWatched(episode);
+    const localStateKey = getEpisodeProgressKey(episode);
+
+    const displayName = `"${episode.name}" S${episode.season_number}E${episode.episode_number}`;
+
+    setAlertTitle('Episode Options');
+    setAlertMessage(`What would you like to do with ${displayName}?`);
+
+    setAlertActions([
+      {
+        label: 'Cancel',
+        style: { color: '#888' },
+        onPress: () => {},
+      },
+      {
+        label: 'Clear Progress',
+        style: { color: currentTheme.colors.error },
+        onPress: async () => {
+          try {
+            // Clear watch progress for this episode using storageService API
+            // storageService.removeWatchProgress expects (id, type, episodeId) where episodeId is "showId:season:episode"
+            const storageEpisodeId = `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
+            await storageService.removeWatchProgress(metadata?.id || '', 'series', storageEpisodeId);
+            // Update local state with the key format we use for lookups
+            setEpisodeProgress(prev => {
+              const newProgress = { ...prev };
+              delete newProgress[localStateKey];
+              return newProgress;
+            });
+          } catch (error) {
+            console.warn('[TVEpisodesTabContent] Error clearing progress:', error);
+          }
+        },
+      },
+      {
+        label: watched ? 'Mark as Unwatched' : 'Mark as Watched',
+        style: { color: currentTheme.colors.primary },
+        onPress: async () => {
+          try {
+            if (watched) {
+              // Clear progress to mark as unwatched
+              const storageEpisodeId = `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
+              await storageService.removeWatchProgress(metadata?.id || '', 'series', storageEpisodeId);
+              setEpisodeProgress(prev => {
+                const newProgress = { ...prev };
+                delete newProgress[localStateKey];
+                return newProgress;
+              });
+            } else {
+              // Mark as watched (100% progress)
+              await watchedService.markEpisodeAsWatched(
+                metadata?.id || '',
+                metadata?.id || '',
+                episode.season_number,
+                episode.episode_number
+              );
+              // Update local state to show as watched using the correct key format
+              setEpisodeProgress(prev => ({
+                ...prev,
+                [localStateKey]: { currentTime: 100, duration: 100 }, // 100% progress
+              }));
+            }
+          } catch (error) {
+            console.warn('[TVEpisodesTabContent] Error updating watched status:', error);
+          }
+        },
+      },
+    ]);
+    setAlertVisible(true);
+  }, [currentTheme.colors.error, currentTheme.colors.primary, metadata?.id, isEpisodeWatched, getEpisodeProgressKey]);
+
+  // Native event listener for TV long press detection
+  useEffect(() => {
+    if (Platform.OS !== 'android' || currentSeasonEpisodes.length === 0) return;
+
+    const { TVKeyEvent } = NativeModules;
+    if (!TVKeyEvent) return;
+
+    const eventEmitter = new NativeEventEmitter(TVKeyEvent);
+    const subscription = eventEmitter.addListener('onTVKeyEvent', (event: any) => {
+      const { key, action, repeatCount } = event;
+
+      // Only care about select button
+      if (key !== 'select') return;
+
+      // Reset long press flag on key up
+      if (action === 'up') {
+        longPressTriggeredRef.current = false;
+        return;
+      }
+
+      // Trigger long press when repeatCount reaches threshold
+      if (action === 'down' && repeatCount === LONG_PRESS_REPEAT_THRESHOLD && !longPressTriggeredRef.current) {
+        const focusedIndex = focusedEpisodeIndexRef.current;
+        if (focusedIndex !== null && focusedIndex >= 0 && focusedIndex < currentSeasonEpisodes.length) {
+          longPressTriggeredRef.current = true;
+          const episode = currentSeasonEpisodes[focusedIndex];
+          handleEpisodeLongPress(episode, focusedIndex);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [currentSeasonEpisodes, handleEpisodeLongPress]);
 
   // Episode refs for focus navigation
   const episodeRefs = useRef<Map<number, React.RefObject<View>>>(new Map());
@@ -104,20 +255,6 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
     }
     return episodeRefs.current.get(index)!;
   }, []);
-
-  // Get current season episodes
-  const currentSeasonEpisodes = useMemo(() => {
-    return groupedEpisodes[selectedSeason] || [];
-  }, [groupedEpisodes, selectedSeason]);
-
-  // Get sorted seasons
-  const seasons = useMemo(() => {
-    return Object.keys(groupedEpisodes).map(Number).sort((a, b) => {
-      if (a === 0) return 1;
-      if (b === 0) return -1;
-      return a - b;
-    });
-  }, [groupedEpisodes]);
 
   // Get season option ref
   const getSeasonOptionRef = useCallback((seasonNum: number) => {
@@ -138,8 +275,11 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
     setIsSeasonDropdownOpen(prev => !prev);
   }, []);
 
-  // Handle episode focus - scroll to keep in view
+  // Handle episode focus - scroll to keep in view and track focused index
   const handleEpisodeFocus = useCallback((index: number) => {
+    // Track focused episode for long press detection
+    focusedEpisodeIndexRef.current = index;
+
     if (flatListRef.current) {
       const offset = index * (CARD_WIDTH + CARD_SPACING);
       flatListRef.current.scrollToOffset({
@@ -277,6 +417,7 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
   }
 
   return (
+    <>
     <View style={styles.container}>
       {/* Season Selector */}
       {seasons.length > 1 && (
@@ -395,6 +536,16 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
         getItemLayout={getItemLayout}
       />
     </View>
+
+    {/* Long Press Menu Alert */}
+    <CustomAlert
+      visible={alertVisible}
+      title={alertTitle}
+      message={alertMessage}
+      onClose={() => setAlertVisible(false)}
+      actions={alertActions}
+    />
+    </>
   );
 };
 

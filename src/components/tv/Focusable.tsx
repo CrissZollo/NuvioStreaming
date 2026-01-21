@@ -41,6 +41,9 @@ const DEBUG_FOCUSABLE = false; // Disabled after debugging
 let focusableRenderCount = 0;
 let focusableInstanceCount = 0;
 
+// Long press delay for TV remote (in milliseconds)
+const LONG_PRESS_DELAY = 500;
+
 interface FocusableProps {
   /** Content to render inside the focusable container */
   children: React.ReactNode | ((focused: boolean) => React.ReactNode);
@@ -327,6 +330,9 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       };
     }, []);
 
+    // Note: TV long press detection is handled at the parent component level
+    // using useTVKeyEvent hook for better control and reliability
+
     // Expose focus methods via ref
     useImperativeHandle(ref, () => ({
       focus: () => {
@@ -401,6 +407,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
           ref={actualRef as any}
           onPress={onPress}
           onLongPress={onLongPress}
+          delayLongPress={500}
           disabled={disabled}
           activeOpacity={0.7}
           style={style}
@@ -481,6 +488,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
         ref={refCallback}
         onPress={onPress}
         onLongPress={onLongPress}
+        delayLongPress={LONG_PRESS_DELAY}
         disabled={disabled}
         android_disableSound={true}
         onLayout={onLayout}

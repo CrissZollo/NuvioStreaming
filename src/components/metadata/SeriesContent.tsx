@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList, Platform, NativeModules, NativeEventEmitter } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -19,6 +19,7 @@ import { TraktService } from '../../services/traktService';
 import { watchedService } from '../../services/watchedService';
 import { logger } from '../../utils/logger';
 import { mmkvStorage } from '../../services/mmkvStorage';
+import CustomAlert from '../CustomAlert';
 
 // Enhanced responsive breakpoints for Seasons Section
 const BREAKPOINTS = {
@@ -196,10 +197,12 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   const [posterViewVisible, setPosterViewVisible] = useState(true);
   const [textViewVisible, setTextViewVisible] = useState(false);
 
-  // Episode action menu state
-  const [episodeActionMenuVisible, setEpisodeActionMenuVisible] = useState(false);
+  // Episode action menu state (using CustomAlert)
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void }>>([]);
   const [selectedEpisodeForAction, setSelectedEpisodeForAction] = useState<Episode | null>(null);
-  const [markingAsWatched, setMarkingAsWatched] = useState(false);
 
   // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
@@ -232,8 +235,14 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   const lastTVFocusTime = useRef<number>(0);
   const TV_FOCUS_DEBOUNCE_MS = 50; // Reduced from 80ms for snappier navigation
 
+  // Track currently focused episode index for TV long press detection
+  const focusedEpisodeIndexRef = useRef<number | null>(null);
+
   // Handle TV episode focus - scroll to keep focused item visible
   const handleTVEpisodeFocus = useCallback((index: number) => {
+    // Track focused episode for long press detection
+    focusedEpisodeIndexRef.current = index;
+
     // Debounce rapid focus events
     const now = Date.now();
     if (now - lastTVFocusTime.current < TV_FOCUS_DEBOUNCE_MS) {
@@ -585,13 +594,6 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     return rating ?? null;
   }, [imdbRatingsMap]);
 
-  // Handle long press on episode to show action menu
-  const handleEpisodeLongPress = useCallback((episode: Episode) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setSelectedEpisodeForAction(episode);
-    setEpisodeActionMenuVisible(true);
-  }, []);
-
   // Check if an episode is watched (>= 85% progress)
   const isEpisodeWatched = useCallback((episode: Episode): boolean => {
     const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
@@ -601,190 +603,66 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     return progressPercent >= 85;
   }, [episodeProgress, metadata?.id]);
 
-  // Mark episode as watched
-  const handleMarkAsWatched = useCallback(async () => {
-    if (!selectedEpisodeForAction || !metadata?.id) return;
+  // Handle long press on episode to show action menu
+  const handleEpisodeLongPress = useCallback((episode: Episode) => {
+    logger.log('[SeriesContent] Long press triggered for episode:', episode.episode_number);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const episode = selectedEpisodeForAction; // Capture for closure
-    const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
+    const episodeTitle = `S${episode.season_number}E${episode.episode_number} - ${episode.name}`;
+    const watched = isEpisodeWatched(episode);
 
-    // 1. Optimistic UI Update
-    setEpisodeProgress(prev => ({
-      ...prev,
-      [episodeId]: { currentTime: 1, duration: 1, lastUpdated: Date.now() } // 100% progress
-    }));
+    setAlertTitle(episodeTitle);
+    setAlertMessage('');
+    setAlertActions([
+      {
+        label: 'Cancel',
+        onPress: () => {},
+      },
+      {
+        label: watched ? 'Mark as Unwatched' : 'Mark as Watched',
+        onPress: async () => {
+          if (!metadata?.id) return;
 
-    // 2. Instant Feedback
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setEpisodeActionMenuVisible(false);
-    setSelectedEpisodeForAction(null);
+          const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
+          const showImdbId = imdbId || metadata.id;
 
-    // 3. Background Async Operation
-    const showImdbId = imdbId || metadata.id;
-    try {
-      const result = await watchedService.markEpisodeAsWatched(
-        showImdbId,
-        metadata.id,
-        episode.season_number,
-        episode.episode_number
-      );
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Reload to ensure consistency (e.g. if optimistic update was slightly off or for other effects)
-      // But we don't strictly *need* to wait for this to update UI
-      loadEpisodesProgress();
+          if (watched) {
+            // Optimistic UI - remove from progress
+            setEpisodeProgress(prev => {
+              const newState = { ...prev };
+              delete newState[episodeId];
+              return newState;
+            });
 
-      logger.log(`[SeriesContent] Mark as watched result:`, result);
-    } catch (error) {
-      logger.error('[SeriesContent] Error marking episode as watched:', error);
-      // Ideally revert state here, but simple error logging is often enough for non-critical non-transactional actions
-      loadEpisodesProgress(); // Reload to revert to source of truth
-    }
-  }, [selectedEpisodeForAction, metadata?.id, imdbId]);
+            try {
+              await watchedService.unmarkEpisodeAsWatched(showImdbId, metadata.id, episode.season_number, episode.episode_number);
+              loadEpisodesProgress();
+            } catch (error) {
+              logger.error('[SeriesContent] Error unmarking episode:', error);
+              loadEpisodesProgress();
+            }
+          } else {
+            // Optimistic UI - mark as watched
+            setEpisodeProgress(prev => ({
+              ...prev,
+              [episodeId]: { currentTime: 1, duration: 1, lastUpdated: Date.now() }
+            }));
 
-  // Mark episode as unwatched
-  const handleMarkAsUnwatched = useCallback(async () => {
-    if (!selectedEpisodeForAction || !metadata?.id) return;
-
-    const episode = selectedEpisodeForAction;
-    const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
-
-    // 1. Optimistic UI Update - Remove from progress map
-    setEpisodeProgress(prev => {
-      const newState = { ...prev };
-      delete newState[episodeId];
-      return newState;
-    });
-
-    // 2. Instant Feedback
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setEpisodeActionMenuVisible(false);
-    setSelectedEpisodeForAction(null);
-
-    // 3. Background Async Operation
-    const showImdbId = imdbId || metadata.id;
-    try {
-      const result = await watchedService.unmarkEpisodeAsWatched(
-        showImdbId,
-        metadata.id,
-        episode.season_number,
-        episode.episode_number
-      );
-
-      loadEpisodesProgress(); // Sync with source of truth
-      logger.log(`[SeriesContent] Unmark watched result:`, result);
-    } catch (error) {
-      logger.error('[SeriesContent] Error unmarking episode as watched:', error);
-      loadEpisodesProgress(); // Revert
-    }
-  }, [selectedEpisodeForAction, metadata?.id, imdbId]);
-
-  // Mark entire season as watched
-  const handleMarkSeasonAsWatched = useCallback(async () => {
-    if (!metadata?.id) return;
-
-    // Capture values
-    const currentSeason = selectedSeason;
-    const seasonEpisodes = groupedEpisodes[currentSeason] || [];
-    const episodeNumbers = seasonEpisodes.map(ep => ep.episode_number);
-
-    // 1. Optimistic UI Update
-    setEpisodeProgress(prev => {
-      const next = { ...prev };
-      seasonEpisodes.forEach(ep => {
-        const id = ep.stremioId || `${metadata.id}:${ep.season_number}:${ep.episode_number}`;
-        next[id] = { currentTime: 1, duration: 1, lastUpdated: Date.now() };
-      });
-      return next;
-    });
-
-    // 2. Instant Feedback
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setEpisodeActionMenuVisible(false);
-    setSelectedEpisodeForAction(null);
-
-    // 3. Background Async Operation
-    const showImdbId = imdbId || metadata.id;
-    try {
-      const result = await watchedService.markSeasonAsWatched(
-        showImdbId,
-        metadata.id,
-        currentSeason,
-        episodeNumbers
-      );
-
-      // Re-sync with source of truth
-      loadEpisodesProgress();
-
-      logger.log(`[SeriesContent] Mark season as watched result:`, result);
-    } catch (error) {
-      logger.error('[SeriesContent] Error marking season as watched:', error);
-      loadEpisodesProgress(); // Revert
-    }
-  }, [metadata?.id, imdbId, selectedSeason, groupedEpisodes]);
-
-  // Check if entire season is watched
-  const isSeasonWatched = useCallback((): boolean => {
-    const seasonEpisodes = groupedEpisodes[selectedSeason] || [];
-    if (seasonEpisodes.length === 0) return false;
-
-    return seasonEpisodes.every(ep => {
-      const episodeId = ep.stremioId || `${metadata?.id}:${ep.season_number}:${ep.episode_number}`;
-      const progress = episodeProgress[episodeId];
-      if (!progress) return false;
-      const progressPercent = (progress.currentTime / progress.duration) * 100;
-      return progressPercent >= 85;
-    });
-  }, [groupedEpisodes, selectedSeason, episodeProgress, metadata?.id]);
-
-  // Unmark entire season as watched
-  const handleMarkSeasonAsUnwatched = useCallback(async () => {
-    if (!metadata?.id) return;
-
-    // Capture values
-    const currentSeason = selectedSeason;
-    const seasonEpisodes = groupedEpisodes[currentSeason] || [];
-    const episodeNumbers = seasonEpisodes.map(ep => ep.episode_number);
-
-    // 1. Optimistic UI Update - Remove all episodes of season from progress
-    setEpisodeProgress(prev => {
-      const next = { ...prev };
-      seasonEpisodes.forEach(ep => {
-        const id = ep.stremioId || `${metadata.id}:${ep.season_number}:${ep.episode_number}`;
-        delete next[id];
-      });
-      return next;
-    });
-
-    // 2. Instant Feedback
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setEpisodeActionMenuVisible(false);
-    setSelectedEpisodeForAction(null);
-
-    // 3. Background Async Operation
-    const showImdbId = imdbId || metadata.id;
-    try {
-      const result = await watchedService.unmarkSeasonAsWatched(
-        showImdbId,
-        metadata.id,
-        currentSeason,
-        episodeNumbers
-      );
-
-      // Re-sync
-      loadEpisodesProgress();
-
-      logger.log(`[SeriesContent] Unmark season as watched result:`, result);
-    } catch (error) {
-      logger.error('[SeriesContent] Error unmarking season as watched:', error);
-      loadEpisodesProgress(); // Revert
-    }
-  }, [metadata?.id, imdbId, selectedSeason, groupedEpisodes]);
-
-  // Close action menu
-  const closeEpisodeActionMenu = useCallback(() => {
-    setEpisodeActionMenuVisible(false);
-    setSelectedEpisodeForAction(null);
-  }, []);
+            try {
+              await watchedService.markEpisodeAsWatched(showImdbId, metadata.id, episode.season_number, episode.episode_number);
+              loadEpisodesProgress();
+            } catch (error) {
+              logger.error('[SeriesContent] Error marking episode:', error);
+              loadEpisodesProgress();
+            }
+          }
+        },
+      },
+    ]);
+    setAlertVisible(true);
+  }, [isEpisodeWatched, metadata?.id, imdbId]);
 
   if (loadingSeasons) {
     return (
@@ -1701,6 +1579,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           showFocusBorder={true}
           blockLeft={isFirst}
           blockRight={isLast}
+          testID={`episode-${episode.season_number}-${episode.episode_number}`}
         >
           {horizontalCardContent}
         </Focusable>
@@ -1741,6 +1620,60 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   ]);
 
   const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
+
+  // TV Long Press Detection for episodes using native event listener
+  const LONG_PRESS_REPEAT_THRESHOLD = 3;
+  const longPressTriggeredRef = useRef(false);
+
+  useEffect(() => {
+    console.log('[SeriesContent] Long press effect - isTVDevice:', isTVDevice, 'platform:', Platform.OS, 'episodes:', currentSeasonEpisodes.length);
+
+    if (!isTVDevice || Platform.OS !== 'android' || currentSeasonEpisodes.length === 0) {
+      console.log('[SeriesContent] Long press listener NOT set up');
+      return;
+    }
+
+    const { TVKeyEvent } = NativeModules;
+    if (!TVKeyEvent) {
+      console.log('[SeriesContent] TVKeyEvent module not found');
+      return;
+    }
+
+    console.log('[SeriesContent] Setting up TV long press listener');
+    const eventEmitter = new NativeEventEmitter(TVKeyEvent);
+
+    const subscription = eventEmitter.addListener('onTVKeyEvent', (event: any) => {
+      const { key, action, repeatCount } = event;
+
+      // Only handle select key for long press
+      if (key !== 'select') return;
+
+      // Log select events
+      console.log(`[SeriesContent] SELECT - action: ${action}, repeat: ${repeatCount}, focusedIdx: ${focusedEpisodeIndexRef.current}`);
+
+      // Reset on key up
+      if (action === 'up') {
+        longPressTriggeredRef.current = false;
+        return;
+      }
+
+      // Long press detected when repeat count reaches threshold
+      if (action === 'down' && repeatCount === LONG_PRESS_REPEAT_THRESHOLD && !longPressTriggeredRef.current) {
+        const focusedIndex = focusedEpisodeIndexRef.current;
+        console.log('[SeriesContent] Long press check - focusedIndex:', focusedIndex);
+        if (focusedIndex !== null && focusedIndex >= 0 && focusedIndex < currentSeasonEpisodes.length) {
+          longPressTriggeredRef.current = true;
+          const episode = currentSeasonEpisodes[focusedIndex];
+          console.log('[SeriesContent] LONG PRESS TRIGGERED for episode:', episode.episode_number);
+          handleEpisodeLongPress(episode);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isTVDevice, currentSeasonEpisodes, handleEpisodeLongPress]);
 
   // Memoized renderItem for horizontal episode FlatList - prevents recreation on every render
   const renderHorizontalEpisodeItem = useCallback(({ item: episode, index }: { item: Episode; index: number }) => (
@@ -1830,6 +1763,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               key={`episodes-${effectiveEpisodeLayout}-${selectedSeason}`}
               ref={horizontalEpisodeScrollViewRef}
               data={currentSeasonEpisodes}
+              extraData={episodeProgress}
               renderItem={renderHorizontalEpisodeItem}
               keyExtractor={episodeKeyExtractor}
               horizontal
@@ -1874,6 +1808,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               key={`episodes-${effectiveEpisodeLayout}-${selectedSeason}`}
               ref={episodeScrollViewRef}
               data={currentSeasonEpisodes}
+              extraData={episodeProgress}
               renderItem={renderVerticalEpisodeItem}
               keyExtractor={episodeKeyExtractor}
               contentContainerStyle={[
@@ -1890,205 +1825,14 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       </Animated.View>
       </TVFocusSection>
 
-      {/* Episode Action Menu Modal */}
-      <Modal
-        visible={episodeActionMenuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeEpisodeActionMenu}
-        statusBarTranslucent
-        supportedOrientations={['portrait', 'landscape']}
-      >
-        <Pressable
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.85)', // Darker overlay
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-          }}
-          onPress={closeEpisodeActionMenu}
-        >
-          <Pressable
-            style={{
-              backgroundColor: '#1E1E1E', // Solid opaque dark background
-              borderRadius: isTV ? 20 : 16,
-              padding: isTV ? 24 : 20,
-              width: isTV ? 400 : isLargeTablet ? 360 : isTablet ? 320 : '100%',
-              maxWidth: 400,
-              alignSelf: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.1)', // Subtle border
-              shadowColor: "#000",
-              shadowOffset: {
-                width: 0,
-                height: 10,
-              },
-              shadowOpacity: 0.51,
-              shadowRadius: 13.16,
-              elevation: 20,
-            }}
-            onPress={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <View style={{ marginBottom: isTV ? 20 : 16 }}>
-              <Text style={{
-                color: '#FFFFFF', // High contrast text
-                fontSize: isTV ? 20 : 18,
-                fontWeight: '700',
-                marginBottom: 4,
-              }}>
-                {selectedEpisodeForAction ? `S${selectedEpisodeForAction.season_number}E${selectedEpisodeForAction.episode_number}` : ''}
-              </Text>
-              <Text style={{
-                color: '#AAAAAA', // Medium emphasis text
-                fontSize: isTV ? 16 : 14,
-              }} numberOfLines={1} ellipsizeMode="tail">
-                {selectedEpisodeForAction?.name || ''}
-              </Text>
-            </View>
-
-            {/* Action buttons */}
-            <View style={{ gap: isTV ? 12 : 10 }}>
-              {/* Mark as Watched / Unwatched */}
-              {selectedEpisodeForAction && (
-                isEpisodeWatched(selectedEpisodeForAction) ? (
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(255, 255, 255, 0.08)', // Defined background
-                      padding: isTV ? 16 : 14,
-                      borderRadius: isTV ? 12 : 10,
-                      opacity: markingAsWatched ? 0.5 : 1,
-                    }}
-                    onPress={handleMarkAsUnwatched}
-                    disabled={markingAsWatched}
-                  >
-                    <MaterialIcons
-                      name="visibility-off"
-                      size={isTV ? 24 : 22}
-                      color="#FFFFFF"
-                      style={{ marginRight: 12 }}
-                    />
-                    <Text style={{
-                      color: '#FFFFFF',
-                      fontSize: isTV ? 16 : 15,
-                      fontWeight: '500',
-                    }}>
-                      {markingAsWatched ? 'Removing...' : 'Mark as Unwatched'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: currentTheme.colors.primary,
-                      padding: isTV ? 16 : 14,
-                      borderRadius: isTV ? 12 : 10,
-                      opacity: markingAsWatched ? 0.5 : 1,
-                    }}
-                    onPress={handleMarkAsWatched}
-                    disabled={markingAsWatched}
-                  >
-                    <MaterialIcons
-                      name="check-circle"
-                      size={isTV ? 24 : 22}
-                      color="#FFFFFF"
-                      style={{ marginRight: 12 }}
-                    />
-                    <Text style={{
-                      color: '#FFFFFF',
-                      fontSize: isTV ? 16 : 15,
-                      fontWeight: '600',
-                    }}>
-                      {markingAsWatched ? 'Marking...' : 'Mark as Watched'}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
-
-              {/* Mark Season as Watched / Unwatched */}
-              {isSeasonWatched() ? (
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    padding: isTV ? 16 : 14,
-                    borderRadius: isTV ? 12 : 10,
-                    opacity: markingAsWatched ? 0.5 : 1,
-                  }}
-                  onPress={handleMarkSeasonAsUnwatched}
-                  disabled={markingAsWatched}
-                >
-                  <MaterialIcons
-                    name="playlist-remove"
-                    size={isTV ? 24 : 22}
-                    color="#FFFFFF"
-                    style={{ marginRight: 12 }}
-                  />
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: isTV ? 16 : 15,
-                    fontWeight: '500',
-                    flex: 1, // Allow text to take up space
-                  }} numberOfLines={1}>
-                    {markingAsWatched ? 'Removing...' : `Unmark Season ${selectedSeason}`}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    padding: isTV ? 16 : 14,
-                    borderRadius: isTV ? 12 : 10,
-                    opacity: markingAsWatched ? 0.5 : 1,
-                  }}
-                  onPress={handleMarkSeasonAsWatched}
-                  disabled={markingAsWatched}
-                >
-                  <MaterialIcons
-                    name="playlist-add-check"
-                    size={isTV ? 24 : 22}
-                    color="#FFFFFF"
-                    style={{ marginRight: 12 }}
-                  />
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: isTV ? 16 : 15,
-                    fontWeight: '500',
-                    flex: 1,
-                  }} numberOfLines={1}>
-                    {markingAsWatched ? 'Marking...' : `Mark Season ${selectedSeason}`}
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Cancel */}
-              <TouchableOpacity
-                style={{
-                  alignItems: 'center',
-                  padding: isTV ? 14 : 12,
-                  marginTop: isTV ? 8 : 4,
-                }}
-                onPress={closeEpisodeActionMenu}
-              >
-                <Text style={{
-                  color: '#999999',
-                  fontSize: isTV ? 15 : 14,
-                  fontWeight: '500',
-                }}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* Episode Action Menu */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+        actions={alertActions}
+      />
     </View>
   );
 };
