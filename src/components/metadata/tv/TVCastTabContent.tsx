@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, memo } from 'react';
+import React, { useCallback, useRef, memo, useMemo } from 'react';
 import {
   View,
   Text,
@@ -67,13 +67,21 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
     );
   }, [navigation]);
 
+  // Memoize image sources to prevent unnecessary re-renders/re-downloads
+  const castImageSources = useMemo(() => {
+    return cast.map(member => {
+      if (member.profile_path) {
+        return { uri: `https://image.tmdb.org/t/p/w185${member.profile_path}` };
+      }
+      return null;
+    });
+  }, [cast]);
+
   // Render cast card
   const renderCastCard = useCallback(({ item, index }: { item: any; index: number }) => {
     const isFirst = index === 0;
     const isLast = index === cast.length - 1;
-    const profileImage = item.profile_path
-      ? `https://image.tmdb.org/t/p/w185${item.profile_path}`
-      : null;
+    const imageSource = castImageSources[index];
 
     return (
       <View style={[styles.castCardWrapper, { marginRight: CAST_SPACING }]}>
@@ -93,9 +101,9 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
           nextFocusLeft={!isFirst ? getCastRef(index - 1) : undefined}
           nextFocusRight={!isLast ? getCastRef(index + 1) : undefined}
         >
-          {profileImage ? (
+          {imageSource ? (
             <FastImage
-              source={{ uri: profileImage }}
+              source={imageSource}
               style={styles.castImage}
               resizeMode={FastImage.resizeMode.cover}
             />
@@ -119,7 +127,7 @@ const TVCastTabContentComponent: React.FC<TVCastTabContentProps> = ({
         </Text>
       </View>
     );
-  }, [cast.length, currentTheme.colors, firstContentItemRef, activeTabRef, getCastRef, handleCastFocus, handleCastPress]);
+  }, [cast.length, currentTheme.colors, firstContentItemRef, activeTabRef, getCastRef, handleCastFocus, handleCastPress, castImageSources]);
 
   // Key extractor
   const keyExtractor = useCallback((item: any) => item.id.toString(), []);

@@ -172,9 +172,16 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
     return metadata?.poster || EPISODE_PLACEHOLDER;
   }, [settings?.enrichMetadataWithTMDB, metadata?.poster]);
 
+  // Memoize episode image sources to prevent unnecessary re-renders/re-downloads
+  const episodeImageSources = useMemo(() => {
+    return currentSeasonEpisodes.map(episode => ({
+      uri: resolveEpisodeImage(episode)
+    }));
+  }, [currentSeasonEpisodes, resolveEpisodeImage]);
+
   // Render episode card
   const renderEpisodeCard = useCallback(({ item: episode, index }: { item: Episode; index: number }) => {
-    const episodeImage = resolveEpisodeImage(episode);
+    const imageSource = episodeImageSources[index];
     const episodeNumber = typeof episode.episode_number === 'number' ? episode.episode_number.toString() : '';
     const episodeString = episodeNumber ? `E${episodeNumber}` : '';
 
@@ -206,7 +213,7 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
         >
           {/* Background Image */}
           <FastImage
-            source={{ uri: episodeImage }}
+            source={imageSource}
             style={styles.cardImage}
             resizeMode={FastImage.resizeMode.cover}
           />
@@ -246,7 +253,7 @@ const TVEpisodesTabContentComponent: React.FC<TVEpisodesTabContentProps> = ({
         </Focusable>
       </View>
     );
-  }, [currentSeasonEpisodes.length, currentTheme.colors.primary, currentTheme.colors.textMuted, firstContentItemRef, activeTabRef, getEpisodeRef, handleEpisodeFocus, hasProgress, isEpisodeWatched, onSelectEpisode, resolveEpisodeImage, seasons.length]);
+  }, [currentSeasonEpisodes.length, currentTheme.colors.primary, currentTheme.colors.textMuted, firstContentItemRef, activeTabRef, getEpisodeRef, handleEpisodeFocus, hasProgress, isEpisodeWatched, onSelectEpisode, episodeImageSources, seasons.length]);
 
   // Key extractor
   const keyExtractor = useCallback((episode: Episode) => episode.id.toString(), []);

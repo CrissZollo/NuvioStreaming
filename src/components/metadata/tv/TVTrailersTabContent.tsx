@@ -149,10 +149,12 @@ const TVTrailersTabContentComponent: React.FC<TVTrailersTabContentProps> = ({
     setSelectedTrailer(null);
   }, []);
 
-  // Get thumbnail URL
-  const getThumbnailUrl = useCallback((key: string) => {
-    return `https://img.youtube.com/vi/${key}/hqdefault.jpg`;
-  }, []);
+  // Memoize thumbnail sources to prevent unnecessary re-renders/re-downloads
+  const thumbnailSources = useMemo(() => {
+    return trailers.map(trailer => ({
+      uri: `https://img.youtube.com/vi/${trailer.key}/hqdefault.jpg`
+    }));
+  }, [trailers]);
 
   // Render trailer card
   const renderItem = useCallback(({ item, index }: { item: TrailerVideo; index: number }) => {
@@ -179,7 +181,7 @@ const TVTrailersTabContentComponent: React.FC<TVTrailersTabContentProps> = ({
         >
           {/* Thumbnail */}
           <FastImage
-            source={{ uri: getThumbnailUrl(item.key) }}
+            source={thumbnailSources[index]}
             style={styles.thumbnail}
             resizeMode={FastImage.resizeMode.cover}
           />
@@ -206,7 +208,7 @@ const TVTrailersTabContentComponent: React.FC<TVTrailersTabContentProps> = ({
         </Text>
       </View>
     );
-  }, [trailers.length, currentTheme.colors.mediumEmphasis, firstContentItemRef, activeTabRef, getItemRef, getThumbnailUrl, handleItemFocus, handleTrailerPress]);
+  }, [trailers.length, currentTheme.colors.mediumEmphasis, firstContentItemRef, activeTabRef, getItemRef, thumbnailSources, handleItemFocus, handleTrailerPress]);
 
   // Key extractor
   const keyExtractor = useCallback((item: TrailerVideo) => item.id, []);
