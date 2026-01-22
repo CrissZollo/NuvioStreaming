@@ -57,8 +57,8 @@ interface SearchItemProps {
   colors: any;
   isFirst: boolean;
   isLast: boolean;
-  autoFocus?: boolean;
   onFocus?: () => void;
+  menuNodeHandle?: number | null;
 }
 
 const SearchItem = memo<SearchItemProps>(({
@@ -69,8 +69,8 @@ const SearchItem = memo<SearchItemProps>(({
   colors,
   isFirst,
   isLast,
-  autoFocus,
   onFocus,
+  menuNodeHandle,
 }) => {
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
   const [watched, setWatched] = useState(false);
@@ -112,7 +112,7 @@ const SearchItem = memo<SearchItemProps>(({
         focusScale={1.0}
         showFocusBorder={true}
         borderRadius={8}
-        autoFocus={autoFocus}
+        nextFocusLeftId={isFirst && menuNodeHandle ? menuNodeHandle : undefined}
       >
         <FastImage
           source={{ uri: optimizedPosterUrl }}
@@ -148,7 +148,7 @@ const SearchItem = memo<SearchItemProps>(({
     </View>
   );
 }, (prev, next) => {
-  return prev.item.id === next.item.id && prev.autoFocus === next.autoFocus && prev.onFocus === next.onFocus;
+  return prev.item.id === next.item.id && prev.onFocus === next.onFocus && prev.isFirst === next.isFirst && prev.menuNodeHandle === next.menuNodeHandle;
 });
 
 // Content row for a type (Movies/TV Shows)
@@ -158,8 +158,8 @@ interface ContentTypeRowProps {
   onItemPress: (item: StreamingContent) => void;
   onItemLongPress?: (item: StreamingContent) => void;
   colors: any;
-  isFirstRow?: boolean;
   onItemFocus?: () => void;
+  menuNodeHandle?: number | null;
 }
 
 const ContentTypeRow = memo<ContentTypeRowProps>(({
@@ -168,8 +168,8 @@ const ContentTypeRow = memo<ContentTypeRowProps>(({
   onItemPress,
   onItemLongPress,
   colors,
-  isFirstRow,
   onItemFocus,
+  menuNodeHandle,
 }) => {
   if (items.length === 0) return null;
 
@@ -194,8 +194,8 @@ const ContentTypeRow = memo<ContentTypeRowProps>(({
             colors={colors}
             isFirst={index === 0}
             isLast={index === items.length - 1}
-            autoFocus={isFirstRow && index === 0}
             onFocus={onItemFocus}
+            menuNodeHandle={menuNodeHandle}
           />
         ))}
       </ScrollView>
@@ -210,6 +210,8 @@ interface AddonTabProps {
   onPress: () => void;
   colors: any;
   autoFocus?: boolean;
+  isFirst?: boolean;
+  menuNodeHandle?: number | null;
 }
 
 const AddonTab = memo<AddonTabProps>(({
@@ -218,6 +220,8 @@ const AddonTab = memo<AddonTabProps>(({
   onPress,
   colors,
   autoFocus,
+  isFirst,
+  menuNodeHandle,
 }) => {
   return (
     <Focusable
@@ -230,6 +234,7 @@ const AddonTab = memo<AddonTabProps>(({
       showFocusBorder={true}
       borderRadius={8}
       autoFocus={autoFocus}
+      nextFocusLeftId={menuNodeHandle ?? undefined}
     >
       <Text style={[
         styles.addonTabName,
@@ -259,6 +264,7 @@ interface AddonResultsProps {
   onItemLongPress?: (item: StreamingContent) => void;
   colors: any;
   onRowFocus?: (rowIndex: number) => void;
+  menuNodeHandle?: number | null;
 }
 
 const AddonResults = memo<AddonResultsProps>(({
@@ -267,6 +273,7 @@ const AddonResults = memo<AddonResultsProps>(({
   onItemLongPress,
   colors,
   onRowFocus,
+  menuNodeHandle,
 }) => {
   const movieResults = useMemo(() =>
     addonGroup.results.filter(item => item.type === 'movie'),
@@ -301,8 +308,8 @@ const AddonResults = memo<AddonResultsProps>(({
         onItemPress={onItemPress}
         onItemLongPress={onItemLongPress}
         colors={colors}
-        isFirstRow={movieResults.length > 0}
         onItemFocus={movieRowIndex >= 0 ? () => onRowFocus?.(movieRowIndex) : undefined}
+        menuNodeHandle={menuNodeHandle}
       />
 
       <ContentTypeRow
@@ -311,8 +318,8 @@ const AddonResults = memo<AddonResultsProps>(({
         onItemPress={onItemPress}
         onItemLongPress={onItemLongPress}
         colors={colors}
-        isFirstRow={movieResults.length === 0 && seriesResults.length > 0}
         onItemFocus={seriesRowIndex >= 0 ? () => onRowFocus?.(seriesRowIndex) : undefined}
+        menuNodeHandle={menuNodeHandle}
       />
 
       <ContentTypeRow
@@ -321,8 +328,8 @@ const AddonResults = memo<AddonResultsProps>(({
         onItemPress={onItemPress}
         onItemLongPress={onItemLongPress}
         colors={colors}
-        isFirstRow={movieResults.length === 0 && seriesResults.length === 0 && otherResults.length > 0}
         onItemFocus={otherRowIndex >= 0 ? () => onRowFocus?.(otherRowIndex) : undefined}
+        menuNodeHandle={menuNodeHandle}
       />
     </View>
   );
@@ -426,7 +433,6 @@ export const TVSearchView: React.FC<TVSearchViewProps> = ({
         <View style={[styles.searchBar, { backgroundColor: colors.elevation2 }]}>
           <Focusable
             onPress={() => inputRef.current?.focus()}
-            onFocus={() => inputRef.current?.focus()}
             style={styles.searchIconButton}
             focusScale={1.0}
             showFocusBorder={true}
@@ -443,7 +449,6 @@ export const TVSearchView: React.FC<TVSearchViewProps> = ({
             value={query}
             onChangeText={onQueryChange}
             returnKeyType="search"
-            autoFocus
           />
           {query.length > 0 && (
             <Focusable
@@ -475,6 +480,8 @@ export const TVSearchView: React.FC<TVSearchViewProps> = ({
                 onPress={() => setSelectedAddonId(addon.addonId)}
                 colors={colors}
                 autoFocus={index === 0}
+                isFirst={index === 0}
+                menuNodeHandle={getMenuFirstItemNodeHandle()}
               />
             ))}
           </ScrollView>
@@ -545,6 +552,7 @@ export const TVSearchView: React.FC<TVSearchViewProps> = ({
             onItemLongPress={onItemLongPress}
             colors={colors}
             onRowFocus={handleRowFocus}
+            menuNodeHandle={getMenuFirstItemNodeHandle()}
           />
         )}
       </ScrollView>

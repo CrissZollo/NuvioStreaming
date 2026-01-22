@@ -173,13 +173,13 @@ export const TVSideRail: React.FC<TVSideRailProps> = ({
   const handleItemBlur = useCallback(() => {
     // Use short timeout to check if focus moved to another rail item
     // If another rail item gets focus, the timeout will be cleared
-    // Reduced from 300ms to 50ms for faster response
+    // Use 100ms to give focus time to settle when navigating from content to menu
     blurTimeoutRef.current = setTimeout(() => {
       focusedItemRef.current = null;
       setRailHasFocus(false);
       setIsExpanded(false);
       onRailBlur?.();
-    }, 50);
+    }, 100);
   }, [onRailBlur]);
 
   // Cleanup timeout on unmount
