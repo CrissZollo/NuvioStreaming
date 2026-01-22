@@ -338,28 +338,6 @@ const FilterSidebar = memo<FilterSidebarProps>(({
         )}
       </View>
 
-      {/* Active filters summary */}
-      {(selectedYear || selectedGenre) && (
-        <View style={styles.activeFilters}>
-          <Text style={[styles.activeFiltersLabel, { color: colors.textMuted }]}>
-            Active Filters:
-          </Text>
-          {selectedYear && (
-            <View style={[styles.filterTag, { backgroundColor: colors.primary + '20' }]}>
-              <Text style={[styles.filterTagText, { color: colors.primary }]}>
-                {selectedYear}
-              </Text>
-            </View>
-          )}
-          {selectedGenre && (
-            <View style={[styles.filterTag, { backgroundColor: colors.primary + '20' }]}>
-              <Text style={[styles.filterTagText, { color: colors.primary }]}>
-                {selectedGenre}
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
     </View>
   );
 });
@@ -706,29 +684,6 @@ const styles = StyleSheet.create({
   dropdownOptionText: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  // Active filters
-  activeFilters: {
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-  },
-  activeFiltersLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  filterTag: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    marginBottom: 6,
-    alignSelf: 'flex-start',
-  },
-  filterTagText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   // Content area
   content: {
