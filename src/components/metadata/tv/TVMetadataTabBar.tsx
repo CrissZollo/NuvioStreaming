@@ -156,34 +156,34 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingTop: 40,
-    paddingBottom: 4,
+    paddingTop: 24,
+    paddingBottom: 2,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   tab: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    marginRight: 32,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    marginRight: 24,
   },
   tabInner: {
     alignItems: 'center',
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
   },
   tabInnerFocused: {
     // Additional styling when focused handled by Focusable animateBackground
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
   tabIndicator: {
-    height: 3,
+    height: 2,
     width: '100%',
-    marginTop: 8,
-    borderRadius: 1.5,
+    marginTop: 4,
+    borderRadius: 1,
   },
 });
 

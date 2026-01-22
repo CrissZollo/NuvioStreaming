@@ -1054,32 +1054,22 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               />
             </View>
           )}
+          {/* Completed Badge - small and clean, only show when watched */}
           {progressPercent >= 85 && (
             <View style={[
               styles.completedBadge,
               {
                 backgroundColor: currentTheme.colors.primary,
-                width: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
-                height: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
-                borderRadius: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 10
+                width: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+                height: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
+                borderRadius: isTV ? 10 : isLargeTablet ? 9 : isTablet ? 8 : 8,
+                top: 6,
+                right: 6,
+                left: undefined,
               }
             ]}>
-              <MaterialIcons name="check" size={isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12} color={currentTheme.colors.white} />
+              <MaterialIcons name="check" size={isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 10} color={currentTheme.colors.white} />
             </View>
-          )}
-          {(!progress || progressPercent === 0) && (
-            <View style={{
-              position: 'absolute',
-              top: 8,
-              left: 8,
-              width: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
-              height: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20,
-              borderRadius: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 10,
-              borderWidth: 2,
-              borderStyle: 'dashed',
-              borderColor: currentTheme.colors.textMuted,
-              opacity: 0.85,
-            }} />
           )}
         </View>
 
@@ -1356,142 +1346,151 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         <LinearGradient
           colors={[
             'rgba(0,0,0,0.05)',
-            'rgba(0,0,0,0.2)',
-            'rgba(0,0,0,0.6)',
-            'rgba(0,0,0,0.85)',
-            'rgba(0,0,0,0.95)'
+            'rgba(0,0,0,0.15)',
+            'rgba(0,0,0,0.4)',
+            'rgba(0,0,0,0.7)',
+            'rgba(0,0,0,0.85)'
           ]}
-          locations={[0, 0.2, 0.5, 0.8, 1]}
+          locations={[0, 0.15, 0.4, 0.7, 1]}
           style={styles.episodeGradient}
         >
-          {/* Content Container */}
+          {/* Two-Column Content Container */}
           <View style={[
             styles.episodeContent,
             {
-              padding: isTV ? 14 : isLargeTablet ? 18 : isTablet ? 16 : 12,
-              paddingBottom: isTV ? 16 : isLargeTablet ? 22 : isTablet ? 20 : 16
+              padding: isTV ? 16 : isLargeTablet ? 18 : isTablet ? 16 : 12,
+              paddingBottom: isTV ? 18 : isLargeTablet ? 22 : isTablet ? 20 : 16,
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              gap: isTV ? 20 : isLargeTablet ? 16 : isTablet ? 14 : 12,
             }
           ]}>
-            {/* Episode Number Badge */}
-            <View style={[
-              styles.episodeNumberBadgeHorizontal,
-              {
-                paddingHorizontal: isTV ? 8 : isLargeTablet ? 8 : isTablet ? 6 : 6,
-                paddingVertical: isTV ? 3 : isLargeTablet ? 4 : isTablet ? 3 : 3,
-                borderRadius: isTV ? 6 : isLargeTablet ? 6 : isTablet ? 4 : 4,
-                marginBottom: isTV ? 6 : isLargeTablet ? 8 : isTablet ? 6 : 6
-              }
-            ]}>
-              <Text style={[
-                styles.episodeNumberHorizontal,
+            {/* Left Column: Episode Info */}
+            <View style={{ flex: isTV ? 0.45 : 0.5 }}>
+              {/* Episode Number Badge */}
+              <View style={[
+                styles.episodeNumberBadgeHorizontal,
                 {
-                  fontSize: isTV ? 11 : isLargeTablet ? 13 : isTablet ? 12 : 10,
-                  fontWeight: isTV ? '600' : isLargeTablet ? '700' : isTablet ? '600' : '600'
+                  paddingHorizontal: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 6 : 6,
+                  paddingVertical: isTV ? 4 : isLargeTablet ? 4 : isTablet ? 3 : 3,
+                  borderRadius: isTV ? 6 : isLargeTablet ? 6 : isTablet ? 4 : 4,
+                  marginBottom: isTV ? 8 : isLargeTablet ? 8 : isTablet ? 6 : 6,
+                  alignSelf: 'flex-start',
                 }
-              ]}>{episodeString}</Text>
-            </View>
+              ]}>
+                <Text style={[
+                  styles.episodeNumberHorizontal,
+                  {
+                    fontSize: isTV ? 12 : isLargeTablet ? 13 : isTablet ? 12 : 10,
+                    fontWeight: isTV ? '600' : isLargeTablet ? '700' : isTablet ? '600' : '600'
+                  }
+                ]}>{episodeString}</Text>
+              </View>
 
-            {/* Episode Title */}
-            <Text style={[
-              styles.episodeTitleHorizontal,
-              {
-                fontSize: isTV ? 16 : isLargeTablet ? 19 : isTablet ? 18 : 15,
-                fontWeight: isTV ? '700' : isLargeTablet ? '800' : isTablet ? '700' : '700',
-                lineHeight: isTV ? 20 : isLargeTablet ? 24 : isTablet ? 22 : 18,
-                marginBottom: isTV ? 4 : isLargeTablet ? 6 : isTablet ? 4 : 4
-              }
-            ]} numberOfLines={2}>
-              {episode.name}
-            </Text>
+              {/* Episode Title */}
+              <Text style={[
+                styles.episodeTitleHorizontal,
+                {
+                  fontSize: isTV ? 18 : isLargeTablet ? 19 : isTablet ? 18 : 15,
+                  fontWeight: isTV ? '700' : isLargeTablet ? '800' : isTablet ? '700' : '700',
+                  lineHeight: isTV ? 22 : isLargeTablet ? 24 : isTablet ? 22 : 18,
+                  marginBottom: isTV ? 10 : isLargeTablet ? 6 : isTablet ? 4 : 4
+                }
+              ]} numberOfLines={2}>
+                {episode.name}
+              </Text>
 
-            {/* Episode Description */}
-            <Text style={[
-              styles.episodeDescriptionHorizontal,
-              {
-                fontSize: isTV ? 12 : isLargeTablet ? 15 : isTablet ? 14 : 12,
-                lineHeight: isTV ? 16 : isLargeTablet ? 20 : isTablet ? 18 : 16,
-                marginBottom: isTV ? 8 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-                opacity: isTV ? 0.85 : isLargeTablet ? 0.9 : isTablet ? 0.9 : 0.9
-              }
-            ]} numberOfLines={isTV ? 3 : (isLargeScreen ? 4 : 3)}>
-              {(episode.overview || (episode as any).description || (episode as any).plot || (episode as any).synopsis || 'No description available')}
-            </Text>
-
-            {/* Metadata Row */}
-            <View style={[
-              styles.episodeMetadataRowHorizontal,
-              {
-                gap: isTV ? 12 : isLargeTablet ? 14 : isTablet ? 12 : 12
-              }
-            ]}>
-              {effectiveRuntime && (
-                <View style={styles.runtimeContainerHorizontal}>
-                  <MaterialIcons name="schedule" size={isTV ? 12 : isLargeTablet ? 15 : isTablet ? 14 : 14} color={currentTheme.colors.mediumEmphasis} />
+              {/* Metadata Row */}
+              <View style={[
+                styles.episodeMetadataRowHorizontal,
+                {
+                  gap: isTV ? 14 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                }
+              ]}>
+                {effectiveRuntime && (
+                  <View style={styles.runtimeContainerHorizontal}>
+                    <MaterialIcons name="schedule" size={isTV ? 14 : isLargeTablet ? 15 : isTablet ? 14 : 14} color={currentTheme.colors.mediumEmphasis} />
+                    <Text style={[
+                      styles.runtimeTextHorizontal,
+                      {
+                        fontSize: isTV ? 12 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                        fontWeight: isTV ? '500' : isLargeTablet ? '500' : isTablet ? '500' : '500',
+                        color: currentTheme.colors.mediumEmphasis
+                      }
+                    ]}>
+                      {formatRuntime(effectiveRuntime)}
+                    </Text>
+                  </View>
+                )}
+                {effectiveVote > 0 && (
+                  <View style={styles.ratingContainerHorizontal}>
+                    {isImdbRating ? (
+                      <>
+                        <FastImage
+                          source={{ uri: IMDb_LOGO }}
+                          style={[
+                            styles.imdbLogoHorizontal,
+                            {
+                              width: isTV ? 28 : isLargeTablet ? 30 : isTablet ? 28 : 28,
+                              height: isTV ? 15 : isLargeTablet ? 16 : isTablet ? 15 : 15
+                            }
+                          ]}
+                          resizeMode={FastImage.resizeMode.contain}
+                        />
+                        <Text style={[
+                          styles.ratingTextHorizontal,
+                          {
+                            fontSize: isTV ? 12 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                            fontWeight: isTV ? '500' : isLargeTablet ? '600' : isTablet ? '600' : '600',
+                            color: '#F5C518'
+                          }
+                        ]}>
+                          {effectiveVote.toFixed(1)}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <MaterialIcons name="star" size={isTV ? 14 : isLargeTablet ? 15 : isTablet ? 14 : 14} color="#FFD700" />
+                        <Text style={[
+                          styles.ratingTextHorizontal,
+                          {
+                            fontSize: isTV ? 12 : isLargeTablet ? 12 : isTablet ? 11 : 11,
+                            fontWeight: isTV ? '500' : isLargeTablet ? '600' : isTablet ? '600' : '600'
+                          }
+                        ]}>
+                          {effectiveVote.toFixed(1)}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                )}
+                {episode.air_date && (
                   <Text style={[
-                    styles.runtimeTextHorizontal,
+                    styles.airDateTextHorizontal,
                     {
-                      fontSize: isTV ? 11 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                      fontWeight: isTV ? '500' : isLargeTablet ? '500' : isTablet ? '500' : '500',
-                      color: currentTheme.colors.mediumEmphasis
+                      color: currentTheme.colors.mediumEmphasis,
+                      fontSize: isTV ? 12 : isLargeTablet ? 12 : isTablet ? 11 : 11
                     }
                   ]}>
-                    {formatRuntime(effectiveRuntime)}
+                    {formatDate(episode.air_date)}
                   </Text>
-                </View>
-              )}
-              {effectiveVote > 0 && (
-                <View style={styles.ratingContainerHorizontal}>
-                  {isImdbRating ? (
-                    <>
-                      <FastImage
-                        source={{ uri: IMDb_LOGO }}
-                        style={[
-                          styles.imdbLogoHorizontal,
-                          {
-                            width: isTV ? 26 : isLargeTablet ? 30 : isTablet ? 28 : 28,
-                            height: isTV ? 14 : isLargeTablet ? 16 : isTablet ? 15 : 15
-                          }
-                        ]}
-                        resizeMode={FastImage.resizeMode.contain}
-                      />
-                      <Text style={[
-                        styles.ratingTextHorizontal,
-                        {
-                          fontSize: isTV ? 11 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                          fontWeight: isTV ? '500' : isLargeTablet ? '600' : isTablet ? '600' : '600',
-                          color: '#F5C518'
-                        }
-                      ]}>
-                        {effectiveVote.toFixed(1)}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <MaterialIcons name="star" size={isTV ? 12 : isLargeTablet ? 15 : isTablet ? 14 : 14} color="#FFD700" />
-                      <Text style={[
-                        styles.ratingTextHorizontal,
-                        {
-                          fontSize: isTV ? 11 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                          fontWeight: isTV ? '500' : isLargeTablet ? '600' : isTablet ? '600' : '600'
-                        }
-                      ]}>
-                        {effectiveVote.toFixed(1)}
-                      </Text>
-                    </>
-                  )}
-                </View>
-              )}
-              {episode.air_date && (
-                <Text style={[
-                  styles.airDateTextHorizontal,
-                  {
-                    color: currentTheme.colors.mediumEmphasis,
-                    fontSize: isTV ? 11 : isLargeTablet ? 12 : isTablet ? 11 : 11
-                  }
-                ]}>
-                  {formatDate(episode.air_date)}
-                </Text>
-              )}
+                )}
+              </View>
+            </View>
+
+            {/* Right Column: Description */}
+            <View style={{ flex: isTV ? 0.55 : 0.5 }}>
+              <Text style={[
+                styles.episodeDescriptionHorizontal,
+                {
+                  fontSize: isTV ? 13 : isLargeTablet ? 15 : isTablet ? 14 : 12,
+                  lineHeight: isTV ? 18 : isLargeTablet ? 20 : isTablet ? 18 : 16,
+                  opacity: isTV ? 0.9 : isLargeTablet ? 0.9 : isTablet ? 0.9 : 0.9,
+                  textAlign: 'left',
+                }
+              ]} numberOfLines={isTV ? 5 : (isLargeScreen ? 4 : 3)}>
+                {(episode.overview || (episode as any).description || (episode as any).plot || (episode as any).synopsis || 'No description available')}
+              </Text>
             </View>
           </View>
 
@@ -1510,35 +1509,22 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             </View>
           )}
 
-          {/* Completed Badge */}
+          {/* Completed Badge - small and clean */}
           {progressPercent >= 85 && (
             <View style={[
               styles.completedBadgeHorizontal,
               {
                 backgroundColor: currentTheme.colors.primary,
-                width: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
-                height: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
-                borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
-                top: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
-                left: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                width: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18,
+                height: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18,
+                borderRadius: isTV ? 11 : isLargeTablet ? 10 : isTablet ? 9 : 9,
+                top: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                right: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                left: undefined,
               }
             ]}>
-              <MaterialIcons name="check" size={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} color="#fff" />
+              <MaterialIcons name="check" size={isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12} color="#fff" />
             </View>
-          )}
-          {(!progress || progressPercent === 0) && (
-            <View style={{
-              position: 'absolute',
-              top: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
-              left: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
-              width: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
-              height: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
-              borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
-              borderWidth: 2,
-              borderStyle: 'dashed',
-              borderColor: currentTheme.colors.textMuted,
-              opacity: 0.9,
-            }} />
           )}
 
         </LinearGradient>
@@ -2022,15 +2008,15 @@ const styles = StyleSheet.create({
   },
   completedBadge: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.2)',
     zIndex: 2,
   },
 
@@ -2190,15 +2176,15 @@ const styles = StyleSheet.create({
   },
   completedBadgeHorizontal: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    top: 10,
+    right: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
 
   // Season Selector Styles

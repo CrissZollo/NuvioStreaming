@@ -177,7 +177,7 @@ const TVMetadataActionButtonsComponent: React.FC<TVMetadataActionButtonsProps> =
         <View style={styles.playButtonContent}>
           <MaterialIcons
             name={playIcon}
-            size={28}
+            size={20}
             color={isWatchedMovie ? '#fff' : '#fff'}
           />
           <Text style={[
@@ -206,7 +206,7 @@ const TVMetadataActionButtonsComponent: React.FC<TVMetadataActionButtonsProps> =
         <View style={styles.iconButtonInner}>
           <MaterialIcons
             name={inLibrary ? 'check' : 'add'}
-            size={28}
+            size={22}
             color={inLibrary ? currentTheme.colors.primary : currentTheme.colors.white}
           />
         </View>
@@ -229,7 +229,7 @@ const TVMetadataActionButtonsComponent: React.FC<TVMetadataActionButtonsProps> =
           <View style={styles.iconButtonInner}>
             <MaterialIcons
               name={isInCollection ? 'favorite' : 'favorite-outline'}
-              size={26}
+              size={20}
               color={isInCollection ? '#E74C3C' : currentTheme.colors.white}
             />
           </View>
@@ -243,16 +243,16 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
   playButton: {
-    height: 56,
-    paddingHorizontal: 32,
-    borderRadius: 30,
+    height: 42,
+    paddingHorizontal: 20,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    minWidth: 180,
+    minWidth: 140,
   },
   watchedPlayButton: {
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -264,10 +264,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   playButtonText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     color: '#fff',
   },
@@ -275,9 +275,9 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   iconButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
