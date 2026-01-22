@@ -67,6 +67,7 @@ import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { useTrailer } from '../contexts/TrailerContext';
 import { useIsTV } from '../contexts/TVContext';
 import { getListRenderingConfig } from '../utils/tvDeviceCapabilities';
+import { Focusable } from '../components/tv/Focusable';
 
 // TV-optimized list configuration (cached at module level)
 const listRenderingConfig = getListRenderingConfig();
@@ -151,10 +152,13 @@ const HomeScreen = () => {
   const [hasAddons, setHasAddons] = useState<boolean | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
   const totalCatalogsRef = useRef(0);
-  // TV needs more catalogs loaded upfront to handle fast D-pad navigation
-  // Mobile can lazy load more aggressively
-  const initialCatalogCount = isTVDevice ? 8 : 5;
+  // Limit initial catalogs for faster load times on TV
+  // Mobile loads all progressively, TV loads only initial batch
+  const initialCatalogCount = 5;
   const [visibleCatalogCount, setVisibleCatalogCount] = useState(initialCatalogCount);
+  // Store pending catalog loaders for TV lazy loading
+  const pendingCatalogLoadersRef = useRef<(() => Promise<void>)[]>([]);
+  const [hasMoreCatalogsToLoad, setHasMoreCatalogsToLoad] = useState(false);
   // Prefetch threshold: load more catalogs when user is within N items of the end
   const prefetchThreshold = isTVDevice ? 3 : 2;
   const insets = useSafeAreaInsets();
@@ -190,6 +194,8 @@ const HomeScreen = () => {
     setCatalogsLoading(true);
     setCatalogs([]);
     setLoadedCatalogCount(0);
+    pendingCatalogLoadersRef.current = [];
+    setHasMoreCatalogsToLoad(false);
 
     try {
       // Check cache first
@@ -226,6 +232,9 @@ const HomeScreen = () => {
       // TV devices have weaker hardware and can freeze if too many requests run at once
       const MAX_CONCURRENT_LOADS = isTVDevice ? 2 : 4;
       let activeLoads = 0;
+      // Track how many catalogs are in this loading batch (for releasing fetch guard)
+      let catalogsInCurrentBatch = 0;
+      let catalogsLoadedInBatch = 0;
 
       // Process catalog queue with concurrency limit
       const processNextInQueue = () => {
@@ -331,14 +340,15 @@ const HomeScreen = () => {
                   if (__DEV__) console.error(`[HomeScreen] Failed to load ${catalog.name} from ${addon.name}:`, error);
                 } finally {
                   // Update loading count
+                  catalogsLoadedInBatch++;
                   setLoadedCatalogCount(prev => {
                     const next = prev + 1;
                     // Exit loading screen as soon as first catalog finishes
                     if (prev === 0) {
                       setCatalogsLoading(false);
                     }
-                    // Release the fetch guard when all catalogs processed
-                    if (next >= totalCatalogsRef.current) {
+                    // Release the fetch guard when current batch is done
+                    if (catalogsLoadedInBatch >= catalogsInCurrentBatch) {
                       isFetchingRef.current = false;
                     }
                     return next;
@@ -346,7 +356,14 @@ const HomeScreen = () => {
                 }
               };
 
-              catalogQueue.push(catalogLoader);
+              // TV: Only queue initial catalogs, store rest for lazy loading
+              if (isTVDevice && catalogIndex >= initialCatalogCount) {
+                // Store for later loading
+                pendingCatalogLoadersRef.current.push(catalogLoader);
+              } else {
+                catalogQueue.push(catalogLoader);
+                catalogsInCurrentBatch++;
+              }
               catalogIndex++;
             }
           }
@@ -355,6 +372,11 @@ const HomeScreen = () => {
 
       totalCatalogsRef.current = catalogIndex;
 
+      // TV: Update state to indicate more catalogs are available
+      if (isTVDevice && pendingCatalogLoadersRef.current.length > 0) {
+        setHasMoreCatalogsToLoad(true);
+      }
+
       // If no catalogs to load, release locks immediately
       if (catalogIndex === 0) {
         setCatalogsLoading(false);
@@ -362,10 +384,13 @@ const HomeScreen = () => {
         return;
       }
 
-      // Initialize catalogs array with proper length
-      setCatalogs(new Array(catalogIndex).fill(null));
+      // Initialize catalogs array
+      // TV: Only create slots for initial catalogs (others will be added when Load More is pressed)
+      // Mobile: Create slots for all catalogs
+      const initialArraySize = isTVDevice ? Math.min(initialCatalogCount, catalogIndex) : catalogIndex;
+      setCatalogs(new Array(initialArraySize).fill(null));
 
-      // Start all catalog requests in parallel
+      // Start catalog requests (TV: only initial batch, Mobile: all)
       launchAllCatalogs();
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
@@ -375,7 +400,7 @@ const HomeScreen = () => {
       });
       isFetchingRef.current = false;
     }
-  }, []);
+  }, [isTVDevice, initialCatalogCount]);
 
   // Only count feature section as loading if it's enabled in settings
   // For catalogs, we show them progressively, so loading should be false as soon as we have any content
@@ -687,12 +712,15 @@ const HomeScreen = () => {
     });
 
     // Add a "Load More" button if there are more catalogs to show
-    if (catalogs.length > visibleCatalogCount && catalogs.filter(c => c).length > visibleCatalogCount) {
+    // TV: Show when there are pending catalogs to load OR more loaded than visible
+    // Mobile: Show when we have more loaded catalogs than currently visible
+    const loadedCatalogs = catalogs.filter(c => c).length;
+    if (hasMoreCatalogsToLoad || loadedCatalogs > visibleCatalogCount) {
       data.push({ type: 'loadMore', key: 'load-more' });
     }
 
     return data;
-  }, [hasAddons, catalogs, visibleCatalogCount]);
+  }, [hasAddons, catalogs, visibleCatalogCount, hasMoreCatalogsToLoad]);
 
   // PERFORMANCE: Pre-compute catalog indices for O(1) adjacent section lookup
   // This replaces O(n) linear search in getAdjacentSectionHandles on every render
@@ -721,8 +749,36 @@ const HomeScreen = () => {
   catalogIndexMapRef.current = catalogIndexMap;
 
   const handleLoadMoreCatalogs = useCallback(() => {
-    setVisibleCatalogCount(prev => Math.min(prev + 3, catalogs.length));
-  }, [catalogs.length]);
+    if (isTVDevice && pendingCatalogLoadersRef.current.length > 0) {
+      // TV: Load next batch of catalogs from pending queue
+      const BATCH_SIZE = 3;
+      const loaders = pendingCatalogLoadersRef.current.splice(0, BATCH_SIZE);
+
+      // Expand the catalogs array to accommodate new catalogs
+      setCatalogs(prev => {
+        const newArray = [...prev];
+        // Add null slots for the new catalogs
+        for (let i = 0; i < loaders.length; i++) {
+          newArray.push(null);
+        }
+        return newArray;
+      });
+
+      // Execute the loaders (they will fill in the slots)
+      loaders.forEach(loader => loader());
+
+      // Update visible count to show newly loaded catalogs
+      setVisibleCatalogCount(prev => prev + loaders.length);
+
+      // Update hasMore state
+      if (pendingCatalogLoadersRef.current.length === 0) {
+        setHasMoreCatalogsToLoad(false);
+      }
+    } else {
+      // Mobile: Just increase visible count (all catalogs already loaded)
+      setVisibleCatalogCount(prev => Math.min(prev + 3, catalogs.length));
+    }
+  }, [catalogs.length, isTVDevice]);
 
   // Stable keyExtractor for FlashList
   const keyExtractor = useCallback((item: HomeScreenListItem) => item.key, []);
@@ -1003,19 +1059,39 @@ const HomeScreen = () => {
           </Animated.View>
         );
       case 'loadMore':
-        return (
-          <View>
+        // Use Focusable for TV to enable D-pad navigation
+        if (isTVDevice) {
+          return (
             <View style={styles.loadMoreContainer}>
-              <TouchableOpacity
-                style={[styles.loadMoreButton, { backgroundColor: currentTheme.colors.primary }]}
+              <Focusable
                 onPress={handleLoadMoreCatalogs}
+                style={[styles.loadMoreButton, { backgroundColor: currentTheme.colors.primary }]}
+                borderRadius={25}
+                focusScale={1.05}
               >
-                <MaterialIcons name="expand-more" size={20} color={currentTheme.colors.white} />
-                <Text style={[styles.loadMoreText, { color: currentTheme.colors.white }]}>
-                  Load More Catalogs
-                </Text>
-              </TouchableOpacity>
+                {(focused) => (
+                  <>
+                    <MaterialIcons name="expand-more" size={20} color={currentTheme.colors.white} />
+                    <Text style={[styles.loadMoreText, { color: currentTheme.colors.white }]}>
+                      Load More Catalogs
+                    </Text>
+                  </>
+                )}
+              </Focusable>
             </View>
+          );
+        }
+        return (
+          <View style={styles.loadMoreContainer}>
+            <TouchableOpacity
+              style={[styles.loadMoreButton, { backgroundColor: currentTheme.colors.primary }]}
+              onPress={handleLoadMoreCatalogs}
+            >
+              <MaterialIcons name="expand-more" size={20} color={currentTheme.colors.white} />
+              <Text style={[styles.loadMoreText, { color: currentTheme.colors.white }]}>
+                Load More Catalogs
+              </Text>
+            </TouchableOpacity>
           </View>
         );
       case 'welcome':
