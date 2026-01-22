@@ -37,6 +37,7 @@ import { StackActions } from '@react-navigation/native';
 import CustomAlert from '../components/CustomAlert';
 import { useIsTV } from '../contexts/TVContext';
 import Focusable from '../components/tv/Focusable';
+import { TVFilmographyView, FilmographyItem } from '../components/tv/TVFilmographyView';
 
 const { width, height } = Dimensions.get('window');
 
@@ -714,11 +715,50 @@ const CastMoviesScreen: React.FC = () => {
       [1, 0.9],
       Extrapolate.CLAMP
     );
-    
+
     return {
       opacity,
     };
   });
+
+  // Handle item press for TV view
+  const handleTVItemPress = useCallback((item: FilmographyItem) => {
+    handleMoviePress(item as CastMovie);
+  }, [handleMoviePress]);
+
+  // TV Layout using new TVFilmographyView
+  if (isTV) {
+    return (
+      <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
+        {loading ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+            <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginTop: 12 }}>
+              Loading filmography...
+            </Text>
+          </View>
+        ) : (
+          <TVFilmographyView
+            items={movies}
+            title="Filmography"
+            castMember={{
+              name: castMember?.name || 'Unknown',
+              profile_path: castMember?.profile_path,
+            }}
+            onItemPress={handleTVItemPress}
+            loading={loading}
+          />
+        )}
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          actions={alertActions}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
