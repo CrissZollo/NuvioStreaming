@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Image, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { Animated } from 'react-native';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../../../utils/logger';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -144,10 +145,10 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
       >
         {/* Thumbnail fills card */}
         {imageUri ? (
-          <Image
-            source={{ uri: imageUri }}
+          <FastImage
+            source={{ uri: imageUri, priority: FastImage.priority.normal }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }}
-            resizeMode="cover"
+            resizeMode={FastImage.resizeMode.cover}
           />
         ) : (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2a2a2a' }}>

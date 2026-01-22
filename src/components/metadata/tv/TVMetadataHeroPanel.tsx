@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
@@ -107,10 +106,10 @@ const TVMetadataHeroPanelComponent: React.FC<TVMetadataHeroPanelProps> = ({
       {/* Logo or Title */}
       <Animated.View style={styles.titleContainer} entering={FadeIn.duration(300)}>
         {logoUri ? (
-          <Image
-            source={{ uri: logoUri }}
+          <FastImage
+            source={{ uri: logoUri, priority: FastImage.priority.high }}
             style={styles.logo}
-            resizeMode="contain"
+            resizeMode={FastImage.resizeMode.contain}
           />
         ) : (
           <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]} numberOfLines={2}>

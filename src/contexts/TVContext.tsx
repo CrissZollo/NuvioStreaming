@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { Dimensions } from 'react-native';
 import { isAndroidTV, isFireTV, getDeviceType, DeviceType } from '../utils/tvDetection';
 
@@ -39,12 +39,17 @@ export const TVProvider: React.FC<TVProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const value: TVContextValue = {
+  // Memoize isFireTV result to avoid calling it on every render
+  const isFireTVDevice = useMemo(() => isFireTV(), []);
+
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  // This is critical for TV performance since TVContext is used throughout the app
+  const value = useMemo<TVContextValue>(() => ({
     isTV,
-    isFireTV: isFireTV(),
+    isFireTV: isFireTVDevice,
     deviceType,
     useDPadNavigation: isTV,
-  };
+  }), [isTV, isFireTVDevice, deviceType]);
 
   return <TVContext.Provider value={value}>{children}</TVContext.Provider>;
 };

@@ -23,10 +23,14 @@ import {
   getDeviceEasing,
   TV_ANIMATION_CONFIG,
   TV_EASING,
+  getLowEndAnimationConfig,
 } from '../../utils/tvDeviceCapabilities';
 
 // Get device capabilities once at module load for performance
 const deviceCapabilities = getTVDeviceCapabilities();
+
+// Get low-end animation config for border-only focus on weak devices
+const lowEndConfig = getLowEndAnimationConfig();
 
 // PERFORMANCE: Use longer animation duration for low-end TV devices
 // At 30fps, 1 frame = 33ms. Use 165ms (5 frames) for smooth animations
@@ -368,9 +372,19 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     // Animated styles for focus effect - simplified for performance
     // When unfocusedScale < 1, items start smaller and grow to focusScale when focused
     // Border color is now animated to avoid state-driven re-renders
+    // LOW-END OPTIMIZATION: On low-end devices, disable scale animation entirely
+    // and use only border-based focus indication for smooth 30fps performance
+    const isLowEndDevice = deviceCapabilities.isLowEnd;
+    const effectiveFocusScale = isLowEndDevice ? 1.0 : focusScale;
+    const effectiveUnfocusedScale = isLowEndDevice ? 1.0 : unfocusedScale;
+
     const animatedContainerStyle = useAnimatedStyle(() => {
       'worklet';
-      const scale = interpolate(focusProgress.value, [0, 1], [unfocusedScale, focusScale]);
+      // On low-end devices, skip scale animation entirely (both values are 1.0)
+      if (effectiveFocusScale === 1.0 && effectiveUnfocusedScale === 1.0) {
+        return {};
+      }
+      const scale = interpolate(focusProgress.value, [0, 1], [effectiveUnfocusedScale, effectiveFocusScale]);
       return {
         transform: [{ scale }],
       };
@@ -440,14 +454,27 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
     if (rightHandle) tvProps.nextFocusRight = rightHandle;
 
     // Border width for focus indicator
-    const BORDER_WIDTH = 3;
+    // LOW-END OPTIMIZATION: Use thicker border on low-end devices since there's no scale animation
+    const BORDER_WIDTH = isLowEndDevice ? lowEndConfig.focusBorderWidth : 3;
 
     // Focus border animated style - applies directly to the Pressable
     // Uses accelerated curve so border appears/disappears faster than scale animation
     // This keeps border in sync with scroll during rapid navigation
+    // LOW-END OPTIMIZATION: On low-end devices, use instant border (no animation) for responsiveness
     const animatedFocusBorderStyle = useAnimatedStyle(() => {
       'worklet';
-      // Accelerated curve: border reaches full opacity faster (at 40% of animation)
+
+      // On low-end devices, use instant border toggle (no interpolation)
+      if (isLowEndDevice) {
+        const isFocused = focusProgress.value > 0.5;
+        return {
+          borderWidth: BORDER_WIDTH,
+          borderColor: isFocused ? lowEndConfig.focusBorderColor : 'transparent',
+        };
+      }
+
+      // Standard devices: Accelerated curve for smooth animation
+      // border reaches full opacity faster (at 40% of animation)
       // and starts fading earlier (at 60% of animation going out)
       // This makes the border feel more responsive while scale still animates smoothly
       const rawOpacity = interpolate(
@@ -459,7 +486,7 @@ export const Focusable = forwardRef<FocusableRef, FocusableProps>(
       // e.g., 6.848392044966639e-7 is invalid - round to 2 decimal places
       const opacity = Math.round(Math.max(0, Math.min(1, rawOpacity)) * 100) / 100;
       return {
-        borderWidth: BORDER_WIDTH,
+        borderWidth: 3,
         borderColor: opacity > 0 ? `rgba(255, 255, 255, ${opacity})` : 'transparent',
       };
     });

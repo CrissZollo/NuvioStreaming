@@ -19,7 +19,7 @@ interface EpisodeCardProps {
   isFocused?: boolean;
 }
 
-export const EpisodeCard: React.FC<EpisodeCardProps> = ({
+const EpisodeCardComponent: React.FC<EpisodeCardProps> = ({
   episode,
   metadata,
   tmdbEpisodeOverrides,
@@ -336,5 +336,22 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(59, 130, 246, 0.3)',
   },
+});
+
+// Memoize the component to prevent unnecessary re-renders in episode lists
+// This is critical for TV performance with large episode lists
+export const EpisodeCard = React.memo(EpisodeCardComponent, (prev, next) => {
+  // Re-render when episode identity changes
+  if (prev.episode.id !== next.episode.id) return false;
+  if (prev.episode.episode_number !== next.episode.episode_number) return false;
+  if (prev.episode.season_number !== next.episode.season_number) return false;
+  // Re-render when visual state changes
+  if (prev.isCurrent !== next.isCurrent) return false;
+  if (prev.isFocused !== next.isFocused) return false;
+  // Re-render when progress changes significantly
+  const prevProgress = prev.episodeProgress?.[prev.episode.stremioId || ''];
+  const nextProgress = next.episodeProgress?.[next.episode.stremioId || ''];
+  if ((prevProgress?.currentTime || 0) !== (nextProgress?.currentTime || 0)) return false;
+  return true;
 });
 

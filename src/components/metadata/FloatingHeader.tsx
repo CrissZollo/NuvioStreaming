@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   Platform,
   Dimensions,
-  Image,
 } from 'react-native';
+import FastImage from '@d11/react-native-fast-image';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 
@@ -114,10 +114,10 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
 
             <View style={styles.headerTitleContainer}>
               {(stableLogoUri || metadata.logo) && !logoLoadError ? (
-                <Image
-                  source={{ uri: stableLogoUri || metadata.logo }}
+                <FastImage
+                  source={{ uri: stableLogoUri || metadata.logo, priority: FastImage.priority.high }}
                   style={styles.floatingHeaderLogo}
-                  resizeMode="contain"
+                  resizeMode={FastImage.resizeMode.contain}
                   onError={() => {
                     logger.warn(`[FloatingHeader] Logo failed to load: ${stableLogoUri || metadata.logo}`);
                     setLogoLoadError(true);
@@ -159,10 +159,10 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
             
             <View style={styles.headerTitleContainer}>
               {metadata.logo && !logoLoadError ? (
-                <Image
-                  source={{ uri: metadata.logo }}
+                <FastImage
+                  source={{ uri: metadata.logo, priority: FastImage.priority.high }}
                   style={styles.floatingHeaderLogo}
-                  resizeMode="contain"
+                  resizeMode={FastImage.resizeMode.contain}
                   onError={() => {
                     logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
                     setLogoLoadError(true);

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useRef, useCallback, useMemo } from 'react';
 import { View, findNodeHandle } from 'react-native';
 
 interface TVFocusContextValue {
@@ -41,8 +41,17 @@ export const TVFocusProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, []);
 
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  // This is critical for TV focus management performance
+  const value = useMemo(() => ({
+    lastFocusedRowRef,
+    setLastFocusedRowView,
+    getMenuFirstItemNodeHandle,
+    setMenuFirstItemView
+  }), [setLastFocusedRowView, getMenuFirstItemNodeHandle, setMenuFirstItemView]);
+
   return (
-    <TVFocusContext.Provider value={{ lastFocusedRowRef, setLastFocusedRowView, getMenuFirstItemNodeHandle, setMenuFirstItemView }}>
+    <TVFocusContext.Provider value={value}>
       {children}
     </TVFocusContext.Provider>
   );

@@ -230,5 +230,98 @@ export const TV_ANIMATION_CONFIG = {
   scrollDuration: 100, // ~3 frames at 30fps - fast for responsiveness
 } as const;
 
+/**
+ * Low-End Device Animation Configuration
+ * Prioritizes smoothness over visual fidelity for Fire TV Stick Gen 1/2 and similar devices
+ */
+export const getLowEndAnimationConfig = () => {
+  const capabilities = getTVDeviceCapabilities();
+
+  if (capabilities.isLowEnd) {
+    return {
+      // Disable or minimize animations for smoothness
+      focusScale: 1.0,           // No scale on focus (was 1.05-1.1) - use border instead
+      focusDuration: 0,          // Instant focus change (was 165ms)
+      transitionDuration: 100,   // Faster screen transitions (was 300ms)
+      enableParallax: false,     // Disable parallax effects
+      enableFadeAnimations: false, // Disable fade animations
+      carouselSnapDuration: 50,  // Faster carousel snapping
+      enableShadows: false,      // Disable shadow effects
+      imageQualityWidth: 300,    // Lower resolution images (was 500)
+      imageQuality: 60,          // Lower quality (was 80)
+      // Use border-based focus indication instead of scale
+      focusBorderWidth: 3,
+      focusBorderColor: '#ffffff',
+    };
+  }
+
+  return {
+    focusScale: 1.05,
+    focusDuration: 165,
+    transitionDuration: 300,
+    enableParallax: true,
+    enableFadeAnimations: true,
+    carouselSnapDuration: 150,
+    enableShadows: true,
+    imageQualityWidth: 500,
+    imageQuality: 80,
+    focusBorderWidth: 0,
+    focusBorderColor: 'transparent',
+  };
+};
+
+/**
+ * Get image optimization config based on device capabilities
+ * Lower resolution and quality for low-end devices to reduce memory pressure
+ */
+export const getImageOptimizationConfig = () => {
+  const capabilities = getTVDeviceCapabilities();
+
+  if (capabilities.isLowEnd) {
+    return {
+      maxWidth: 300,
+      quality: 60,
+      priority: 'low' as const,
+      // Limit concurrent loads to prevent memory pressure
+      maxConcurrent: capabilities.maxConcurrentImageLoads,
+    };
+  }
+
+  return {
+    maxWidth: 500,
+    quality: 80,
+    priority: 'normal' as const,
+    maxConcurrent: capabilities.maxConcurrentImageLoads,
+  };
+};
+
+/**
+ * Get list rendering config based on device capabilities
+ * Lower batch sizes and window sizes for low-end devices
+ */
+export const getListRenderingConfig = () => {
+  const capabilities = getTVDeviceCapabilities();
+
+  if (capabilities.isLowEnd) {
+    return {
+      maxToRenderPerBatch: 2,
+      windowSize: 2,
+      initialNumToRender: 3,
+      updateCellsBatchingPeriod: 100,
+      // FlashList specific
+      drawDistance: 200,
+    };
+  }
+
+  return {
+    maxToRenderPerBatch: 4,
+    windowSize: 3,
+    initialNumToRender: 5,
+    updateCellsBatchingPeriod: 50,
+    // FlashList specific
+    drawDistance: 400,
+  };
+};
+
 // Re-export for convenience
 export { cachedCapabilities as _cachedCapabilities };

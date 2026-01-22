@@ -26,6 +26,12 @@ import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useIsTV } from '../contexts/TVContext';
 import { Focusable } from '../components/tv/Focusable';
+import { getTVDeviceCapabilities, getListRenderingConfig } from '../utils/tvDeviceCapabilities';
+import TVCatalogView from '../components/tv/TVCatalogView';
+
+// Cache device capabilities for performance
+const deviceCapabilities = getTVDeviceCapabilities();
+const listConfig = getListRenderingConfig();
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for CatalogScreen
 let GlassViewComp: any = null;
@@ -276,6 +282,143 @@ const createStyles = (colors: any) => StyleSheet.create({
 // Constants for TV layout
 const TV_SIDE_MENU_WIDTH = 60; // Collapsed side menu width
 
+// Pre-computed title style to avoid inline object creation
+const TITLE_STYLE = {
+  fontSize: 12,
+  fontWeight: '500' as const,
+  marginTop: 6,
+  textAlign: 'center' as const,
+  paddingHorizontal: 4,
+};
+
+// ============================================================================
+// MEMOIZED CATALOG ITEM COMPONENT
+// Extracted from renderItem to prevent re-renders when parent state changes
+// ============================================================================
+interface CatalogItemProps {
+  item: Meta;
+  index: number;
+  itemWidth: number;
+  cellWidth: number;
+  itemSpacing: number;
+  numColumns: number;
+  showTitles: boolean;
+  isNowPlaying: boolean;
+  isTVDevice: boolean;
+  isDarkMode: boolean;
+  styles: ReturnType<typeof createStyles>;
+  colors: any;
+  onPress: () => void;
+  optimizePosterUrl: (url: string | undefined) => string;
+}
+
+const CatalogItemComponent: React.FC<CatalogItemProps> = ({
+  item,
+  index,
+  itemWidth,
+  cellWidth,
+  itemSpacing,
+  numColumns,
+  showTitles,
+  isNowPlaying,
+  isTVDevice,
+  isDarkMode,
+  styles,
+  colors,
+  onPress,
+  optimizePosterUrl,
+}) => {
+  const TV_FOCUS_PADDING = 4;
+  const halfSpacing = itemSpacing / 2;
+
+  // Calculate aspect ratio based on posterShape
+  const shape = item.posterShape || 'poster';
+  const aspectRatio = shape === 'landscape' ? 16 / 9 : (shape === 'square' ? 1 : 2 / 3);
+
+  // Memoize title style with color to avoid object recreation
+  const titleStyle = useMemo(() => ({
+    ...TITLE_STYLE,
+    color: colors.mediumGray,
+  }), [colors.mediumGray]);
+
+  const posterContent = (
+    <>
+      <FastImage
+        source={{ uri: optimizePosterUrl(item.poster) }}
+        style={[styles.poster, { aspectRatio }]}
+        resizeMode={FastImage.resizeMode.cover}
+      />
+      {isNowPlaying && (
+        <View style={styles.badgeContainer}>
+          <MaterialIcons
+            name="theaters"
+            size={12}
+            color={colors.white}
+            style={{ marginRight: 4 }}
+          />
+          <Text style={styles.badgeText}>In Theaters</Text>
+        </View>
+      )}
+      {showTitles && (
+        <Text style={titleStyle} numberOfLines={2}>
+          {item.name}
+        </Text>
+      )}
+    </>
+  );
+
+  // TV path: Focusable wrapper
+  if (isTVDevice) {
+    return (
+      <View style={{
+        width: cellWidth,
+        paddingHorizontal: halfSpacing,
+        paddingBottom: itemSpacing,
+        paddingTop: TV_FOCUS_PADDING,
+        alignItems: 'center',
+      }}>
+        <Focusable
+          onPress={onPress}
+          style={{ borderRadius: 12 }}
+          focusScale={deviceCapabilities.isLowEnd ? 1.0 : 1.03}
+          showFocusBorder={true}
+          borderRadius={12}
+          autoFocus={index === 0}
+        >
+          <View style={[styles.item, { width: itemWidth, marginBottom: 0 }]}>
+            {posterContent}
+          </View>
+        </Focusable>
+      </View>
+    );
+  }
+
+  // Mobile path: TouchableOpacity
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={{ marginBottom: SPACING.lg }}
+    >
+      <View style={[styles.item, { width: itemWidth }]}>
+        {posterContent}
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// Memoize CatalogItem to prevent re-renders when parent state changes
+const CatalogItem = React.memo(CatalogItemComponent, (prev, next) => {
+  // Only re-render if these specific props change
+  if (prev.item.id !== next.item.id) return false;
+  if (prev.item.poster !== next.item.poster) return false;
+  if (prev.itemWidth !== next.itemWidth) return false;
+  if (prev.showTitles !== next.showTitles) return false;
+  if (prev.isNowPlaying !== next.isNowPlaying) return false;
+  if (prev.index !== next.index) return false; // For autoFocus
+  return true;
+});
+
 const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name: originalName, genreFilter } = route.params;
   const [items, setItems] = useState<Meta[]>([]);
@@ -292,6 +435,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const isTVDevice = useIsTV();
   const listRef = useRef<FlatList>(null);
   const backButtonRef = useRef<View>(null);
+
+  // PERFORMANCE: Track current load operation to cancel stale InteractionManager tasks
+  // Each load increments this counter, and callbacks check if they're still the latest
+  const loadOperationRef = useRef(0);
   const [screenData, setScreenData] = useState(() => {
     const { width } = Dimensions.get('window');
     return {
@@ -443,6 +590,9 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   }, [type]);
 
   const loadItems = useCallback(async (shouldRefresh: boolean = false, pageParam: number = 1) => {
+    // PERFORMANCE: Increment load operation counter to invalidate any stale callbacks
+    const currentLoadOperation = ++loadOperationRef.current;
+
     logger.log('[CatalogScreen] loadItems called', {
       shouldRefresh,
       pageParam,
@@ -450,12 +600,19 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       type,
       id,
       dataSource,
-      activeGenreFilter
+      activeGenreFilter,
+      loadOperation: currentLoadOperation
     });
+
+    // Helper to check if this load operation is still valid
+    const isStale = () => loadOperationRef.current !== currentLoadOperation;
+
     try {
       if (shouldRefresh) {
         setRefreshing(true);
         setPage(1);
+        // PERFORMANCE: Clear items immediately on refresh to prevent showing stale data
+        setItems([]);
       } else {
         setLoading(true);
       }
@@ -508,6 +665,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             );
 
             InteractionManager.runAfterInteractions(() => {
+              // PERFORMANCE: Skip if this load operation was superseded by a newer one
+              if (isStale()) {
+                logger.log('[CatalogScreen] Skipping stale TMDB result');
+                return;
+              }
               setItems(uniqueItems);
               setHasMore(false); // TMDB already returns a full set
               setLoading(false);
@@ -521,6 +683,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             return;
           } else {
             InteractionManager.runAfterInteractions(() => {
+              if (isStale()) return;
               setError("No content found for the selected filters");
               setItems([]);
               setLoading(false);
@@ -533,6 +696,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         } catch (error) {
           logger.error('Failed to get TMDB catalog:', error);
           InteractionManager.runAfterInteractions(() => {
+            if (isStale()) return;
             setError('Failed to load content from TMDB');
             setItems([]);
             setLoading(false);
@@ -573,6 +737,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         if (catalogItems.length > 0) {
           foundItems = true;
           InteractionManager.runAfterInteractions(() => {
+            // PERFORMANCE: Skip if this load operation was superseded by a newer one
+            if (isStale()) {
+              logger.log('[CatalogScreen] Skipping stale addon catalog result');
+              return;
+            }
             if (shouldRefresh || pageParam === 1) {
               setItems(catalogItems);
             } else {
@@ -682,6 +851,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         if (uniqueItems.length > 0) {
           foundItems = true;
           InteractionManager.runAfterInteractions(() => {
+            if (isStale()) return;
             setItems(uniqueItems);
             setHasMore(false);
             logger.log('[CatalogScreen] Genre aggregated uniqueItems', { count: uniqueItems.length });
@@ -691,23 +861,32 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
       if (!foundItems) {
         InteractionManager.runAfterInteractions(() => {
+          if (isStale()) return;
           setError("No content found for the selected filters");
           logger.log('[CatalogScreen] No items found after loading');
         });
       }
     } catch (err) {
       InteractionManager.runAfterInteractions(() => {
+        if (isStale()) return;
         setError(err instanceof Error ? err.message : 'Failed to load catalog items');
       });
       logger.error('Failed to load catalog:', err);
     } finally {
       InteractionManager.runAfterInteractions(() => {
+        // PERFORMANCE: Always update loading state even if stale, to clean up UI
+        // but only if we're still the current operation
+        if (isStale()) {
+          logger.log('[CatalogScreen] Skipping stale finally block');
+          return;
+        }
         setLoading(false);
         setRefreshing(false);
         setIsFetchingMore(false);
         logger.log('[CatalogScreen] loadItems finished', {
           shouldRefresh,
-          pageParam
+          pageParam,
+          loadOperation: currentLoadOperation
         });
       });
     }
@@ -784,180 +963,33 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     return effectiveItemWidth + itemSpacing;
   }, [effectiveItemWidth, screenData]);
 
+  // Memoize item spacing to avoid recalculating
+  const itemSpacing = useMemo(() => (screenData as any).itemSpacing ?? SPACING.sm, [screenData]);
+
+  // OPTIMIZED: renderItem now delegates to memoized CatalogItem component
+  // This reduces the callback dependencies from 13 to just the stable ones
   const renderItem = useCallback(({ item, index }: { item: Meta; index: number }) => {
-    // Use spacing from calculated layout (already accounts for TV)
-    const itemSpacing = (screenData as any).itemSpacing ?? SPACING.sm;
-    const TV_FOCUS_PADDING = 4; // Small padding to prevent border clipping
-
-    // Calculate if this is the last item in a row
-    const isLastInRow = (index + 1) % effectiveNumColumns === 0;
-    const isFirstInRow = index % effectiveNumColumns === 0;
-
-    // Calculate aspect ratio based on posterShape
-    const shape = item.posterShape || 'poster';
-    const aspectRatio = shape === 'landscape' ? 16 / 9 : (shape === 'square' ? 1 : 2 / 3);
-
-    const content = (
-      <View
-        style={[
-          styles.item,
-          {
-            width: effectiveItemWidth,
-          }
-        ]}
-      >
-        <FastImage
-          source={{ uri: optimizePosterUrl(item.poster) }}
-          style={[styles.poster, { aspectRatio }]}
-          resizeMode={FastImage.resizeMode.cover}
-        />
-
-        {type === 'movie' && nowPlayingMovies.has(item.id) && (
-          Platform.OS === 'ios' ? (
-            <View style={styles.badgeBlur}>
-              {GlassViewComp && liquidGlassAvailable ? (
-                <GlassViewComp style={{ borderRadius: 10 }} glassEffectStyle="regular">
-                  <View style={styles.badgeContent}>
-                    <MaterialIcons
-                      name="theaters"
-                      size={12}
-                      color={colors.white}
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text style={styles.badgeText}>In Theaters</Text>
-                  </View>
-                </GlassViewComp>
-              ) : (
-                <BlurView intensity={40} tint={isDarkMode ? 'dark' : 'light'} style={{ borderRadius: 10 }}>
-                  <View style={styles.badgeContent}>
-                    <MaterialIcons
-                      name="theaters"
-                      size={12}
-                      color={colors.white}
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text style={styles.badgeText}>In Theaters</Text>
-                  </View>
-                </BlurView>
-              )}
-            </View>
-          ) : (
-            <View style={styles.badgeContainer}>
-              <MaterialIcons
-                name="theaters"
-                size={12}
-                color={colors.white}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={styles.badgeText}>In Theaters</Text>
-            </View>
-          )
-        )}
-
-        {/* Poster Title */}
-        {showTitles && (
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: '500',
-              color: colors.mediumGray,
-              marginTop: 6,
-              textAlign: 'center',
-              paddingHorizontal: 4,
-            }}
-            numberOfLines={2}
-          >
-            {item.name}
-          </Text>
-        )}
-      </View>
-    );
-
-    // On TV, wrap with Focusable for D-pad navigation
-    // Use a container that takes up the full cell width with padding for spacing
-    if (isTVDevice) {
-      const halfSpacing = itemSpacing / 2;
-      // Create TV-specific content without the marginBottom from styles.item
-      const tvContent = (
-        <View
-          style={[
-            styles.item,
-            {
-              width: effectiveItemWidth,
-              marginBottom: 0, // Remove margin - wrapper handles spacing
-            }
-          ]}
-        >
-          <FastImage
-            source={{ uri: optimizePosterUrl(item.poster) }}
-            style={[styles.poster, { aspectRatio }]}
-            resizeMode={FastImage.resizeMode.cover}
-          />
-
-          {type === 'movie' && nowPlayingMovies.has(item.id) && (
-            <View style={styles.badgeContainer}>
-              <MaterialIcons
-                name="theaters"
-                size={12}
-                color={colors.white}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={styles.badgeText}>In Theaters</Text>
-            </View>
-          )}
-
-          {showTitles && (
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '500',
-                color: colors.mediumGray,
-                marginTop: 6,
-                textAlign: 'center',
-                paddingHorizontal: 4,
-              }}
-              numberOfLines={2}
-            >
-              {item.name}
-            </Text>
-          )}
-        </View>
-      );
-
-      return (
-        <View style={{
-          width: cellWidth,
-          paddingHorizontal: halfSpacing,
-          paddingBottom: itemSpacing,
-          paddingTop: TV_FOCUS_PADDING,
-          alignItems: 'center', // Center the focusable within the cell
-        }}>
-          <Focusable
-            onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
-            style={{
-              borderRadius: 12,
-            }}
-            focusScale={1.03}
-            showFocusBorder={true}
-            borderRadius={12}
-            autoFocus={index === 0}
-          >
-            {tvContent}
-          </Focusable>
-        </View>
-      );
-    }
+    const isNowPlaying = type === 'movie' && nowPlayingMovies.has(item.id);
 
     return (
-      <TouchableOpacity
+      <CatalogItem
+        item={item}
+        index={index}
+        itemWidth={effectiveItemWidth}
+        cellWidth={cellWidth}
+        itemSpacing={itemSpacing}
+        numColumns={effectiveNumColumns}
+        showTitles={showTitles}
+        isNowPlaying={isNowPlaying}
+        isTVDevice={isTVDevice}
+        isDarkMode={isDarkMode}
+        styles={styles}
+        colors={colors}
         onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
-        activeOpacity={0.7}
-        style={{ marginBottom: SPACING.lg }}
-      >
-        {content}
-      </TouchableOpacity>
+        optimizePosterUrl={optimizePosterUrl}
+      />
     );
-  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth, screenData, type, nowPlayingMovies, colors.white, colors.mediumGray, optimizePosterUrl, addonId, isDarkMode, showTitles, isTVDevice, cellWidth]);
+  }, [effectiveItemWidth, cellWidth, itemSpacing, effectiveNumColumns, showTitles, type, nowPlayingMovies, isTVDevice, isDarkMode, styles, colors, navigation, addonId, optimizePosterUrl]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>
@@ -1096,8 +1128,40 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     );
   }
 
+  // TV-NATIVE LAYOUT: Use horizontal rows with left sidebar for genres
+  // This provides a native TV experience similar to Netflix/Prime Video
+  if (isTVDevice) {
+    // Extract genre options from catalog extras (computed inline since we can't use hooks in conditionals)
+    const genreExtra = catalogExtras.find(e => e.name === 'genre');
+    const genreOptions = genreExtra?.options || [];
+
+    return (
+      <SafeAreaView style={[styles.container, { paddingLeft: TV_SIDE_MENU_WIDTH }]}>
+        <StatusBar barStyle="light-content" />
+        <TVCatalogView
+          items={items}
+          title={displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}
+          genres={genreOptions}
+          selectedGenre={activeGenreFilter}
+          onGenreSelect={(genre) => handleFilterChange('genre', genre)}
+          onItemPress={(item) => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
+          loading={loading || refreshing}
+          onLoadMore={() => {
+            if (!hasMore || loading || refreshing || isFetchingMore) return;
+            setIsFetchingMore(true);
+            const next = page + 1;
+            setPage(next);
+            loadItems(false, next);
+          }}
+          hasMore={hasMore}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  // MOBILE/TABLET LAYOUT: Grid with filter chips
   return (
-    <SafeAreaView style={[styles.container, isTVDevice && { paddingLeft: TV_SIDE_MENU_WIDTH }]}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <BackButton />
@@ -1199,6 +1263,8 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             </View>
           ) : null}
           estimatedItemSize={cellWidth * 1.5 + 20}
+          // PERFORMANCE: Device-aware draw distance for mobile/tablet
+          drawDistance={400}
         />
       ) : renderEmptyState()}
     </SafeAreaView>

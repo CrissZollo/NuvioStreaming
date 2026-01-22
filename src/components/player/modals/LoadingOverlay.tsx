@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, TouchableOpacity, Animated, ActivityIndicator, StyleSheet, Image, Text } from 'react-native';
+import { View, TouchableOpacity, Animated, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsTV } from '../../../contexts/TVContext';
@@ -104,10 +105,10 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
               opacity: backdropImageOpacityAnim
             }
           ]}>
-          <Image
-            source={{ uri: backdrop }}
+          <FastImage
+            source={{ uri: backdrop, priority: FastImage.priority.high }}
             style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
+            resizeMode={FastImage.resizeMode.cover}
           />
         </Animated.View>
       )}
@@ -149,13 +150,13 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             },
             logoAnimatedStyle
           ]}>
-            <Image
-              source={{ uri: logo }}
+            <FastImage
+              source={{ uri: logo, priority: FastImage.priority.high }}
               style={{
                 width: 300,
                 height: 180,
               }}
-              resizeMode="contain"
+              resizeMode={FastImage.resizeMode.contain}
             />
           </Reanimated.View>
         ) : (

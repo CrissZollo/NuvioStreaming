@@ -66,6 +66,10 @@ import FirstTimeWelcome from '../components/FirstTimeWelcome';
 import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { useTrailer } from '../contexts/TrailerContext';
 import { useIsTV } from '../contexts/TVContext';
+import { getListRenderingConfig } from '../utils/tvDeviceCapabilities';
+
+// TV-optimized list configuration (cached at module level)
+const listRenderingConfig = getListRenderingConfig();
 
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
@@ -1117,9 +1121,9 @@ const HomeScreen = () => {
           nestedScrollEnabled={true}
           scrollEnabled={!isTVDevice}
           estimatedItemSize={isTVDevice ? 350 : 300}
-          // TV needs larger drawDistance to ensure scrollToIndex works for items further down
-          // 1500px = ~4-5 catalog rows pre-rendered, balancing memory vs scroll reliability
-          drawDistance={isTVDevice ? 1500 : 250}
+          // TV PERFORMANCE: Use device-aware drawDistance from capabilities
+          // Lower on low-end devices to reduce memory pressure
+          drawDistance={isTVDevice ? listRenderingConfig.drawDistance * 3 : 250}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}
@@ -1127,8 +1131,26 @@ const HomeScreen = () => {
           onScroll={handleScroll}
           onViewableItemsChanged={isTVDevice ? handleViewableItemsChanged : undefined}
           viewabilityConfig={isTVDevice ? { itemVisiblePercentThreshold: 50 } : undefined}
-          // REMOVED: extraData={sectionHandlesVersion} was causing full list re-renders
-          // Native focus engine handles navigation when handles aren't yet available
+          // TV PERFORMANCE: Fixed item sizes for catalog rows
+          // Eliminates layout recalculation during scroll
+          overrideItemLayout={(layout, item) => {
+            const listItem = item as HomeScreenListItem;
+            // Catalog rows: 2 rows of posters (~150px each) + header (~30px) + spacing
+            // thisWeek, continueWatching: variable but typically ~200px
+            // placeholder: ~180px
+            // loadMore: ~60px
+            if (listItem.type === 'catalog') {
+              layout.size = isTVDevice ? 350 : 300;
+            } else if (listItem.type === 'thisWeek' || listItem.type === 'continueWatching') {
+              layout.size = isTVDevice ? 280 : 220;
+            } else if (listItem.type === 'placeholder') {
+              layout.size = 180;
+            } else if (listItem.type === 'loadMore') {
+              layout.size = 60;
+            } else if (listItem.type === 'welcome') {
+              layout.size = 400;
+            }
+          }}
         />
         {/* Toasts are rendered globally at root */}
       </View>

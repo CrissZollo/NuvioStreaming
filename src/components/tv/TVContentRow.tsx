@@ -2,15 +2,18 @@ import React, { useRef, useCallback, memo, useMemo } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
   Dimensions,
-  ListRenderItemInfo,
 } from 'react-native';
+import { FlashList, ListRenderItemInfo } from '@shopify/flash-list';
 import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useFocusMemory } from '../../hooks/useTVFocus';
 import { navLog } from '../../utils/navigationDebugLogger';
+import { getTVDeviceCapabilities } from '../../utils/tvDeviceCapabilities';
+
+// Cache device capabilities outside component to avoid repeated calls
+const deviceCapabilities = getTVDeviceCapabilities();
 
 interface ContentItem {
   id: string;
@@ -126,10 +129,13 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
   itemHeight = 270,
 }) => {
   const { currentTheme } = useTheme();
-  const listRef = useRef<FlatList>(null);
+  const listRef = useRef<FlashList<ContentItem>>(null);
   const itemRefs = useRef<Map<number, View>>(new Map());
   const focusedIndexRef = useRef(0);
   const { saveFocus, getLastFocused } = useFocusMemory();
+
+  // Device-aware configuration for low-end TV performance
+  const isLowEnd = deviceCapabilities.isLowEnd;
 
   // Debounce for TV focus events to prevent jumping on fast navigation
   const lastFocusTime = useRef<number>(0);
@@ -199,14 +205,9 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
     []
   );
 
-  const getItemLayout = useCallback(
-    (_: any, index: number) => ({
-      length: itemWidth + 16, // width + gap
-      offset: (itemWidth + 16) * index,
-      index,
-    }),
-    [itemWidth]
-  );
+  // FlashList handles layout calculation automatically - no getItemLayout needed
+  // Estimated item size for FlashList (width + gap)
+  const estimatedItemSize = itemWidth + 16;
 
   if (items.length === 0) {
     return null;
@@ -219,37 +220,20 @@ export const TVContentRow: React.FC<TVContentRowProps> = memo(({
       >
         {title}
       </Text>
-      <FlatList
+      <FlashList
         ref={listRef}
         data={items}
         renderItem={renderContentItem}
         keyExtractor={keyExtractor}
         horizontal
-        showsHorizontalScrollIndicator={false}
+        showsScrollIndicator={false}
         scrollEnabled={false}
         contentContainerStyle={styles.listContent}
-        getItemLayout={getItemLayout}
-        initialNumToRender={5}
-        maxToRenderPerBatch={4}
-        windowSize={3}
-        removeClippedSubviews
-        onScrollToIndexFailed={(info) => {
-          // Handle scroll failure gracefully
-          navLog.perfWarn(`TVContentRow[${title}].scrollToIndexFailed`, info.index);
-          navLog.log('SCROLL', 'SCROLL_TO_INDEX_FAILED:', {
-            index: info.index,
-            highestMeasuredFrameIndex: info.highestMeasuredFrameIndex,
-            averageItemLength: info.averageItemLength,
-          });
-          const wait = new Promise((resolve) => setTimeout(resolve, 100));
-          wait.then(() => {
-            navLog.log('SCROLL', 'RETRY_SCROLL_TO_INDEX:', info.index);
-            listRef.current?.scrollToIndex({
-              index: info.index,
-              animated: false,
-            });
-          });
-        }}
+        // FlashList uses estimatedItemSize instead of getItemLayout
+        estimatedItemSize={estimatedItemSize}
+        // Device-aware batch sizes for low-end TV optimization
+        // Lower values = less memory pressure, smoother D-Pad navigation
+        drawDistance={isLowEnd ? estimatedItemSize * 2 : estimatedItemSize * 4}
       />
     </View>
   );

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback } from 'react';
+import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import { View, Dimensions } from 'react-native';
 import Animated, { SharedValue } from 'react-native-reanimated';
 import { navLog } from '../utils/navigationDebugLogger';
@@ -74,8 +74,12 @@ export const TVScrollProvider: React.FC<TVScrollProviderProps> = ({
     });
   }, [screenHeight, scrollY, scrollViewRef]);
 
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  // This is critical for TV scroll performance
+  const value = useMemo(() => ({ scrollToElement }), [scrollToElement]);
+
   return (
-    <TVScrollContext.Provider value={{ scrollToElement }}>
+    <TVScrollContext.Provider value={value}>
       {children}
     </TVScrollContext.Provider>
   );

@@ -473,9 +473,13 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     </View>
   );
 
+  // TV PERFORMANCE: Disable FadeIn animation on TV - mount animations cause frame drops during navigation
+  // On mobile, keep the nice fade effect
+  const containerEntering = isTVDevice ? undefined : FadeIn.duration(300);
+
   return (
     <>
-      <Animated.View style={[styles.itemContainer, { width: finalWidth }]} entering={FadeIn.duration(300)}>
+      <Animated.View style={[styles.itemContainer, { width: finalWidth }]} entering={containerEntering}>
         {isTVDevice ? (
           <Focusable
             style={[styles.contentItem, { width: finalWidth, aspectRatio: finalAspectRatio, borderRadius }]}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
 
 interface LoadingContextValue {
   isHomeLoading: boolean;
@@ -10,10 +10,16 @@ const LoadingContext = createContext<LoadingContextValue | undefined>(undefined)
 export const LoadingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isHomeLoading, setIsHomeLoading] = useState(true);
 
-  const value: LoadingContextValue = {
+  // Memoize the callback to maintain referential stability
+  const setHomeLoading = useCallback((loading: boolean) => {
+    setIsHomeLoading(loading);
+  }, []);
+
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  const value = useMemo<LoadingContextValue>(() => ({
     isHomeLoading,
-    setHomeLoading: setIsHomeLoading,
-  };
+    setHomeLoading,
+  }), [isHomeLoading, setHomeLoading]);
 
   return (
     <LoadingContext.Provider value={value}>

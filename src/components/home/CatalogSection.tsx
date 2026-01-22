@@ -179,9 +179,10 @@ const ViewAllCard = memo<ViewAllCardProps>(({
     </View>
   );
 
+  // TV PERFORMANCE: Disable FadeIn animation on TV - mount animations cause frame drops during navigation
   if (isTVDevice) {
     return (
-      <Animated.View style={{ width: posterWidth }} entering={FadeIn.duration(300)}>
+      <View style={{ width: posterWidth }}>
         <Focusable
           style={{ width: posterWidth, aspectRatio: 2/3, borderRadius }}
           onPress={onPress}
@@ -198,10 +199,11 @@ const ViewAllCard = memo<ViewAllCardProps>(({
         >
           {cardContent}
         </Focusable>
-      </Animated.View>
+      </View>
     );
   }
 
+  // Mobile: Keep the nice fade animation
   return (
     <Animated.View style={{ width: posterWidth }} entering={FadeIn.duration(300)}>
       <TouchableOpacity
@@ -708,7 +710,10 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(CatalogSection, (prevProps, nextProps) => {
-  // Only re-render if the catalog data or TV navigation props change
+  // Only re-render if the catalog data or structural position changes
+  // TV PERFORMANCE: Do NOT re-render when vertical navigation handles change
+  // These handles are used as optional hints - native focus engine provides fallback behavior
+  // Removing them from comparison eliminates cascading re-renders as sections mount
   return (
     prevProps.catalog.addon === nextProps.catalog.addon &&
     prevProps.catalog.id === nextProps.catalog.id &&
@@ -716,9 +721,6 @@ export default React.memo(CatalogSection, (prevProps, nextProps) => {
     prevProps.catalog.items.length === nextProps.catalog.items.length &&
     prevProps.isFirstSection === nextProps.isFirstSection &&
     prevProps.isLastSection === nextProps.isLastSection &&
-    // Vertical navigation handles - must re-render when these change
-    prevProps.prevSectionFirstItemHandle === nextProps.prevSectionFirstItemHandle &&
-    prevProps.nextSectionFirstItemHandle === nextProps.nextSectionFirstItemHandle &&
     // Deep compare the first few items to detect changes
     prevProps.catalog.items.slice(0, 3).every((item, index) =>
       nextProps.catalog.items[index] &&
