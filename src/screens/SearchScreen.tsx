@@ -49,6 +49,7 @@ import { useIsTV } from '../contexts/TVContext';
 import { Focusable } from '../components/tv/Focusable';
 import { useTVKeyEvent } from '../hooks/useTVKeyEvent';
 import { useTVFocus } from '../contexts/TVFocusContext';
+import TVSearchView from '../components/tv/TVSearchView';
 
 const { width, height } = Dimensions.get('window');
 
@@ -1124,6 +1125,74 @@ const SearchScreen = () => {
     };
   }, []);
 
+  // TV-NATIVE LAYOUT: Use compact search view optimized for TV
+  if (isTVDevice) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground, paddingLeft: 60 }]}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <TVSearchView
+          query={query}
+          onQueryChange={setQuery}
+          results={results}
+          searching={searching}
+          searched={searched}
+          recentSearches={recentSearches}
+          onRecentSearchSelect={(search) => setQuery(search)}
+          onItemPress={(item) => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+          onItemLongPress={(item) => {
+            setSelectedItem(item);
+            setMenuVisible(true);
+          }}
+          onClearSearch={handleClearSearch}
+        />
+        {/* DropUpMenu for TV */}
+        {selectedItem && (
+          <DropUpMenu
+            visible={menuVisible}
+            onClose={() => setMenuVisible(false)}
+            item={selectedItem}
+            isSaved={isSaved}
+            isWatched={isWatched}
+            onOptionSelect={async (option: string) => {
+              if (!selectedItem) return;
+              switch (option) {
+                case 'share': {
+                  let url = '';
+                  if (selectedItem.id) {
+                    url = `https://www.imdb.com/title/${selectedItem.id}/`;
+                  }
+                  const message = `${selectedItem.name}\n${url}`;
+                  Share.share({ message, url, title: selectedItem.name });
+                  break;
+                }
+                case 'library': {
+                  if (isSaved) {
+                    await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
+                    setIsSaved(false);
+                  } else {
+                    await catalogService.addToLibrary(selectedItem);
+                    setIsSaved(true);
+                  }
+                  break;
+                }
+                case 'watched': {
+                  const key = `watched:${selectedItem.type}:${selectedItem.id}`;
+                  const newWatched = !isWatched;
+                  await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
+                  setIsWatched(newWatched);
+                  break;
+                }
+                default:
+                  break;
+              }
+            }}
+          />
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  // MOBILE/TABLET LAYOUT
   return (
     <View
       style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
@@ -1145,77 +1214,7 @@ const SearchScreen = () => {
             styles.searchBarWrapper,
             { width: '100%' }
           ]}>
-            {isTVDevice ? (
-              <View
-                style={[
-                  styles.searchBar,
-                  {
-                    backgroundColor: currentTheme.colors.elevation2,
-                    borderColor: 'rgba(255,255,255,0.1)',
-                    borderWidth: 1,
-                    height: 56,
-                    borderRadius: 16,
-                  }
-                ]}
-              >
-                <Focusable
-                  onPress={() => {
-                    inputRef.current?.focus();
-                  }}
-                  onFocus={() => {
-                    // Auto-focus the TextInput when the search button receives focus
-                    inputRef.current?.focus();
-                  }}
-                  style={styles.tvSearchButton}
-                  borderRadius={12}
-                  focusScale={1.05}
-                  animateBackground={false}
-                  showFocusBorder={true}
-                  blockUp={true}
-                  nextFocusLeftId={getMenuFirstItemNodeHandle() ?? undefined}
-                  viewRef={searchButtonRef}
-                >
-                  <MaterialIcons
-                    name="search"
-                    size={28}
-                    color={currentTheme.colors.lightGray}
-                  />
-                </Focusable>
-                <TextInput
-                  style={[
-                    styles.searchInput,
-                    { color: currentTheme.colors.white, fontSize: 18 }
-                  ]}
-                  placeholder="Search movies, shows..."
-                  placeholderTextColor={currentTheme.colors.lightGray}
-                  value={query}
-                  onChangeText={setQuery}
-                  returnKeyType="search"
-                  keyboardAppearance="dark"
-                  ref={inputRef}
-                  autoFocus
-                />
-                {query.length > 0 && (
-                  <Focusable
-                    onPress={handleClearSearch}
-                    style={[styles.clearButton, { padding: 8 }]}
-                    borderRadius={20}
-                    focusScale={1.1}
-                    animateBackground={false}
-                    showFocusBorder={true}
-                    blockUp={true}
-                    nextFocusLeftId={getMenuFirstItemNodeHandle() ?? undefined}
-                  >
-                    <MaterialIcons
-                      name="close"
-                      size={24}
-                      color={currentTheme.colors.lightGray}
-                    />
-                  </Focusable>
-                )}
-              </View>
-            ) : (
-              <View
+            <View
                 style={[
                   styles.searchBar,
                   {
@@ -1258,7 +1257,6 @@ const SearchScreen = () => {
                   </TouchableOpacity>
                 )}
               </View>
-            )}
           </View>
         </View>
       </ScreenHeader>
