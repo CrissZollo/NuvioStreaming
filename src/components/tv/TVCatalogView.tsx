@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, memo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, memo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,11 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Focusable } from './Focusable';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Meta } from '../../services/stremioService';
-import { getTVDeviceCapabilities, getListRenderingConfig } from '../../utils/tvDeviceCapabilities';
-
-// Cache device capabilities
-const deviceCapabilities = getTVDeviceCapabilities();
-const listConfig = getListRenderingConfig();
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -32,6 +26,11 @@ const ROW_MARGIN_BOTTOM = 24;
 
 // Number of items per row (fills the screen width minus sidebar)
 const ITEMS_PER_ROW = Math.floor((SCREEN_WIDTH - SIDEBAR_WIDTH - CONTENT_PADDING * 2 + POSTER_SPACING) / (POSTER_WIDTH + POSTER_SPACING));
+
+// Number of rows to display per page (to limit DOM elements for smooth navigation)
+// Using 3 rows to ensure poster titles are visible above pagination controls
+const ROWS_PER_PAGE = 3;
+const ITEMS_PER_PAGE = ITEMS_PER_ROW * ROWS_PER_PAGE;
 
 // Generate year options (current year down to 1970)
 const generateYearOptions = (): string[] => {
@@ -68,6 +67,7 @@ interface PosterItemProps {
   colors: any;
   isFirstInRow: boolean;
   isLastInRow: boolean;
+  onFocus?: () => void;
 }
 
 const PosterItem = memo<PosterItemProps>(({
@@ -78,6 +78,7 @@ const PosterItem = memo<PosterItemProps>(({
   colors,
   isFirstInRow,
   isLastInRow,
+  onFocus,
 }) => {
   const optimizedPosterUrl = useMemo(() => {
     if (!item.poster || item.poster.includes('placeholder')) {
@@ -94,6 +95,7 @@ const PosterItem = memo<PosterItemProps>(({
       {/* Focusable wraps only the poster image, not the title */}
       <Focusable
         onPress={onPress}
+        onFocus={onFocus}
         style={styles.posterFocusable}
         focusScale={1.0}
         showFocusBorder={true}
@@ -130,9 +132,10 @@ interface ContentRowProps {
   rowIndex: number;
   onItemPress: (item: Meta) => void;
   colors: any;
+  onRowFocus?: () => void;
 }
 
-const ContentRow = memo<ContentRowProps>(({ items, rowIndex, onItemPress, colors }) => {
+const ContentRow = memo<ContentRowProps>(({ items, rowIndex, onItemPress, colors, onRowFocus }) => {
   return (
     <View style={styles.rowContainer}>
       <ScrollView
@@ -151,6 +154,7 @@ const ContentRow = memo<ContentRowProps>(({ items, rowIndex, onItemPress, colors
               colors={colors}
               isFirstInRow={index === 0}
               isLastInRow={index === items.length - 1}
+              onFocus={onRowFocus}
             />
           </View>
         ))}
@@ -360,6 +364,99 @@ const FilterSidebar = memo<FilterSidebarProps>(({
   );
 });
 
+// Pagination controls component
+interface PaginationControlsProps {
+  currentPage: number;
+  totalPages: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  onLoadMore?: () => void;
+  hasMoreFromServer: boolean;
+  loadingMore: boolean;
+  colors: any;
+}
+
+const PaginationControls = memo<PaginationControlsProps>(({
+  currentPage,
+  totalPages,
+  onPrevious,
+  onNext,
+  onLoadMore,
+  hasMoreFromServer,
+  loadingMore,
+  colors,
+}) => {
+  const canGoPrevious = currentPage > 1;
+  const canGoNext = currentPage < totalPages;
+  const isOnLastPage = currentPage === totalPages;
+  const showLoadMore = isOnLastPage && hasMoreFromServer && onLoadMore;
+
+  return (
+    <View style={styles.paginationContainer}>
+      {/* Previous Page button */}
+      <Focusable
+        onPress={onPrevious}
+        style={[
+          styles.paginationButton,
+          { backgroundColor: canGoPrevious ? colors.elevation2 : colors.elevation1 }
+        ]}
+        focusScale={1.0}
+        showFocusBorder={true}
+        borderRadius={6}
+        disabled={!canGoPrevious}
+      >
+        <MaterialIcons
+          name="keyboard-arrow-up"
+          size={20}
+          color={canGoPrevious ? colors.text : colors.textMuted}
+        />
+      </Focusable>
+
+      {/* Page indicator */}
+      <Text style={[styles.pageIndicatorText, { color: colors.textMuted }]}>
+        {currentPage}/{totalPages}{hasMoreFromServer ? '+' : ''}
+      </Text>
+
+      {/* Next Page button or Load More */}
+      {showLoadMore ? (
+        <Focusable
+          onPress={onLoadMore}
+          style={[styles.paginationButton, styles.loadMoreButton, { backgroundColor: colors.primary }]}
+          focusScale={1.0}
+          showFocusBorder={true}
+          borderRadius={6}
+          disabled={loadingMore}
+        >
+          <Text style={styles.loadMoreText}>
+            {loadingMore ? '...' : 'More'}
+          </Text>
+        </Focusable>
+      ) : (
+        <Focusable
+          onPress={onNext}
+          style={[
+            styles.paginationButton,
+            { backgroundColor: canGoNext ? colors.elevation2 : colors.elevation1 }
+          ]}
+          focusScale={1.0}
+          showFocusBorder={true}
+          borderRadius={6}
+          disabled={!canGoNext}
+        >
+          <MaterialIcons
+            name="keyboard-arrow-down"
+            size={20}
+            color={canGoNext ? colors.text : colors.textMuted}
+          />
+        </Focusable>
+      )}
+    </View>
+  );
+});
+
+// Calculate content row height for scroll calculations
+const CONTENT_ROW_HEIGHT = POSTER_HEIGHT + 32 + ROW_MARGIN_BOTTOM; // poster + title container + margin
+
 export const TVCatalogView: React.FC<TVCatalogViewProps> = ({
   items,
   title,
@@ -375,12 +472,25 @@ export const TVCatalogView: React.FC<TVCatalogViewProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
-  const listRef = useRef<any>(null); // FlashList ref type is complex, use any
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Internal year state if not provided externally
   const [internalYear, setInternalYear] = useState<string | undefined>(undefined);
   const effectiveYear = selectedYear !== undefined ? selectedYear : internalYear;
   const handleYearSelect = onYearSelect || setInternalYear;
+
+  // Client-side pagination state (for smooth navigation through loaded items)
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset to page 1 when filters change or items are refreshed
+  const prevItemsLengthRef = useRef(items.length);
+  useEffect(() => {
+    // Reset page when items decrease (new filter/search) or when filters change
+    if (items.length < prevItemsLengthRef.current) {
+      setCurrentPage(1);
+    }
+    prevItemsLengthRef.current = items.length;
+  }, [items.length, selectedGenre, effectiveYear]);
 
   // Filter items by year if year is selected
   const filteredItems = useMemo(() => {
@@ -392,35 +502,65 @@ export const TVCatalogView: React.FC<TVCatalogViewProps> = ({
     });
   }, [items, effectiveYear]);
 
-  // Group items into rows
+  // Calculate total pages based on filtered items
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  }, [filteredItems.length]);
+
+  // Ensure current page is valid
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // Get items for current page only (limits rendered elements for smooth D-pad navigation)
+  const pageItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredItems.slice(startIndex, endIndex);
+  }, [filteredItems, currentPage]);
+
+  // Group page items into rows
   const rows = useMemo(() => {
     const result: Meta[][] = [];
-    for (let i = 0; i < filteredItems.length; i += ITEMS_PER_ROW) {
-      result.push(filteredItems.slice(i, i + ITEMS_PER_ROW));
+    for (let i = 0; i < pageItems.length; i += ITEMS_PER_ROW) {
+      result.push(pageItems.slice(i, i + ITEMS_PER_ROW));
     }
     return result;
-  }, [filteredItems]);
+  }, [pageItems]);
 
-  // Render a single row
-  const renderRow = useCallback(({ item: rowItems, index }: { item: Meta[]; index: number }) => {
-    return (
-      <ContentRow
-        items={rowItems}
-        rowIndex={index}
-        onItemPress={onItemPress}
-        colors={colors}
-      />
-    );
-  }, [onItemPress, colors]);
+  // Page navigation handlers
+  const handlePreviousPage = useCallback(() => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  }, [currentPage]);
 
-  const keyExtractor = useCallback((item: Meta[], index: number) => `row-${index}`, []);
+  const handleNextPage = useCallback(() => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+    }
+  }, [currentPage, totalPages]);
 
-  // Handle end reached for pagination
-  const handleEndReached = useCallback(() => {
+  // Handle load more from server
+  const handleLoadMore = useCallback(() => {
     if (hasMore && onLoadMore && !loading) {
       onLoadMore();
     }
   }, [hasMore, onLoadMore, loading]);
+
+  // Handle row focus to auto-scroll and ensure title is visible
+  const handleRowFocus = useCallback((rowIndex: number) => {
+    if (scrollViewRef.current) {
+      // For the last row, scroll down extra to show the title below the poster
+      const isLastRow = rowIndex === rows.length - 1;
+      const scrollOffset = rowIndex * CONTENT_ROW_HEIGHT;
+      // Add extra offset for last row to ensure title is visible above pagination
+      const extraOffset = isLastRow ? 60 : 0;
+      scrollViewRef.current.scrollTo({ y: scrollOffset + extraOffset, animated: true });
+    }
+  }, [rows.length]);
 
   const showSidebar = genres.length > 0 || true; // Always show sidebar for year filter
 
@@ -447,19 +587,38 @@ export const TVCatalogView: React.FC<TVCatalogViewProps> = ({
         )}
 
         {filteredItems.length > 0 ? (
-          <FlashList
-            ref={listRef}
-            data={rows}
-            renderItem={renderRow}
-            keyExtractor={keyExtractor}
-            estimatedItemSize={ROW_HEIGHT + ROW_MARGIN_BOTTOM}
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.catalogContent}
+            contentContainerStyle={styles.catalogScrollContent}
             showsVerticalScrollIndicator={false}
-            scrollEnabled={false} // D-pad handles vertical navigation
-            drawDistance={listConfig.drawDistance * 2}
-            onEndReached={handleEndReached}
-            onEndReachedThreshold={0.5}
-            contentContainerStyle={styles.listContent}
-          />
+          >
+            {/* Content grid - render rows directly for better scroll control */}
+            {rows.map((rowItems, index) => (
+              <ContentRow
+                key={`page-${currentPage}-row-${index}`}
+                items={rowItems}
+                rowIndex={index}
+                onItemPress={onItemPress}
+                colors={colors}
+                onRowFocus={() => handleRowFocus(index)}
+              />
+            ))}
+
+            {/* Pagination controls - only show if more than one page or can load more */}
+            {(totalPages > 1 || hasMore) && (
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPrevious={handlePreviousPage}
+                onNext={handleNextPage}
+                onLoadMore={onLoadMore ? handleLoadMore : undefined}
+                hasMoreFromServer={hasMore || false}
+                loadingMore={loading || false}
+                colors={colors}
+              />
+            )}
+          </ScrollView>
         ) : loading ? (
           <View style={styles.loadingContainer}>
             <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading...</Text>
@@ -586,9 +745,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 24,
   },
-  listContent: {
-    paddingBottom: 40,
-  },
   rowContainer: {
     marginBottom: ROW_MARGIN_BOTTOM,
   },
@@ -640,6 +796,41 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     marginTop: 16,
+  },
+  // Catalog content wrapper
+  catalogContent: {
+    flex: 1,
+  },
+  catalogScrollContent: {
+    paddingBottom: 20,
+  },
+  // Compact pagination controls
+  paginationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 12,
+  },
+  paginationButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+  },
+  loadMoreButton: {
+    width: 'auto' as any,
+    paddingHorizontal: 12,
+  },
+  loadMoreText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  pageIndicatorText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
 
